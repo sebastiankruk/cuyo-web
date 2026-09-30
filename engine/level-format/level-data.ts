@@ -79,11 +79,13 @@ export interface LevelDef {
   /** Border descent, in steps per pixel. */
   readonly topTime: number;
   /**
-   * Cells above the bottom where the chase border comes to rest.
+   * Pixels above the bottom where the chase border comes to rest.
    *
-   * `.ld` entry `topstop`, default 0. Only read by the time-bonus animation,
-   * which is why it does not affect play: it decides how much height is left to
-   * convert into points once the level has been won.
+   * `.ld` entry `topstop`, default 0. The man page documents it as a number of
+   * pixels rather than rows, which matters because the value is subtracted from a
+   * pixel height. Only the time-bonus animation reads it, so it does not affect
+   * play: it decides how much height is left to convert into points once the
+   * level has been won.
    */
   readonly hetzrandStop: number;
   /** Expected steps between random grey blobs, or -1 for none. */

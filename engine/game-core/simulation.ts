@@ -471,11 +471,12 @@ export class Simulation {
   /**
    * Where the border comes to rest once the bonus animation is over.
    *
-   * Upstream's `unten = gric * gry - ld->mHetzrandStop`, with `topstop`
-   * defaulting to 0.
+   * Upstream's `unten = gric * gry - ld->mHetzrandStop`. `hetzrandStop` is
+   * `topstop`, which the man page documents as a number of *pixels* to stop
+   * before the bottom, not a number of rows.
    */
   bonusTargetPx(): number {
-    return GRY * GRIC - this.level.hetzrandStop * GRIC;
+    return GRY * GRIC - this.level.hetzrandStop;
   }
 
   /** True once the level is over, whatever the reason. */

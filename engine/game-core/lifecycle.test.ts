@@ -310,17 +310,26 @@ describe("5.18 winning and the time bonus", () => {
   });
 
   it("pays less when hetzrandStop leaves less height to convert", () => {
+    // `topstop` is a number of pixels, so 320 leaves ten of the twenty rows.
     const full = readyToWin(0);
     full.step();
     while (!full.isOver()) full.step();
 
-    const shortened = readyToWin(10);
+    const shortened = readyToWin(320);
     shortened.step();
     while (!shortened.isOver()) shortened.step();
 
     expect(shortened.score).toBeLessThan(full.score);
     expect(full.score).toBe(200);
     expect(shortened.score).toBe(100);
+  });
+
+  it("reads hetzrandStop as pixels, not rows", () => {
+    // Ten rows is 320px. Reading it as rows would stop the border 10 rows up for
+    // any non-zero value, which is a different number.
+    const sim = readyToWin(320);
+    expect(sim.bonusTargetPx()).toBe(GRY * GRIC - 320);
+    expect(sim.bonusTargetPx()).toBe(10 * GRIC);
   });
 
   it("pays less when the border had already descended", () => {

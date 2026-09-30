@@ -43,7 +43,7 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 
 - [x] 2.1 Implement the `.ld` lexer (comments, identifiers, words, quoted strings, numbers, punctuation, version brackets) and verify it tokenises every file in `cuyo-2.1.0/data/` without error
 - [x] 2.2 Implement the `.ld` parser for top-level and nested section definitions, and verify sections and definitions are read from a fixture matching the `example.ld` structure
-- [ ] 2.3 Implement the `*` repeat shorthand and the `<expression>` arithmetic (with `+ - * / %` over literals and defined names) and verify the man page's worked examples
+- [x] 2.3 Implement the `*` repeat shorthand and the `<expression>` arithmetic (with `+ - * / %` over literals and defined names) and verify the man page's worked examples
 - [ ] 2.4 Implement version resolution (most specific applicable subset wins) including the mutual-exclusion and exhaustiveness rules, and verify the documented `[1] [2] [easy] [hard]` examples plus the ambiguity-rejection case
 - [ ] 2.5 Implement kind declaration lists (`pics`, `greypic`, `startpic`, `emptypic`), the successive kind constants, first-use-wins naming and per-kind overrides, and verify the apple/orange/pear/banana/pineapple example from the man page
 - [ ] 2.6 Implement level-wide setting extraction with documented defaults (`toptime` 50, `chaingrass` 0, `mirror` 0, colours, `randomfallpos`, `randomgreys`, `nogreyprob`) and verify defaults apply when omitted
