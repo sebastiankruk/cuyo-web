@@ -25,8 +25,8 @@ is not). These are cheap to close and should be done before new features:
 Not started:
   5.20 the flipped coordinate system reported to Cual needs the Cual runtime
 
-Group 2: 2.1-2.5 are done and verified. The corpus test has now paid for itself
-three times over. At 2.4 it said the transcribed version rules accept every real
+Group 2: 2.1-2.7 are done and verified. The corpus test has now paid for itself
+four times over. At 2.4 it said the transcribed version rules accept every real
 level, including the fifteen `[1]`/`[2]` pairs that carry no unqualified
 definition. At 2.5 it said the kind numbering is right for all 2556 kinds in the
 corpus, and it needed `cual-constants.ts` to get there: the `neighbours_*` and
@@ -36,7 +36,10 @@ levels fail to build. The `level-format` spec's pear/orange arithmetic was wrong
 and is corrected against `cual.6`. At 2.6 the corpus said which of the twenty
 documented settings real levels actually use - all twenty - and that 81 of 237
 level reads leave the description out, so the empty default is the exception
-rather than the rule.
+rather than the rule. At 2.7 it said five levels override the neighbour mode per
+kind, covering six of the seven rectangular modes, and that no level anywhere puts
+a hex mode on a kind in a rectangular board - so the mode/geometry separation is
+asserted as an absence, and only the unit tests cover it.
 
 Groups 7, 9 and 10 have substantial code but no task is complete against its own
 bar: 7.2, 7.3, 7.9-7.11, 7.13 need Cual or the art pipeline; the rest are
