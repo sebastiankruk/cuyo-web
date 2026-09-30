@@ -15,6 +15,8 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LdLexError, decodeLatin1, tokenize } from "./lexer.ts";
+import { parseLd } from "./parser.ts";
+import type { LdNode } from "./parser.ts";
 import type { Token } from "./lexer.ts";
 
 const DATA_DIR =
@@ -224,5 +226,112 @@ describe("upstream corpus: shape of what it contains", () => {
       const { tokens } = lexFile(name);
       expect(tokens.length).toBeGreaterThan(100);
     }
+  });
+});
+
+describe("upstream corpus: the parser reads it", () => {
+  it("parses every .ld file", () => {
+    // Tokenising is not parsing. The grammar has several rules the lexer knows
+    // nothing about - dotted names rejoined from three tokens, version specifiers
+    // that may be numbers, signed numbers split across two tokens - and each one
+    // was wrong here until the corpus was run through it.
+    const failures: string[] = [];
+    let definitions = 0;
+    for (const name of ALL_LD_FILES) {
+      try {
+        definitions += parseLd(lexFile(name).source, name).definitions.length;
+      } catch (error) {
+        failures.push(`${name}: ${(error as Error).message}`);
+      }
+    }
+    expect(failures, `\n${failures.join("\n")}`).toEqual([]);
+    expect(definitions).toBeGreaterThan(100);
+  });
+
+  it("finds the constructs the resolution steps depend on", () => {
+    // Each of these is needed by a later task, and none of them appears in the
+    // inline fixtures, so the corpus is the only place they are exercised.
+    let dotted = 0;
+    let versioned = 0;
+    let repeats = 0;
+    let expressions = 0;
+    let signed = 0;
+    let numericVersions = 0;
+
+    const walk = (node: LdNode): void => {
+      if (node.type === "section") {
+        for (const def of node.definitions) {
+          // Dotted names are only reached through the picture lists here; no
+          // definition in the corpus is itself dotted, because the dot always
+          // belongs to a file name.
+          if (def.name.includes(".")) dotted++;
+          if (def.versions.length > 0) versioned++;
+          if (def.versions.some((v) => /^[0-9]+$/.test(v))) numericVersions++;
+          walk(def.value);
+        }
+        return;
+      }
+      if (node.type === "list") {
+        for (const item of node.items) {
+          if (item.type === "repeat") {
+            repeats++;
+            if (item.word.includes(".")) dotted++;
+          }
+          if (item.type === "expr") expressions++;
+          if (
+            item.type === "datum" &&
+            item.value.type === "word" &&
+            item.value.text.includes(".")
+          ) {
+            dotted++;
+          }
+          if (
+            item.type === "datum" &&
+            item.value.type === "number" &&
+            item.value.value < 0
+          ) {
+            signed++;
+          }
+          walk(item);
+        }
+        return;
+      }
+      if (node.type === "repeat") walk(node.count);
+    };
+
+    for (const name of ALL_LD_FILES) {
+      const file = parseLd(lexFile(name).source, name);
+      for (const def of file.definitions) walk(def.value);
+    }
+
+    expect(dotted, "no dotted names").toBeGreaterThan(0);
+    expect(versioned, "no versioned definitions").toBeGreaterThan(0);
+    expect(numericVersions, "no numeric [1]/[2] versions").toBeGreaterThan(0);
+    expect(repeats, "no repeat shorthand").toBeGreaterThan(0);
+    expect(expressions, "no <...> expressions").toBeGreaterThan(0);
+    expect(signed, "no negative numbers").toBeGreaterThan(0);
+  });
+
+  it("finds the Cual blocks the runtime will need", () => {
+    let blocks = 0;
+    let insideSections = 0;
+    for (const name of ALL_LD_FILES) {
+      const file = parseLd(lexFile(name).source, name);
+      blocks += file.code.length;
+      const walk = (node: LdNode): void => {
+        if (node.type === "section") {
+          blocks += node.code.length;
+          insideSections += node.code.length;
+          for (const def of node.definitions) walk(def.value);
+        } else if (node.type === "list") {
+          for (const item of node.items) walk(item);
+        } else if (node.type === "repeat") {
+          walk(node.count);
+        }
+      };
+      for (const def of file.definitions) walk(def.value);
+    }
+    expect(insideSections, "no Cual inside a section").toBeGreaterThan(70);
+    expect(blocks).toBeGreaterThan(70);
   });
 });
