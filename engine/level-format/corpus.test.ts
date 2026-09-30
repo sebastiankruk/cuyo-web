@@ -16,8 +16,9 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LdLexError, decodeLatin1, tokenize } from "./lexer.ts";
 import { parseLd } from "./parser.ts";
-import type { LdNode } from "./parser.ts";
+import type { LdDefinition, LdNode } from "./parser.ts";
 import type { Token } from "./lexer.ts";
+import { Version, VersionSet } from "./version.ts";
 
 const DATA_DIR =
   process.env["CUYO_DATA_DIR"] ??
@@ -310,6 +311,51 @@ describe("upstream corpus: the parser reads it", () => {
     expect(repeats, "no repeat shorthand").toBeGreaterThan(0);
     expect(expressions, "no <...> expressions").toBeGreaterThan(0);
     expect(signed, "no negative numbers").toBeGreaterThan(0);
+  });
+
+  it("passes the version rules on every versioned definition upstream ships", () => {
+    // Task 2.4's real oracle. The rules are transcribed from `src/version.cpp`,
+    // and this is what says the transcription is right: every `[2]` beside
+    // `[hard]` in the corpus has the joint definition the man page demands,
+    // every `[easy,hard]` is absent, and every `[1]`/`[2]` pair is legal with no
+    // unqualified definition - `baender.ld` is one, and so are fifteen others.
+    //
+    // What the corpus cannot settle is the redundancy rule, where the C++ as
+    // written and as described differ, because no shipped level is eclipsed
+    // under either reading. `version.test.ts` pins that one.
+    //
+    // `defaultPresent` is true, which is what every level setting and every
+    // section lookup upstream uses (`DatenDateiPush` passes `verlange = true`),
+    // so a name defined only for some versions is legal.
+    const failures: string[] = [];
+    let versionedNames = 0;
+    for (const name of ALL_LD_FILES) {
+      const file = parseLd(lexFile(name).source, name);
+      const check = (defs: readonly LdDefinition[], path: string): void => {
+        const set = new VersionSet<string>();
+        for (const def of defs) {
+          if (def.versions.length === 0) continue;
+          // Upstream compares the version as a set, so `a,b` and `b,a` collide.
+          set.add(def.name, Version.of(...def.versions), path);
+        }
+        for (const key of set.names()) {
+          versionedNames++;
+          try {
+            set.checkWellFormed(key, true);
+          } catch (error) {
+            failures.push(`${name} ${path}/${key}: ${(error as Error).message}`);
+          }
+        }
+        for (const def of defs) {
+          if (def.value.type === "section") {
+            check(def.value.definitions, `${path}/${def.name}`);
+          }
+        }
+      };
+      check(file.definitions, "");
+    }
+    expect(failures, `\n${failures.join("\n")}`).toEqual([]);
+    expect(versionedNames).toBeGreaterThan(20);
   });
 
   it("finds the Cual blocks the runtime will need", () => {
