@@ -751,15 +751,23 @@ export class Simulation {
     if (freeColumns.length === 0) return false;
 
     const weights = this.level.kinds.map((k) => k.greyProb);
+    const greyTotal = weights.reduce((sum, w) => sum + w, 0);
+    // Upstream rejects a level where neither greys nor `nogreyprob` are positive,
+    // so there is nothing to roll for here.
+    if (greyTotal + this.level.noGreyProb <= 0) return false;
+
     let spawned = false;
     while (this.pendingGreys > 0 && freeColumns.length > 0) {
-      // Upstream also folds `nogreyprob` into the sum so a column can get
-      // nothing at all; the weight of the empty kind models that.
-      const pick = this.random.weighted(weights);
       const column = freeColumns.splice(this.random.int(freeColumns.length), 1)[0];
       if (column === undefined) break;
+      // `nogreyprob` is a weight on *no* grey appearing, rolled per scheduled
+      // grey rather than folded into the kind weights, so it has to sit in the
+      // same draw as they do. Selecting the trailing entry is the cancel.
+      // `src/spielfeld.cpp:Spielfeld::empfangeGraue`.
+      const pick = this.random.weighted([...weights, this.level.noGreyProb]);
+      if (pick >= weights.length) continue;
       const kind = this.level.kinds[pick];
-      if (kind === undefined || kind.role !== "grey") continue;
+      if (kind === undefined) continue;
       const blob = new Blob();
       blob.initFromKind(kind);
       blob.version = this.random.int(Math.max(1, kind.versions));
