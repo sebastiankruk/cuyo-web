@@ -1,0 +1,268 @@
+:root {
+  --bg: #10131a;
+  --panel: #1a1f2b;
+  --panel-2: #232a3a;
+  --line: #2f3850;
+  --text: #e8ecf5;
+  --muted: #97a1b8;
+  --accent: #5ac8fa;
+  --accent-2: #7ee787;
+  --danger: #ff7b72;
+  --radius: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font:
+    16px/1.5 system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ shell */
+
+.shell {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: max(1.25rem, env(safe-area-inset-top)) 1rem
+    max(1.25rem, env(safe-area-inset-bottom));
+}
+
+.shell__header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.9rem;
+  letter-spacing: 0.02em;
+}
+
+.shell__header p {
+  margin: 0 0 1.5rem;
+  color: var(--muted);
+}
+
+.levels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.levelCard {
+  display: grid;
+  gap: 0.3rem;
+  width: 100%;
+  text-align: left;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  transition:
+    border-color 120ms,
+    transform 120ms;
+}
+
+.levelCard:hover,
+.levelCard:focus-visible {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.levelCard__name {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.levelCard__author {
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+.levelCard__desc {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.levelCard__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+}
+
+.levelCard__tags span {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--muted);
+}
+
+.shell__footer {
+  margin-top: 2rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* ------------------------------------------------------------------- play */
+
+.play {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  height: 100%;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+.play__hud {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.play__title {
+  display: grid;
+  line-height: 1.2;
+  min-width: 0;
+}
+
+.play__title span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.play__stats {
+  margin-left: auto;
+  display: flex;
+  gap: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+}
+
+.play__board {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 0.75rem;
+}
+
+.play__canvas {
+  width: 100%;
+  /* The board is 10x20, so exactly half as tall as it is wide. */
+  aspect-ratio: 1 / 2;
+  max-height: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  touch-action: none;
+}
+
+.play__overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.5rem;
+  background: rgb(8 10 14 / 82%);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.play__overlay h2 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.play__overlay p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.play__overlayActions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.btn {
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  border-radius: 10px;
+  padding: 0.6rem 1.1rem;
+}
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #06131a;
+  font-weight: 600;
+}
+
+.play__controls {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 1fr 1.4fr;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem 0.4rem;
+}
+
+.pad {
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  border-radius: 12px;
+  padding: 1rem 0.5rem;
+  font-size: 1.15rem;
+  min-height: 3.25rem;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pad:active {
+  background: var(--accent);
+  color: #06131a;
+}
+
+.pad--wide {
+  font-size: 0.95rem;
+}
+
+.play__dev {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.25rem 1rem 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}

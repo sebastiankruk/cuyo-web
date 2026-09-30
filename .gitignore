@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Local-only context: upstream Cuyo source, AI memory, notes, plans.
+# The directory and its own .gitignore are tracked so it exists on a fresh
+# clone; everything inside it is not.
+.context/*
+
+# Environment
+.env
+.env.local
+*.local
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

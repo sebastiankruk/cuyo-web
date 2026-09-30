@@ -1,0 +1,1 @@
+../.agents/rules/cuyo-standards.md
