@@ -25,9 +25,15 @@ is not). These are cheap to close and should be done before new features:
 Not started:
   5.20 the flipped coordinate system reported to Cual needs the Cual runtime
 
-Group 2: 2.1-2.4 are done and verified. The corpus test earned its keep again at
-2.4 - it is what says the transcribed version rules accept every real level,
-including the fifteen `[1]`/`[2]` pairs that carry no unqualified definition.
+Group 2: 2.1-2.5 are done and verified. The corpus test has now paid for itself
+three times over. At 2.4 it said the transcribed version rules accept every real
+level, including the fifteen `[1]`/`[2]` pairs that carry no unqualified
+definition. At 2.5 it said the kind numbering is right for all 2556 kinds in the
+corpus, and it needed `cual-constants.ts` to get there: the `neighbours_*` and
+behaviour names a level uses in `<...>` are supplied by the engine, not by
+`globals.ld`, so the root scope has to be seeded with them or a fifth of the
+levels fail to build. The `level-format` spec's pear/orange arithmetic was wrong
+and is corrected against `cual.6`.
 
 Groups 7, 9 and 10 have substantial code but no task is complete against its own
 bar: 7.2, 7.3, 7.9-7.11, 7.13 need Cual or the art pipeline; the rest are
@@ -49,7 +55,7 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [x] 2.2 Implement the `.ld` parser for top-level and nested section definitions, and verify sections and definitions are read from a fixture matching the `example.ld` structure
 - [x] 2.3 Implement the `*` repeat shorthand and the `<expression>` arithmetic (with `+ - * / %` over literals and defined names) and verify the man page's worked examples
 - [x] 2.4 Implement version resolution (most specific applicable subset wins) including the mutual-exclusion and exhaustiveness rules, and verify the documented `[1] [2] [easy] [hard]` examples plus the ambiguity-rejection case
-- [ ] 2.5 Implement kind declaration lists (`pics`, `greypic`, `startpic`, `emptypic`), the successive kind constants, first-use-wins naming and per-kind overrides, and verify the apple/orange/pear/banana/pineapple example from the man page
+- [x] 2.5 Implement kind declaration lists (`pics`, `greypic`, `startpic`, `emptypic`), the successive kind constants, first-use-wins naming and per-kind overrides, and verify the apple/orange/pear/banana/pineapple example from the man page
 - [ ] 2.6 Implement level-wide setting extraction with documented defaults (`toptime` 50, `chaingrass` 0, `mirror` 0, colours, `randomfallpos`, `randomgreys`, `nogreyprob`) and verify defaults apply when omitted
 - [ ] 2.7 Implement `neighbours` mode parsing including the hex-mode flag, and verify each of the ten modes resolves correctly
 - [ ] 2.8 Implement `startdist` decoding (row alignment, `.`/`+`/`-`/`*`, `distkey` version offsets, the 4- and 8-character informational last row) and verify the man page's example rows

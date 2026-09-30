@@ -108,8 +108,15 @@ kind identifiers SHALL be assigned successive integers in declaration order.
 - **THEN** apple and orange exist once each from `startpic`, orange, pear, three
   apples and banana exist from `pics`, and pineapple exists from `greypic`
 - **AND** the constant for orange is exactly one more than the constant for apple,
-  pear is one more than orange, banana is four more than pear, and pineapple is one
-  more than banana
+  pear is *two* more than orange, banana is four more than pear, and pineapple is
+  one more than banana
+
+A name that appears in more than one declaration list keeps the number its first
+appearance gave it, and the slot it would have taken in a later list is left
+unused. Pear therefore is not one more than orange: `pics` starts after the two
+`startpic` slots, `orange` claims slot 2 of it on its way past without claiming
+the number, and pear lands on 3. `cual.6` gives these four differences as 1, 2, 4
+and 1.
 
 #### Scenario: First use of a repeated name fixes its constant
 

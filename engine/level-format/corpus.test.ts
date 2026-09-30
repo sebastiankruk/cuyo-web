@@ -19,6 +19,8 @@ import { parseLd } from "./parser.ts";
 import type { LdDefinition, LdNode } from "./parser.ts";
 import type { Token } from "./lexer.ts";
 import { Version, VersionSet } from "./version.ts";
+import { DefinitionScope, rootScope } from "./scope.ts";
+import { buildKinds } from "./kinds.ts";
 
 const DATA_DIR =
   process.env["CUYO_DATA_DIR"] ??
@@ -356,6 +358,85 @@ describe("upstream corpus: the parser reads it", () => {
     }
     expect(failures, `\n${failures.join("\n")}`).toEqual([]);
     expect(versionedNames).toBeGreaterThan(20);
+  });
+
+  it("builds the kind table of every level section in the corpus", () => {
+    // Task 2.5's oracle. Kind numbering is where the level format stops being
+    // obvious - a name that appears in two declaration lists takes the number of
+    // its first appearance - so the only way to know the transcription is right
+    // is to run it over the real level data.
+    //
+    // The scope chain is the one `ladLevelConfig` produces: `globals.ld` is loaded
+    // into the same root node as the level files, and a level section's parent is
+    // that root. `<...>` expressions such as `<neighbours_hex6>` resolve through
+    // it, so a level whose kinds are built without it would fail on every hex
+    // mode in the corpus.
+    //
+    // Every version is tried, because the versioned declarations are where the
+    // numbering gets interesting: `baender.ld` has five bands in one-player and
+    // four in two-player, and both have to build.
+    const globals = parseLd(lexFile("globals.ld").source, "globals.ld");
+    const versions = [
+      Version.of("1", "main"),
+      Version.of("2", "main"),
+      Version.of("1", "main", "hard"),
+      Version.of("2", "contrib", "easy"),
+    ];
+
+    const failures: string[] = [];
+    let levels = 0;
+    let kinds = 0;
+    let constants = 0;
+
+    for (const name of ALL_LD_FILES) {
+      if (name === "summary.ld" || name === "globals.ld" || name === "example.ld") {
+        continue;
+      }
+      const file = parseLd(lexFile(name).source, name);
+      const levelSections = file.definitions.filter((d) => d.value.type === "section");
+      if (levelSections.length === 0) continue;
+
+      for (const version of versions) {
+        const root = rootScope(name, version);
+        root.defineAll(globals.definitions);
+        root.defineAll(file.definitions);
+        for (const def of levelSections) {
+          if (def.value.type !== "section") continue;
+          levels++;
+          const level = new DefinitionScope(def.name, root, version, name);
+          level.defineAll(def.value.definitions);
+          try {
+            const table = buildKinds(level, {
+              neighbours: 0,
+              chainGrass: false,
+              numExplode: 4,
+            });
+            // A kind table with holes would mean a list's slots were claimed by a
+            // list that has since shrunk, which the kind array could not index.
+            expect(
+              table.kinds.map((k) => k.id),
+              `${name} ${def.name}[${version}]: kind ids are not 0..count-1`,
+            ).toEqual(table.kinds.map((_, i) => i));
+            expect(table.count, `${name} ${def.name}: kind count`).toBe(
+              table.kinds.length,
+            );
+            kinds += table.count;
+            constants += table.constants.size;
+          } catch (error) {
+            failures.push(`${name} ${def.name}[${version}]: ${(error as Error).message}`);
+          }
+        }
+      }
+    }
+
+    expect(failures, `\n${failures.join("\n")}`).toEqual([]);
+    // Floors, not exact figures: what they say is that a large part of the corpus
+    // is being built, so a future change that makes `buildKinds` quietly skip
+    // levels cannot pass unnoticed. Four versions of every level section, which
+    // is 2556 kinds and 1184 distinct kind names.
+    expect(levels).toBeGreaterThan(300);
+    expect(kinds).toBeGreaterThan(2000);
+    expect(constants).toBeGreaterThan(1000);
   });
 
   it("finds the Cual blocks the runtime will need", () => {

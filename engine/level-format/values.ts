@@ -102,6 +102,69 @@ export interface ResolvedList {
 }
 
 /**
+ * One entry of a list as it was *written*, keeping the repeat multiplier.
+ *
+ * `ListenKnoten` keeps `VielfachheitKnoten` children and offers two ways to
+ * read them: `getLaenge` counts entries and `getImpliziteLaenge` counts
+ * repetitions. Kind numbering needs both - a name takes the number of the slot it
+ * lands in, and the counter advances by the multiplicity either way - so the
+ * structure has to survive resolution rather than be flattened away.
+ */
+export interface ResolvedRun {
+  /** The word, as written, extension and all. */
+  readonly word: string;
+  /** How many slots this entry occupies; 1 for an unmultiplied entry. */
+  readonly count: number;
+}
+
+/**
+ * Resolves a node to its list entries with multiplicities intact.
+ *
+ * Only words can be repeated, so a run is always a word; a bare number in a list
+ * becomes a one-slot run whose text is its value, which keeps the caller from
+ * having to re-check what it was handed. `Sorte::Sorte` would fail on such an
+ * entry with `assert_datatype(type_WortDatum)`, and the kind builder says so.
+ */
+export function resolveRuns(
+  node: LdNode,
+  resolve: NameResolver,
+  filename = "<input>",
+): readonly ResolvedRun[] {
+  if (node.type === "section") {
+    throw new LdParseError(
+      "expected a list of values but found a section",
+      node.pos.line,
+      node.pos.col,
+      filename,
+    );
+  }
+  if (node.type === "expr") {
+    return [{ word: String(evaluate(node, resolve, filename)), count: 1 }];
+  }
+  if (node.type === "datum") {
+    return [{ word: runWord(node.value), count: 1 }];
+  }
+  if (node.type === "repeat") {
+    return [{ word: node.word, count: repeatCount(node, resolve, filename) }];
+  }
+  const out: ResolvedRun[] = [];
+  for (const item of node.items) out.push(...resolveRuns(item, resolve, filename));
+  return out;
+}
+
+/** The text of a value, as `runWord` needs it. */
+function runWord(value: LdValue): string {
+  return value.type === "number" ? String(value.value) : value.text;
+}
+
+/** `getImpliziteLaenge`: the number of slots a list of runs occupies. */
+export function implicitLength(runs: readonly ResolvedRun[]): number {
+  let total = 0;
+  for (const run of runs) total += run.count;
+  return total;
+}
+
+/**
  * Resolves a node to a list of plain values.
  *
  * A `repeat` expands to `count` copies of its word, matching
