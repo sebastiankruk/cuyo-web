@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dev:host": "vite --port 5173 --strictPort --host 127.0.0.1"
   },
   "dependencies": {
     "react": "^19.3.0",

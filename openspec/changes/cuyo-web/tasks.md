@@ -1,3 +1,36 @@
+<!--
+Reconciliation note (group 5, after the first playable build)
+
+Work was done ahead of the plan order to get a playable build, so the checkboxes
+lagged. On review, a task counts as done only when the implementation exists AND
+the verification it names exists and passes. That is a stricter bar than
+"the code is written", and several items fall short of it.
+
+Fully done and verified: 5.1-5.5, 5.9, 5.10, 5.14.
+
+Implemented but the named verification is missing (the code is present; the test
+is not). These are cheap to close and should be done before new features:
+  5.6  border clamp on descent is untested
+  5.7  the mirror-aware blob-order swap has no test (no mirrored fixture)
+  5.8  the horizontal split and vertical bottom-first order are not directly tested
+  5.11 the 12-blob chain-reaction case and the spawn offset are untested
+  5.12 no simulation-level test of the random-grey arrival rate
+  5.13 no test that a floating blob declines to fall
+  5.15 the spawn gate is not directly tested
+  5.16 loss on an unspawnable piece is not directly tested
+  5.17 the exact 2-normal + 1-goal = 22 point case is untested
+  5.18 win detection and the 300-point time-bonus case are untested
+  5.19 restart works; the introduction state does not exist
+
+Not started:
+  5.20 the flipped coordinate system reported to Cual needs the Cual runtime
+
+Groups 7, 9 and 10 have substantial code but no task is complete against its own
+bar: 7.2, 7.3, 7.9-7.11, 7.13 need Cual or the art pipeline; the rest are
+implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
+10 is 0/11.
+-->
+
 ## 1. Project Setup and Toolchain
 
 - [x] 1.1 Scaffold a Vite + React + TypeScript app at `cuyo-web/` and verify `npm run dev` serves it and `npm run build` produces `dist/`
@@ -55,20 +88,20 @@
 
 ## 5. Game Core
 
-- [ ] 5.1 Implement the seeded PRNG and route every random draw in the simulation through the single instance, and verify two runs with the same seed and inputs produce identical state at every step
-- [ ] 5.2 Implement the board as a 10x20 grid of blob records with kind, version, weight, behaviour bits and per-blob variable storage, and verify coordinate bounds for all accesses
-- [ ] 5.3 Implement the neighbour offset tables for all ten modes ported from `NachbarIterator::setXY`, and verify each mode's offsets against the C++ source
-- [ ] 5.4 Implement hex column offsetting for the three hex modes and verify odd columns are offset half a cell and the diagonal directions follow
-- [ ] 5.5 Implement connection computation including same-kind, neighbour mode and `inhibit`, and verify inhibition and kind mismatch both break a connection
+- [x] 5.1 Implement the seeded PRNG and route every random draw in the simulation through the single instance, and verify two runs with the same seed and inputs produce identical state at every step
+- [x] 5.2 Implement the board as a 10x20 grid of blob records with kind, version, weight, behaviour bits and per-blob variable storage, and verify coordinate bounds for all accesses
+- [x] 5.3 Implement the neighbour offset tables for all ten modes ported from `NachbarIterator::setXY`, and verify each mode's offsets against the C++ source
+- [x] 5.4 Implement hex column offsetting for the three hex modes and verify odd columns are offset half a cell and the diagonal directions follow
+- [x] 5.5 Implement connection computation including same-kind, neighbour mode and `inhibit`, and verify inhibition and kind mismatch both break a connection
 - [ ] 5.6 Implement the falling piece: spawn at column 4, descent at 6 and 32 px/step, clamping at the chase border, and verify the spawn position and descent rates
 - [ ] 5.7 Implement steering, rotation with the mirror-aware blob order swap, and fast-fall toggle, all rejected when blocked, and verify each accepted and rejected case
 - [ ] 5.8 Implement landing, including vertical pieces landing bottom-first and horizontal pieces splitting so the free blob continues falling, and verify both cases
-- [ ] 5.9 Implement component computation summing `weight`, and verify a 2+3+1 component reports size 6 to all members
-- [ ] 5.10 Implement explosion resolution: size threshold, `explodes_on_size` gating, grass and grey propagation with `chaingrass`, chain-reaction flagging and the 8-step exploding state, and verify every case in the spec including chain-grass resistance
+- [x] 5.9 Implement component computation summing `weight`, and verify a 2+3+1 component reports size 6 to all members
+- [x] 5.10 Implement explosion resolution: size threshold, `explodes_on_size` gating, grass and grey propagation with `chaingrass`, chain-reaction flagging and the 8-step exploding state, and verify every case in the spec including chain-grass resistance
 - [ ] 5.11 Implement grey generation using the documented formula and random placement at `hetzrand + 8px`, and verify the 1 and 12 blob cases
 - [ ] 5.12 Implement random grey arrivals at the configured expected interval, and verify the observed rate over a long run
 - [ ] 5.13 Implement gravity with the `floats` behaviour respected and empty cells unaffected, and verify settling after a mid-column removal
-- [ ] 5.14 Implement the chase border descending one pixel per `toptime` steps and killing on contact, and verify the default 1600-steps-per-cell rate and the loss condition
+- [x] 5.14 Implement the chase border descending one pixel per `toptime` steps and killing on contact, and verify the default 1600-steps-per-cell rate and the loss condition
 - [ ] 5.15 Implement the mode machine (test-explosion, explode, settle, new-grey, new-piece, wait-for-stop) including the `neues_fall_platz` spawn gate, and verify a new piece is held back while grey blobs are still high
 - [ ] 5.16 Implement loss when a new piece cannot spawn, and verify the level ends immediately
 - [ ] 5.17 Implement scoring (1 normal, 20 goal, 10 chain, 10 time-bonus step) and verify the mixed 22-point case
