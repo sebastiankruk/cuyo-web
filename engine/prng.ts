@@ -33,6 +33,13 @@ export interface RandomSource {
   pick<T>(items: readonly T[]): T | undefined;
   /** Picks an index from non-negative weights. */
   weighted(weights: readonly number[]): number;
+  /**
+   * Restores the source to the state it had when it was created.
+   *
+   * A restarted level calls this, so a replay is defined by its seed rather
+   * than by however many values the previous game happened to consume.
+   */
+  restart(): void;
 }
 
 /**
@@ -44,6 +51,7 @@ export interface RandomSource {
  */
 export class Prng implements RandomSource {
   private state: number;
+  private readonly initialState: number;
 
   /** @param seed any non-empty array of 32-bit integers. */
   constructor(seed: Seed) {
@@ -58,6 +66,7 @@ export class Prng implements RandomSource {
       s = Math.imul(s, 0x9e3779b1) | 0;
     }
     this.state = s === 0 ? 0x6d2b79f5 : s;
+    this.initialState = this.state;
   }
 
   /**
@@ -128,6 +137,11 @@ export class Prng implements RandomSource {
   /** Restores a state captured by {@link saveState}. */
   restoreState(state: number): void {
     this.state = state | 0;
+  }
+
+  /** Rewinds to the seeded starting state. See {@link RandomSource.restart}. */
+  restart(): void {
+    this.state = this.initialState;
   }
 }
 

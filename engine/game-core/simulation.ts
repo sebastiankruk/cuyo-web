@@ -11,6 +11,7 @@
  */
 
 import {
+  BONUS_SPEED,
   CALCULATE_SIZE,
   EXPLODES_ON_CHAIN_REACTION,
   EXPLODES_ON_EXPLOSION,
@@ -40,6 +41,26 @@ import type { RandomSource } from "../prng.ts";
 
 /** Orientation of the falling piece. */
 export type Orientation = "horizontal" | "vertical" | "single";
+
+/**
+ * The single blob left over after a horizontal piece splits.
+ *
+ * `src/fall.cpp:Fall::halbiere` advances the column and switches the piece to
+ * `richtung_einzel`. A single piece always falls at the fast rate, so the fast
+ * flag is inherited from the piece rather than forced on.
+ */
+function survivingHalf(
+  attempted: FallPiece,
+  x: number,
+  blob: Blob,
+): FallPiece {
+  return {
+    ...attempted,
+    x,
+    orientation: "single",
+    blobs: [blob, blob],
+  };
+}
 
 export interface FallPiece {
   /** Column of the left blob, or of the lone blob when `single`. */
@@ -104,9 +125,16 @@ export class Simulation {
     this.reset();
   }
 
-  /** Rebuilds the board from the level's start layout and clears counters. */
+  /**
+   * Rebuilds the board from the level's start layout and clears counters.
+   *
+   * The random source is rewound too, not just the board: a restart has to
+   * replay the same sequence, otherwise the same seed would give a different
+   * second game depending on how long the first one lasted.
+   */
   reset(): void {
     this.board.clear();
+    this.random.restart();
     this.score = 0;
     this.time = 0;
     this.borderPx = 0;
@@ -210,17 +238,54 @@ export class Simulation {
     this.phase = "falling";
   }
 
-  private fits(piece: FallPiece): boolean {
-    for (const p of this.piecePositions(piece)) {
-      if (p.x < 0 || p.x >= GRX) return false;
-      if (p.y >= GRY) return false;
-      if (p.y < 0) continue;
-      for (let y = p.y; y >= 0; y--) {
-        const blob = this.board.at(p.x, y);
-        if (blob !== null && !floats(blob)) return false;
-      }
+/**
+ * `src/blopgitter.cpp:BlopGitter::testPlatzSpalte`.
+ *
+ * True when a blob may occupy column `x` at row `y`. The cell itself must be
+ * free, and the first blob above it must float *and* be separated by at least
+ * one empty cell - so a blob sitting directly overhead blocks, which is what
+ * stops a piece from being steered in under a stack.
+ */
+  private canOccupy(x: number, y: number): boolean {
+    if (x < 0 || x >= GRX) return false;
+    if (y >= GRY) return false;
+    let separated = false;
+    for (let row = y; row >= 0; row--) {
+      const blob = this.board.at(x, row);
+      if (blob !== null) return separated && floats(blob);
+      separated = true;
     }
     return true;
+  }
+
+  /**
+   * Which halves of `piece` cannot descend, as a pair of flags.
+   *
+   * `src/fall.cpp:Fall::testBelegt` returns a bitmask of the blocked halves, and
+   * the split on landing is decided from that - not from whether each half has
+   * something underneath it. The two differ whenever a half is stopped by a
+   * blob in its own cell with clear space below, and using the wrong one leaves
+   * the piece wedged with neither half able to land.
+   */
+  private blockedHalves(piece: FallPiece): { zero: boolean; one: boolean } {
+    const positions = this.piecePositions(piece);
+    const blocked = (i: number): boolean => {
+      const p = positions[i];
+      return p === undefined ? false : !this.canOccupy(p.x, p.y);
+    };
+    const zero = blocked(0);
+    const one = blocked(1);
+    // A vertical piece has one blob resting on the other, so if either is
+    // blocked the whole piece stops.
+    if (piece.orientation === "vertical" && (zero || one)) {
+      return { zero: true, one: true };
+    }
+    return { zero, one };
+  }
+
+  private fits(piece: FallPiece): boolean {
+    const blocked = this.blockedHalves(piece);
+    return !blocked.zero && !blocked.one;
   }
 
   /**
@@ -313,7 +378,7 @@ export class Simulation {
     if (this.phase === "won" || this.phase === "lost") return;
 
     if (this.phase === "timeBonus") {
-      this.score += POINTS_PER_TIME_BONUS;
+      this.stepTimeBonus();
       return;
     }
 
@@ -365,22 +430,61 @@ export class Simulation {
     };
 
     if (!this.fits(dropped)) {
-      this.land(piece);
+      this.land(piece, dropped);
       return;
     }
     this.fall = dropped;
   }
 
   /**
+   * One step of the time-bonus animation: pay out, then rush the border down.
+   *
+   * `src/cuyo.cpp:bonusAnimationSchritt` and `src/spielfeld.cpp:bonusSchritt`.
+   * The border is what makes the animation finite, so it also decides how long
+   * the payout lasts: a level won early has further to fall and so scores more.
+   * The last step both pays out and stops, matching upstream awarding the points
+   * before it tests `ba_fertig`.
+   */
+  private stepTimeBonus(): void {
+    this.score += POINTS_PER_TIME_BONUS;
+    const target = this.bonusTargetPx();
+    this.borderPx = Math.min(this.borderPx + BONUS_SPEED, target);
+    if (this.borderPx >= target) this.phase = "won";
+  }
+
+  /**
+   * Where the border comes to rest once the bonus animation is over.
+   *
+   * Upstream's `unten = gric * gry - ld->mHetzrandStop`, with `topstop`
+   * defaulting to 0.
+   */
+  bonusTargetPx(): number {
+    return GRY * GRIC - this.level.hetzrandStop * GRIC;
+  }
+
+  /** True once the level is over, whatever the reason. */
+  isOver(): boolean {
+    return this.phase === "won" || this.phase === "lost";
+  }
+
+  /**
    * Settles the piece into the board.
    *
-   * A vertical piece lands as a unit. A horizontal piece whose halves are
-   * supported unevenly commits only the supported half and continues falling as
-   * a single blob, which is `src/fall.cpp:Fall::spielSchrittPlatziertIntern`.
+   * `src/fall.cpp:Fall::spielSchrittPlatziertIntern`. The blocked mask is taken
+   * from the position the piece *failed* to reach, while the committed blobs go
+   * where the piece actually is - the drop was refused, so the piece rests where
+   * it stopped. The surviving half of a split adopts the attempted position, so
+   * it carries straight on without visibly pausing.
    */
-  private land(piece: FallPiece): void {
+  private land(piece: FallPiece, attempted: FallPiece): void {
     const positions = this.piecePositions(piece);
-    const supported = positions.map((p) => this.isSupported(p.x, p.y));
+
+    if (piece.orientation === "single") {
+      const p = positions[0];
+      if (p !== undefined) this.commit(p, piece, 0);
+      this.fall = null;
+      return;
+    }
 
     if (piece.orientation === "vertical") {
       // Blob 1 is the lower of the pair, and upstream fixes the lower one first.
@@ -391,54 +495,28 @@ export class Simulation {
       return;
     }
 
-    if (piece.orientation === "single") {
-      const p = positions[0];
-      if (p !== undefined) this.commit(p, piece, 0);
-      this.fall = null;
-      return;
-    }
-
     const left = positions[0] as { x: number; y: number };
     const right = positions[1] as { x: number; y: number };
-    const leftSupported = supported[0] === true;
-    const rightSupported = supported[1] === true;
+    const blocked = this.blockedHalves(attempted);
 
-    if (leftSupported && rightSupported) {
+    if (blocked.zero === blocked.one) {
+      // Both halves stop, or - which landing cannot produce - neither does.
+      // Committing both keeps the game moving instead of wedging the piece.
       this.commit(left, piece, 0);
       this.commit(right, piece, 1);
       this.fall = null;
       return;
     }
-    if (leftSupported) {
-      // The right blob survives and keeps its own column.
+
+    if (blocked.zero) {
+      // The left half is stuck; the right one carries on in its own column.
       this.commit(left, piece, 0);
-      this.fall = {
-        ...piece,
-        x: piece.x + 1,
-        orientation: "single",
-        blobs: [piece.blobs[1], piece.blobs[1]],
-        fast: true,
-      };
+      this.fall = survivingHalf(attempted, piece.x + 1, piece.blobs[1]);
       return;
     }
-    if (rightSupported) {
-      // The left blob survives and keeps its own column.
-      this.commit(right, piece, 1);
-      this.fall = {
-        ...piece,
-        x: piece.x,
-        orientation: "single",
-        blobs: [piece.blobs[0], piece.blobs[0]],
-        fast: true,
-      };
-    }
-  }
-
-  /** True when the cell cannot fall further because of support or the border. */
-  private isSupported(x: number, y: number): boolean {
-    if (y >= GRY - 1) return true;
-    if (y + 1 <= this.borderRow()) return true;
-    return this.board.at(x, y + 1) !== null;
+    // The right half is stuck; the left one carries on where it already is.
+    this.commit(right, piece, 1);
+    this.fall = survivingHalf(attempted, piece.x, piece.blobs[0]);
   }
 
   /**

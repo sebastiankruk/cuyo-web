@@ -30,6 +30,12 @@ export class ScriptedPrng implements RandomSource {
     }
   }
 
+  /** Rewinds to the first scripted value. */
+  restart(): void {
+    this.index = 0;
+    this.drawn.length = 0;
+  }
+
   /** How many values have been consumed. */
   get consumed(): number {
     return this.index;
@@ -134,6 +140,17 @@ export class RecordingPrng implements RandomSource {
   /** Every recorded call to `method`, in order. */
   callsTo(method: string): DrawRecord[] {
     return this.log.filter((entry) => entry.method === method);
+  }
+
+  /**
+   * Forwards the restart to the wrapped source.
+   *
+   * The log is deliberately kept, so a test can still see the calls made during
+   * the first game. Reading it after a restart means reading past the restart
+   * point, which is what lets a test compare the two games.
+   */
+  restart(): void {
+    this.inner.restart();
   }
 }
 

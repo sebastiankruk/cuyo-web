@@ -50,6 +50,13 @@ export const GREY_SPAWN_OFFSET_PX = 8;
 export const FALLING_SPEED = 6;
 export const FALLING_FAST_SPEED = GRIC;
 
+/**
+ * How far the chase border travels per time-bonus step.
+ *
+ * `leveldaten.h:#define bonus_geschwindigkeit 32`, i.e. one cell per step.
+ */
+export const BONUS_SPEED = 32;
+
 /** `src/leveldaten.cpp`: default `toptime`, in steps per pixel of border travel. */
 export const DEFAULT_TOPTIME = 50;
 

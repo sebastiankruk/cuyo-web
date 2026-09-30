@@ -338,6 +338,17 @@ Scoring requirement.
   heights
 - **THEN** the run with more remaining height awards more time-bonus points
 
+#### Scenario: The bonus animation ends when the border reaches its rest row
+
+- **WHEN** the time-bonus animation runs until the chase border has descended to
+  `hetzrandStop` cells above the bottom
+- **THEN** the level becomes won, having paid out 10 points for every step of the
+  animation including the one that lands the border there
+
+The animation advances the border by one cell per step, so it lasts at most one
+step per board row: winning with the border still at the top pays out 200
+points, and any `hetzrandStop` above zero shortens it.
+
 ### Requirement: Scoring
 
 The score SHALL increase by 1 per exploded non-goal blob, 20 per exploded goal
@@ -351,8 +362,10 @@ decrease during a level.
 
 #### Scenario: Time bonus accrues over the animation
 
-- **WHEN** the time-bonus animation runs for 30 steps
-- **THEN** the player's score increases by 300
+- **WHEN** the time-bonus animation runs to completion with the chase border
+  still at the top of a board whose `hetzrandStop` is 0
+- **THEN** the player's score increases by 200, one step of 10 points for each of
+  the 20 rows the border descends
 
 ### Requirement: Deterministic randomness
 

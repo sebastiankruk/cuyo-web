@@ -93,9 +93,9 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [x] 5.3 Implement the neighbour offset tables for all ten modes ported from `NachbarIterator::setXY`, and verify each mode's offsets against the C++ source
 - [x] 5.4 Implement hex column offsetting for the three hex modes and verify odd columns are offset half a cell and the diagonal directions follow
 - [x] 5.5 Implement connection computation including same-kind, neighbour mode and `inhibit`, and verify inhibition and kind mismatch both break a connection
-- [ ] 5.6 Implement the falling piece: spawn at column 4, descent at 6 and 32 px/step, clamping at the chase border, and verify the spawn position and descent rates
-- [ ] 5.7 Implement steering, rotation with the mirror-aware blob order swap, and fast-fall toggle, all rejected when blocked, and verify each accepted and rejected case
-- [ ] 5.8 Implement landing, including vertical pieces landing bottom-first and horizontal pieces splitting so the free blob continues falling, and verify both cases
+- [x] 5.6 Implement the falling piece: spawn at column 4, descent at 6 and 32 px/step, clamping at the chase border, and verify the spawn position and descent rates
+- [x] 5.7 Implement steering, rotation with the mirror-aware blob order swap, and fast-fall toggle, all rejected when blocked, and verify each accepted and rejected case
+- [x] 5.8 Implement landing, including vertical pieces landing bottom-first and horizontal pieces splitting so the free blob continues falling, and verify both cases
 - [x] 5.9 Implement component computation summing `weight`, and verify a 2+3+1 component reports size 6 to all members
 - [x] 5.10 Implement explosion resolution: size threshold, `explodes_on_size` gating, grass and grey propagation with `chaingrass`, chain-reaction flagging and the 8-step exploding state, and verify every case in the spec including chain-grass resistance
 - [ ] 5.11 Implement grey generation using the documented formula and random placement at `hetzrand + 8px`, and verify the 1 and 12 blob cases
