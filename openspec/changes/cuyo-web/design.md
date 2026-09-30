@@ -350,6 +350,31 @@ rather than merely intended.
   by versioning the cache name with the build hash and using a skipWaiting plus
   clients.claim flow with a reload prompt.
 
+## Known divergences from upstream
+
+Each of these was found by transcribing a test against the C++ source and
+noticing the port disagreed. They are listed rather than silently corrected,
+because each is a judgement call and the reason should survive review.
+
+- **Losing when a piece cannot be introduced.** Upstream's `Fall::insSpiel`
+  simply fails: the piece is not sent, the field carries on with none, and the
+  chase border eventually catches something. This port ends the level at once
+  instead (task 5.16). Immediate loss is clearer to a player than a board that
+  mysteriously stops accepting pieces, and the border would have ended the level
+  within a few seconds anyway.
+- **Mode transitions are collapsed into a single step.** Upstream spends one
+  80 ms step per transition through test-explosion, settle and new-grey. This
+  port runs them in one step, guarded at eight iterations, which keeps a piece
+  cycle close to its true length. The visible consequence is that rules which
+  mean "wait one more step" - notably `neues_fall_platz`, which withholds a piece
+  while blobs are still settling above the spawn margin - have little to attach
+  to. The mechanism is ported faithfully and exposed as `isHeldBack()`, but its
+  effect is not reliably observable at step granularity, so the tests pin the
+  mechanism and the fit gate rather than a step count.
+- **The mirror flag is only partly honoured.** Geometry and the rotation swap
+  respect it, but the Cual-facing coordinate system does not mirror yet; that
+  is task 5.20.
+
 ## Migration Plan
 
 Not applicable in the deployment sense - this is a new static application with no

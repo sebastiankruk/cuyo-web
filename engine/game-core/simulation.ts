@@ -117,6 +117,11 @@ export class Simulation {
   phase: Phase = "falling";
   /** True when the current resolution pass is a chain reaction. */
   chainReaction = false;
+  /**
+   * Set by the last gravity pass when a blob came to rest above the spawn
+   * margin, which withholds a new piece. Mirrors `rutschnach_viel`.
+   */
+  private settledAboveMargin = false;
 
   constructor(level: LevelDef, options: SimulationOptions = {}) {
     this.level = level;
@@ -142,6 +147,7 @@ export class Simulation {
     this.greyCount = 0;
     this.goalCount = 0;
     this.chainReaction = false;
+    this.settledAboveMargin = false;
     this.phase = "falling";
 
     const dist = this.level.startDist;
@@ -226,13 +232,16 @@ export class Simulation {
   private spawnPiece(): void {
     const piece = this.next;
     if (piece === null) return;
-    // Held back until everything has dropped clear of the margin below the border.
+    // Upstream sets the entry position *before* testing it (`Fall::insSpiel`).
+    // Testing the position the piece happened to be created at instead would
+    // test a row the piece is not going to occupy, and let it be introduced into
+    // cells that are already taken.
+    piece.yPx = this.borderPx - GRIC;
     if (!this.canSpawn(piece)) {
       this.phase = "lost";
       this.fall = null;
       return;
     }
-    piece.yPx = this.borderPx - GRIC;
     this.fall = piece;
     this.next = this.makePiece();
     this.phase = "falling";
@@ -291,18 +300,25 @@ export class Simulation {
   /**
    * True when `piece` may be introduced.
    *
-   * Upstream holds a new piece back until the field has drained clear of
-   * `NEW_FALL_MARGIN` cells below the border, so a tall stack of grey blobs
-   * delays the next piece rather than ending the game.
+   * `src/fall.cpp:Fall::insSpiel` is only a fit test: the piece goes in at
+   * `hetzrand - gric` unless `testBelegt` refuses. Whether a piece is *ready* to
+   * be introduced is a separate question, answered during the gravity pass - see
+   * {@link settledAboveMargin}.
    */
   private canSpawn(piece: FallPiece): boolean {
-    if (!this.fits(piece)) return false;
-    const limit = this.borderRow() + NEW_FALL_MARGIN;
-    for (const p of this.piecePositions(piece)) {
-      if (p.y >= limit) continue;
-      if (this.board.at(p.x, p.y) !== null) return false;
-    }
-    return true;
+    return this.fits(piece);
+  }
+
+  /**
+   * Row above which a settling blob still counts as "not low enough".
+   *
+   * `hya + neues_fall_platz` from `Spielfeld::rutschNach`, where `hya` is the
+   * row greys appear in.
+   */
+  private spawnMarginRow(): number {
+    return (
+      Math.floor((this.borderPx + GREY_SPAWN_OFFSET_PX) / GRIC) + NEW_FALL_MARGIN
+    );
   }
 
   /** The cells a piece currently occupies. */
@@ -465,6 +481,18 @@ export class Simulation {
   /** True once the level is over, whatever the reason. */
   isOver(): boolean {
     return this.phase === "won" || this.phase === "lost";
+  }
+
+  /**
+   * True when the last gravity pass left a blob above the spawn margin, which
+   * withholds the next piece.
+   *
+   * Upstream reports this as `rutschnach_viel`. It is exposed because the mode
+   * machine here collapses several upstream steps into one, so the flag's effect
+   * is not always visible at step granularity and would otherwise be untestable.
+   */
+  isHeldBack(): boolean {
+    return this.settledAboveMargin;
   }
 
   /**
@@ -682,6 +710,13 @@ export class Simulation {
           this.phase = "timeBonus";
           return;
         }
+        // Upstream stays in `modus_neue_graue` while `rutschnach_viel` is
+        // reported, giving the field another step to come down before a piece is
+        // sent. Returning to `settling` is the equivalent here.
+        if (this.settledAboveMargin) {
+          this.phase = "settling";
+          continue;
+        }
         this.spawnPiece();
         continue;
       }
@@ -715,9 +750,17 @@ export class Simulation {
    * Lets blobs fall one cell where there is room.
    *
    * Returns true when anything moved. Blobs marked as floating stay put.
+   *
+   * A blob that comes to rest above the spawn margin sets
+   * {@link settledAboveMargin}, which is how upstream's `rutschnach_viel` keeps a
+   * new piece from being sent while the field is still draining. Without this
+   * the margin would never apply, because a blob sitting in the row a piece
+   * spawns into has already been caught by the chase border first.
    */
   private applyGravity(): boolean {
     let moved = false;
+    this.settledAboveMargin = false;
+    const margin = this.spawnMarginRow();
     for (let y = GRY - 1; y >= 0; y--) {
       for (let x = 0; x < GRX; x++) {
         const blob = this.board.at(x, y);
@@ -728,6 +771,7 @@ export class Simulation {
         this.board.set(x, y + 1, blob);
         this.board.set(x, y, null);
         moved = true;
+        if (y + 1 < margin) this.settledAboveMargin = true;
       }
     }
     return moved;

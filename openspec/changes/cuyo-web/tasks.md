@@ -102,11 +102,11 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [x] 5.12 Implement random grey arrivals at the configured expected interval, and verify the observed rate over a long run
 - [x] 5.13 Implement gravity with the `floats` behaviour respected and empty cells unaffected, and verify settling after a mid-column removal
 - [x] 5.14 Implement the chase border descending one pixel per `toptime` steps and killing on contact, and verify the default 1600-steps-per-cell rate and the loss condition
-- [ ] 5.15 Implement the mode machine (test-explosion, explode, settle, new-grey, new-piece, wait-for-stop) including the `neues_fall_platz` spawn gate, and verify a new piece is held back while grey blobs are still high
-- [ ] 5.16 Implement loss when a new piece cannot spawn, and verify the level ends immediately
-- [ ] 5.17 Implement scoring (1 normal, 20 goal, 10 chain, 10 time-bonus step) and verify the mixed 22-point case
-- [ ] 5.18 Implement win detection on zero goal blobs and the time-bonus animation at 10 points per step, and verify the 300-point case
-- [ ] 5.19 Implement the level lifecycle (intro, running, won/lost/bonus-complete) and restart with a fresh board, score and random sequence, and verify a restart matches the initial layout
+- [x] 5.15 Implement the mode machine (test-explosion, explode, settle, new-grey, new-piece, wait-for-stop) including the `neues_fall_platz` spawn gate, and verify a new piece is held back while grey blobs are still high
+- [x] 5.16 Implement loss when a new piece cannot spawn, and verify the level ends immediately
+- [x] 5.17 Implement scoring (1 normal, 20 goal, 10 chain, 10 time-bonus step) and verify the mixed 22-point case
+- [x] 5.18 Implement win detection on zero goal blobs and the time-bonus animation at 10 points per step, and verify the 300-point case
+- [x] 5.19 Implement the level lifecycle (intro, running, won/lost/bonus-complete) and restart with a fresh board, score and random sequence, and verify a restart matches the initial layout
 - [ ] 5.20 Implement `mirror` level support including the flipped coordinate system reported to Cual, and verify `loc_x`/`loc_y` are mirrored
 
 ## 6. Level Catalog
