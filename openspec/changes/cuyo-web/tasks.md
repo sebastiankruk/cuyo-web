@@ -196,7 +196,7 @@ untested files; the per-table tests are what protect fidelity, so both are neede
 
 - [x] 13.1 Test every neighbour-mode offset table against upstream's own `bx`/`by` digit strings from `NachbarIterator::setXY`, including the shifted and unshifted hex columns, and verify all ten modes are covered
 - [x] 13.2 Test `connected` and component computation for each neighbour mode, and verify inhibition breaks a connection in the suppressing blob's own frame only
-- [ ] 13.3 Extract the renderer's pure geometry, colour derivation and cell-origin maths into canvas-free functions and unit-test them in Node, verifying hex column offsets and mirrored cell origins
+- [x] 13.3 Extract the renderer's pure geometry, colour derivation and cell-origin maths into canvas-free functions and unit-test them in Node, verifying hex column offsets and mirrored cell origins
 - [ ] 13.4 Drive the frame loop's accumulator with an injected clock and verify it executes one step per 80 ms, clamps a long backlog rather than fast-forwarding, and honours pause
 - [ ] 13.5 Add behaviour tests for input timing under a DOM environment: immediate move, delayed repeat, repeat rate, and cancellation on the opposite direction
 - [ ] 13.6 Set coverage thresholds in the test config at the levels in design.md decision 12 and verify the suite fails when a file is left untested
