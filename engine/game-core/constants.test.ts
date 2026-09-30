@@ -14,7 +14,8 @@ import { describe, expect, it } from "vitest";
 import {
   GRX,
   NeighbourMode,
-  hexShift,
+  columnShift,
+  hexGeometry,
   isHexMode,
   neighbourOffsets,
 } from "./constants.ts";
@@ -97,13 +98,67 @@ describe("neighbourOffsets: knight offsets are real knight moves", () => {
 });
 
 describe("hex modes", () => {
-  it("offsets odd columns only, and only in hex modes", () => {
+  // A hex board with the default `hexflip = 0`: odd columns are offset, so column
+  // 1 takes the shifted digit row and column 0 the unshifted one.
+  const HEX = hexGeometry(NeighbourMode.Hex6);
+
+  it("offsets odd columns only, and only in a hex board", () => {
+    // The board's geometry, not a blob's mode: `LevelDaten::ladLevel` reads
+    // `mSechseck` from the level-wide `neighbours` and `getHexShift` reads that,
+    // so a kind asking for hex six in a rectangular board still draws square.
     for (const x of [0, 1, 2, 3]) {
-      expect(hexShift(NeighbourMode.Rect, x)).toBe(false);
-      expect(hexShift(NeighbourMode.Eight, x)).toBe(false);
-      expect(hexShift(NeighbourMode.Hex6, x)).toBe(x % 2 === 1);
-      expect(hexShift(NeighbourMode.Hex4, x)).toBe(x % 2 === 1);
+      expect(columnShift(hexGeometry(NeighbourMode.Rect), false, x)).toBe(false);
+      expect(columnShift(hexGeometry(NeighbourMode.Eight), false, x)).toBe(false);
+      expect(columnShift(hexGeometry(NeighbourMode.Hex6), false, x)).toBe(x % 2 === 1);
+      expect(columnShift(hexGeometry(NeighbourMode.Hex4), false, x)).toBe(x % 2 === 1);
     }
+  });
+
+  it("flips the offset with hexflip, and each side of the board separately", () => {
+    // `getHexShift`: bit 0 of hexflip flips the left player's columns, bit 1 the
+    // right's, so a two-player hex board can run the two halves in opposite
+    // directions. That is why there are four values and not two.
+    const shifted = (flip: number, right: boolean): boolean[] =>
+      [0, 1, 2, 3].map((x) => columnShift(hexGeometry(NeighbourMode.Hex6, flip), right, x));
+    // Both bits clear: both halves offset their odd columns.
+    expect(shifted(0, false)).toEqual([false, true, false, true]);
+    expect(shifted(0, true)).toEqual([false, true, false, true]);
+    // Bit 0 flips the left half, leaving the right alone.
+    expect(shifted(1, false)).toEqual([true, false, true, false]);
+    expect(shifted(1, true)).toEqual([false, true, false, true]);
+    // Bit 1 flips the right half, leaving the left alone.
+    expect(shifted(2, false)).toEqual([false, true, false, true]);
+    expect(shifted(2, true)).toEqual([true, false, true, false]);
+    // Both bits: the two halves run in opposite directions, which is the case
+    // the four values exist for.
+    expect(shifted(3, false)).toEqual([true, false, true, false]);
+    expect(shifted(3, true)).toEqual([true, false, true, false]);
+  });
+
+  it("ignores hexflip in a rectangular board", () => {
+    for (let flip = 0; flip < 4; flip++) {
+      for (const right of [false, true]) {
+        expect(columnShift(hexGeometry(NeighbourMode.Rect, flip), right, 1)).toBe(false);
+      }
+    }
+  });
+
+  it("gives a kind's hex mode unshifted offsets in a rectangular board", () => {
+    // `NachbarIterator::setXY` takes the mode from the blob's kind and the
+    // shifted-or-unshifted digit row from the board. In a rectangular board a
+    // hex-six kind gets hex six's offsets on an unshifted grid.
+    const rect = hexGeometry(NeighbourMode.Rect);
+    const hex = hexGeometry(NeighbourMode.Hex6);
+    expect(neighbourOffsets(NeighbourMode.Hex6, 0, rect)).toEqual(
+      neighbourOffsets(NeighbourMode.Hex6, 0, hex),
+    );
+    expect(neighbourOffsets(NeighbourMode.Hex6, 1, rect)).toEqual(
+      neighbourOffsets(NeighbourMode.Hex6, 0, hex),
+    );
+    // And in a hex board the same kind does get the shifted row in odd columns.
+    expect(neighbourOffsets(NeighbourMode.Hex6, 1, hex)).not.toEqual(
+      neighbourOffsets(NeighbourMode.Hex6, 0, hex),
+    );
   });
 
   it("marks exactly hex6, hex4 and 3D as hex", () => {
@@ -124,32 +179,32 @@ describe("hex modes", () => {
   });
 
   it("matches upstream '221133'/'131212' for a shifted hex6 column", () => {
-    expect(asPairs(neighbourOffsets(NeighbourMode.Hex6, 1))).toEqual(
+    expect(asPairs(neighbourOffsets(NeighbourMode.Hex6, 1, HEX))).toEqual(
       decode("221133", "131212"),
     );
   });
 
   it("matches upstream '221133'/'132323' for an unshifted hex6 column", () => {
-    expect(asPairs(neighbourOffsets(NeighbourMode.Hex6, 0))).toEqual(
+    expect(asPairs(neighbourOffsets(NeighbourMode.Hex6, 0, HEX))).toEqual(
       decode("221133", "132323"),
     );
   });
 
   it("matches upstream '1133'/'1212' for a shifted hex4 column", () => {
-    expect(asPairs(neighbourOffsets(NeighbourMode.Hex4, 1))).toEqual(
+    expect(asPairs(neighbourOffsets(NeighbourMode.Hex4, 1, HEX))).toEqual(
       decode("1133", "1212"),
     );
   });
 
   it("matches upstream '1133'/'2323' for an unshifted hex4 column", () => {
-    expect(asPairs(neighbourOffsets(NeighbourMode.Hex4, 0))).toEqual(
+    expect(asPairs(neighbourOffsets(NeighbourMode.Hex4, 0, HEX))).toEqual(
       decode("1133", "2323"),
     );
   });
 
   it("gives a shifted and an unshifted hex6 column six offsets each", () => {
-    expect(neighbourOffsets(NeighbourMode.Hex6, 0)).toHaveLength(6);
-    expect(neighbourOffsets(NeighbourMode.Hex6, 1)).toHaveLength(6);
+    expect(neighbourOffsets(NeighbourMode.Hex6, 0, HEX)).toHaveLength(6);
+    expect(neighbourOffsets(NeighbourMode.Hex6, 1, HEX)).toHaveLength(6);
   });
 
   it("keeps every hex6 offset inside one column of the origin", () => {
@@ -165,8 +220,8 @@ describe("hex modes", () => {
     // The distinction that makes hex6 work: a shifted column reaches across and
     // up, an unshifted column reaches across and down. Both still connect
     // straight up and down.
-    const shifted = neighbourOffsets(NeighbourMode.Hex6, 1);
-    const unshifted = neighbourOffsets(NeighbourMode.Hex6, 0);
+    const shifted = neighbourOffsets(NeighbourMode.Hex6, 1, HEX);
+    const unshifted = neighbourOffsets(NeighbourMode.Hex6, 0, HEX);
     for (const offsets of [shifted, unshifted]) {
       expect(offsets.some((o) => o.dx === 0 && o.dy === -1)).toBe(true);
       expect(offsets.some((o) => o.dx === 0 && o.dy === 1)).toBe(true);

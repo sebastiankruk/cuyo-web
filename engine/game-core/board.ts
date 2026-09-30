@@ -15,9 +15,11 @@ import {
   FLOATS,
   GRX,
   GRY,
+  NO_HEX,
   NeighbourMode,
   neighbourOffsets,
 } from "./constants.ts";
+import type { HexGeometry } from "./constants.ts";
 import type { Kind, LevelDef } from "../level-format/level-data.ts";
 
 /** Index of the empty kind, used as the "no blob" sentinel. */
@@ -112,9 +114,16 @@ export class Board {
 /**
  * True when blobs `a` at (ax, ay) and `b` at (bx, by) are connected.
  *
- * `mode` is the neighbour mode in force for `a`'s kind. Upstream requires both
- * blobs to agree, which they do unless a level sets different modes per kind;
- * that combination is not used by any ported level.
+ * `mode` is the neighbour mode in force for `a`'s kind, and `hex` is the *board's*
+ * geometry. They are separate because upstream is: `NachbarIterator::setXY` takes
+ * the mode from the blob's `Sorte` and the shifted-or-unshifted digit row from
+ * `ld->getHexShift`, which reads the level-wide `neighbours` and `hexflip`. A kind
+ * asking for hex six in a rectangular board therefore gets hex six's offsets laid
+ * out on a square grid.
+ *
+ * Upstream also requires both blobs to agree on the mode, which they do unless a
+ * level sets different modes per kind; that combination is used by no ported
+ * level.
  */
 export function connected(
   board: Board,
@@ -123,6 +132,7 @@ export function connected(
   ay: number,
   bx: number,
   by: number,
+  hex: HexGeometry = NO_HEX,
 ): boolean {
   const a = board.at(ax, ay);
   const b = board.at(bx, by);
@@ -131,7 +141,7 @@ export function connected(
 
   const dx = bx - ax;
   const dy = by - ay;
-  const allowed = neighbourOffsets(mode, ax);
+  const allowed = neighbourOffsets(mode, ax, hex);
   const inMode = allowed.some((o) => o.dx === dx && o.dy === dy);
   if (!inMode) return false;
 
@@ -206,13 +216,14 @@ export interface Component {
  *
  * Corresponds to the `w == 1` pass of `calcFloppRec`, which accumulates
  * `getKettenBeitrag()` over same-kind blobs reachable through the neighbour
- * mode.
+ * mode. `hex` is the board's geometry, as in {@link connected}.
  */
 export function componentOf(
   board: Board,
   mode: NeighbourMode,
   x: number,
   y: number,
+  hex: HexGeometry = NO_HEX,
 ): Component {
   const start = board.at(x, y);
   if (start === null || start.exploding !== 0) {
@@ -231,12 +242,12 @@ export function componentOf(
     positions.push(p);
     weight += blob.weight;
 
-    for (const o of neighbourOffsets(mode, p.x)) {
+    for (const o of neighbourOffsets(mode, p.x, hex)) {
       const nx = p.x + o.dx;
       const ny = p.y + o.dy;
       if (!board.inBounds(nx, ny)) continue;
       if (seen[ny * GRX + nx] === 1) continue;
-      if (!connected(board, mode, p.x, p.y, nx, ny)) continue;
+      if (!connected(board, mode, p.x, p.y, nx, ny, hex)) continue;
       seen[ny * GRX + nx] = 1;
       stack.push({ x: nx, y: ny });
     }

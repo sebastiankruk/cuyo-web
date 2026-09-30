@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import { Board, Blob, componentOf, connected } from "./board.ts";
-import { FLOATS, NeighbourMode } from "./constants.ts";
+import { FLOATS, NeighbourMode, hexGeometry } from "./constants.ts";
 import type { Kind } from "../level-format/level-data.ts";
 
 const COLOUR: Kind = {
@@ -114,13 +114,16 @@ describe("connected: same kind and mode", () => {
 });
 
 describe("connected: hex modes use the column's own offsets", () => {
+  // A hex board with the default `hexflip = 0`, so column 1 is the offset one.
+  const HEX = hexGeometry(NeighbourMode.Hex6);
+
   it("reaches across from both column parities in hex6", () => {
     // Both parities offer the straight-across link, so a row of blobs is
     // connected either side of a column boundary.
     const board = new Board();
     for (let x = 0; x < 3; x++) board.set(x, 9, blob(COLOUR));
-    expect(connected(board, NeighbourMode.Hex6, 0, 9, 1, 9)).toBe(true);
-    expect(connected(board, NeighbourMode.Hex6, 1, 9, 2, 9)).toBe(true);
+    expect(connected(board, NeighbourMode.Hex6, 0, 9, 1, 9, HEX)).toBe(true);
+    expect(connected(board, NeighbourMode.Hex6, 1, 9, 2, 9, HEX)).toBe(true);
   });
 
   it("reaches up-right from a shifted column but not an unshifted one", () => {
@@ -132,8 +135,8 @@ describe("connected: hex modes use the column's own offsets", () => {
     board.set(1, 8, blob(COLOUR));
     board.set(2, 8, blob(COLOUR));
 
-    expect(connected(board, NeighbourMode.Hex6, 1, 9, 2, 8)).toBe(true);
-    expect(connected(board, NeighbourMode.Hex6, 0, 9, 1, 8)).toBe(false);
+    expect(connected(board, NeighbourMode.Hex6, 1, 9, 2, 8, HEX)).toBe(true);
+    expect(connected(board, NeighbourMode.Hex6, 0, 9, 1, 8, HEX)).toBe(false);
   });
 
   it("never uses a plain horizontal-only link in hex4 across the wrong row", () => {
@@ -142,15 +145,15 @@ describe("connected: hex modes use the column's own offsets", () => {
       { x: 1, y: 9, kind: COLOUR },
       { x: 2, y: 9, kind: COLOUR },
     );
-    expect(connected(board, NeighbourMode.Hex4, 1, 9, 2, 9)).toBe(true);
+    expect(connected(board, NeighbourMode.Hex4, 1, 9, 2, 9, HEX)).toBe(true);
 
     const shiftedOnly = boardWith(
       { x: 1, y: 9, kind: COLOUR },
       { x: 2, y: 8, kind: COLOUR },
     );
-    expect(connected(shiftedOnly, NeighbourMode.Hex4, 1, 9, 2, 8)).toBe(true);
+    expect(connected(shiftedOnly, NeighbourMode.Hex4, 1, 9, 2, 8, HEX)).toBe(true);
     // The same pair read from an unshifted column is the down-diagonal instead.
-    expect(connected(shiftedOnly, NeighbourMode.Hex4, 0, 9, 1, 8)).toBe(false);
+    expect(connected(shiftedOnly, NeighbourMode.Hex4, 0, 9, 1, 8, HEX)).toBe(false);
   });
 });
 

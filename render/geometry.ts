@@ -11,15 +11,22 @@
 import {
   GRX,
   GRY,
-  hexShift,
+  columnShift,
 } from "../engine/game-core/constants.ts";
-import type { LevelDef } from "../engine/level-format/level-data.ts";
+import type { HexGeometry } from "../engine/game-core/constants.ts";
 
 /** The level properties that affect board geometry. */
 export interface BoardFrame {
   /** Cell size in CSS pixels. */
   readonly size: number;
-  readonly neighbours: LevelDef["neighbours"];
+  /**
+   * The board's hex geometry, from the level-wide `neighbours` and `hexflip`.
+   *
+   * Not the kind's mode: a kind may ask for hex connections in a rectangular
+   * board, and that changes which cells connect without offsetting any column.
+   * See `HexGeometry`.
+   */
+  readonly hex: HexGeometry;
   readonly mirror: boolean;
 }
 
@@ -75,7 +82,7 @@ export function cellSizeFor(availableWidth: number): number {
  */
 export function cellOrigin(f: BoardFrame, x: number, y: number): Point {
   const row = f.mirror ? GRY - 1 - y : y;
-  const shift = hexShift(f.neighbours, x) ? f.size / 2 : 0;
+  const shift = columnShift(f.hex, false, x) ? f.size / 2 : 0;
   return { x: x * f.size, y: row * f.size + shift };
 }
 

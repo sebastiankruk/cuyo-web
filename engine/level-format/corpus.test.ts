@@ -21,11 +21,14 @@ import type { Token } from "./lexer.ts";
 import { Version, VersionSet } from "./version.ts";
 import { DefinitionScope, rootScope } from "./scope.ts";
 import { buildKinds, UNDEFINED_EXPLODE } from "./kinds.ts";
+import { isHexMode } from "../game-core/constants.ts";
 import {
   NO_RANDOM_GREYS,
   isHexNeighbourMode,
+  kindDefaultsFrom,
   readLevelSettings,
 } from "./settings.ts";
+import { boardHex, readNeighbourOverrides, requireNeighbourMode } from "./neighbours.ts";
 
 const DATA_DIR =
   process.env["CUYO_DATA_DIR"] ??
@@ -537,6 +540,87 @@ describe("upstream corpus: the parser reads it", () => {
     expect(withRandomGreys).toBeGreaterThan(0);
     expect(hexLevels).toBeGreaterThan(0);
     expect(levels).toBeGreaterThan(200);
+  });
+
+  it("resolves the neighbour mode of every level and kind in the corpus", () => {
+    // Task 2.7's oracle. Two things are checked for every real level: that its
+    // own `neighbours` is one of the ten, and that every kind overriding it is
+    // too. The second is the one worth having - a per-kind mode is a number in
+    // the level data like any other, and there is no other point at which a bad
+    // one would be noticed.
+    //
+    // The hex flag is checked separately, because it comes from the level-wide
+    // value alone: a level may set a hex mode on one kind in a rectangular board
+    // and that must not turn the geometry on.
+    const globals = parseLd(lexFile("globals.ld").source, "globals.ld");
+    const versions = [
+      Version.of("1", "main"),
+      Version.of("2", "main"),
+      Version.of("1", "weird", "hard"),
+    ];
+
+    const failures: string[] = [];
+    let levels = 0;
+    let hexBoards = 0;
+    let perKindHexInRectBoard = 0;
+    let withOverrides = 0;
+
+    for (const name of ALL_LD_FILES) {
+      if (name === "summary.ld" || name === "globals.ld" || name === "example.ld") {
+        continue;
+      }
+      const file = parseLd(lexFile(name).source, name);
+      const levelSections = file.definitions.filter((d) => d.value.type === "section");
+      if (levelSections.length === 0) continue;
+
+      for (const version of versions) {
+        const root = rootScope(name, version);
+        root.defineAll(globals.definitions);
+        root.defineAll(file.definitions);
+        for (const def of levelSections) {
+          if (def.value.type !== "section") continue;
+          levels++;
+          const level = new DefinitionScope(def.name, root, version, name);
+          level.defineAll(def.value.definitions);
+          try {
+            const settings = readLevelSettings(level);
+            requireNeighbourMode(settings.neighbours, level, "neighbours");
+            const hex = boardHex(level);
+            if (hex.enabled) hexBoards++;
+            const table = buildKinds(
+              level,
+              kindDefaultsFrom(settings),
+            );
+            const overrides = readNeighbourOverrides(level, table);
+            if (overrides.length > 0) withOverrides++;
+            for (const o of overrides) {
+              // A per-kind hex mode in a rectangular board must not have enabled
+              // the geometry; if the level-wide mode is rectangular, the board
+              // stays square no matter what the kinds say.
+              if (!hex.enabled && isHexMode(o.mode)) perKindHexInRectBoard++;
+            }
+          } catch (error) {
+            failures.push(`${name} ${def.name}[${version}]: ${(error as Error).message}`);
+          }
+        }
+      }
+    }
+
+    expect(failures, `\n${failures.join("\n")}`).toEqual([]);
+    // The corpus really does use hex boards and really does override the mode per
+    // kind - five levels do, with `neighbours_none`, `neighbours_horizontal`,
+    // `neighbours_vertical`, `neighbours_diagonal`, `neighbours_knight` and
+    // `neighbours_eight` among them, so every rectangular mode is reached.
+    expect(hexBoards).toBeGreaterThan(0);
+    expect(withOverrides).toBeGreaterThan(0);
+    expect(levels).toBeGreaterThan(200);
+
+    // What the corpus does *not* have: a hex mode on a kind in a rectangular
+    // board. All eleven hex levels set the mode level-wide. Asserted as an
+    // absence on purpose - it says the mode/geometry separation is covered only by
+    // `neighbours.test.ts`, so nobody reads a green corpus run as evidence that
+    // it is exercised by the level data.
+    expect(perKindHexInRectBoard).toBe(0);
   });
 
   it("finds the Cual blocks the runtime will need", () => {

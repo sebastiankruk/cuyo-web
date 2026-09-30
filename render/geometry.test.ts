@@ -6,7 +6,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { GRX, GRY, NeighbourMode } from "../engine/game-core/constants.ts";
+import {
+  GRX,
+  GRY,
+  NeighbourMode,
+  hexGeometry,
+} from "../engine/game-core/constants.ts";
 import {
   ART_COLOURS,
   boardHeight,
@@ -30,17 +35,17 @@ import type { BoardFrame } from "./geometry.ts";
 const SIZE = 32;
 const rect: BoardFrame = {
   size: SIZE,
-  neighbours: NeighbourMode.Rect,
+  hex: hexGeometry(NeighbourMode.Rect),
   mirror: false,
 };
 const hex: BoardFrame = {
   size: SIZE,
-  neighbours: NeighbourMode.Hex6,
+  hex: hexGeometry(NeighbourMode.Hex6),
   mirror: false,
 };
 const mirrored: BoardFrame = {
   size: SIZE,
-  neighbours: NeighbourMode.Rect,
+  hex: hexGeometry(NeighbourMode.Rect),
   mirror: true,
 };
 
@@ -115,7 +120,9 @@ describe("cellOrigin: hex offset", () => {
   });
 
   it("does not offset in a non-hex mode", () => {
-    const eight: BoardFrame = { ...hex, neighbours: NeighbourMode.Eight };
+    // The column offset is a property of the board, not of a blob's mode: the
+    // level's own `neighbours` decides it.
+    const eight: BoardFrame = { ...hex, hex: hexGeometry(NeighbourMode.Eight) };
     expect(cellOrigin(eight, 1, 4).y).toBe(128);
   });
 

@@ -11,7 +11,11 @@
  * and the game is playable.
  */
 
-import { EXPLOSION_STEPS, GRIC } from "../engine/game-core/constants.ts";
+import {
+  EXPLOSION_STEPS,
+  GRIC,
+  hexGeometry,
+} from "../engine/game-core/constants.ts";
 import type { Blob } from "../engine/game-core/board.ts";
 import type { LevelDef } from "../engine/level-format/level-data.ts";
 import type { Simulation } from "../engine/game-core/simulation.ts";
@@ -107,7 +111,7 @@ export function render(
   size: number,
 ): void {
   const level = sim.level;
-  const f: BoardFrame = { size, neighbours: level.neighbours, mirror: level.mirror };
+  const f: BoardFrame = { size, hex: hexGeometry(level.neighbours), mirror: level.mirror };
   const width = 10 * size;
   const height = 20 * size;
 

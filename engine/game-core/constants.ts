@@ -91,13 +91,45 @@ export function isHexMode(mode: NeighbourMode): boolean {
 }
 
 /**
- * True when column `x` is drawn offset half a cell downward.
+ * The board's hex geometry: whether the columns are offset at all, and which way
+ * the offset alternates.
  *
- * `src/leveldaten.cpp:getHexShift` with the default `hexflip = 0`: the flip is
- * zero, so odd columns shift.
+ * Kept apart from the neighbour *mode* on purpose. `LevelDaten::ladLevel` decides
+ * `mSechseck` from the level-wide `neighbours` alone, and `getHexShift` reads
+ * `mSechseck` and `hexflip`. A kind may set its own `neighbours` - that changes
+ * which cells count as connected and nothing else - so a kind using hex six in a
+ * rectangular board still gets the *unshifted* offsets and draws square. Reading
+ * the mode where the geometry belongs is the mistake this type exists to prevent.
  */
-export function hexShift(mode: NeighbourMode, x: number): boolean {
-  return isHexMode(mode) && (x & 1) !== 0;
+export interface HexGeometry {
+  /** False unless the level-wide mode is one of the three hex modes. */
+  readonly enabled: boolean;
+  /** `hexflip`, 0 to 3. Bit 0 is the left player's columns, bit 1 the right's. */
+  readonly flip: number;
+}
+
+/** A rectangular board: no column is ever offset. */
+export const NO_HEX: HexGeometry = { enabled: false, flip: 0 };
+
+/** The geometry a level-wide `neighbours` and `hexflip` imply. */
+export function hexGeometry(mode: number, flip = 0): HexGeometry {
+  return { enabled: isHexMode(mode as NeighbourMode), flip };
+}
+
+/**
+ * True when column `x` of `right` is drawn half a cell lower.
+ *
+ * `LevelDaten::getHexShift`, transcribed. The offset alternates with the column
+ * parity, and which parity is offset depends on `hexflip` *and* on which player's
+ * side the column is on - in a two-player game the two halves of the board can be
+ * flipped independently, which is why `hexflip` has four values and not two.
+ */
+export function columnShift(hex: HexGeometry, right: boolean, x: number): boolean {
+  if (!hex.enabled) return false;
+  // `x & 1` is 0 or 1, and C++ promotes the bool `flip` to 0 or 1 the same way,
+  // so the comparison is against a number rather than a boolean.
+  const flip = right ? (hex.flip & 2) !== 0 : (hex.flip & 1) !== 0;
+  return (x & 1) !== (flip ? 1 : 0);
 }
 
 export interface Offset {
@@ -191,12 +223,20 @@ const HEX4_UNSHIFTED: readonly Offset[] = [
 /**
  * The neighbour offsets for `mode` at column `x`.
  *
+ * `hex` is the *board's* geometry, not the mode's, because
+ * `NachbarIterator::setXY` picks the shifted or unshifted digit row with
+ * `ld->getHexShift(...)` and takes the mode from the blob's own kind. In a
+ * rectangular board a kind that asks for hex six therefore gets hex six's
+ * offsets laid out on a square grid - which is what upstream does, and is why
+ * `3d.ld`'s per-kind hex modes work on a board that is not itself hex.
+ *
  * `ThreeD` is not implemented and falls back to no neighbours; only `3d.ld`
  * uses it, and that level is not yet ported.
  */
 export function neighbourOffsets(
   mode: NeighbourMode,
   x: number,
+  hex: HexGeometry = NO_HEX,
 ): readonly Offset[] {
   switch (mode) {
     case NeighbourMode.Rect:
@@ -204,9 +244,9 @@ export function neighbourOffsets(
     case NeighbourMode.Diagonal:
       return DIAGONAL;
     case NeighbourMode.Hex6:
-      return hexShift(mode, x) ? HEX6_SHIFTED : HEX6_UNSHIFTED;
+      return columnShift(hex, false, x) ? HEX6_SHIFTED : HEX6_UNSHIFTED;
     case NeighbourMode.Hex4:
-      return hexShift(mode, x) ? HEX4_SHIFTED : HEX4_UNSHIFTED;
+      return columnShift(hex, false, x) ? HEX4_SHIFTED : HEX4_UNSHIFTED;
     case NeighbourMode.Knight:
       return KNIGHT;
     case NeighbourMode.Eight:
