@@ -20,7 +20,12 @@ import type { LdDefinition, LdNode } from "./parser.ts";
 import type { Token } from "./lexer.ts";
 import { Version, VersionSet } from "./version.ts";
 import { DefinitionScope, rootScope } from "./scope.ts";
-import { buildKinds } from "./kinds.ts";
+import { buildKinds, UNDEFINED_EXPLODE } from "./kinds.ts";
+import {
+  NO_RANDOM_GREYS,
+  isHexNeighbourMode,
+  readLevelSettings,
+} from "./settings.ts";
 
 const DATA_DIR =
   process.env["CUYO_DATA_DIR"] ??
@@ -437,6 +442,101 @@ describe("upstream corpus: the parser reads it", () => {
     expect(levels).toBeGreaterThan(300);
     expect(kinds).toBeGreaterThan(2000);
     expect(constants).toBeGreaterThan(1000);
+  });
+
+  it("reads the settings of every level section in the corpus", () => {
+    // Task 2.6's oracle. The defaults are upstream's, and the only way to know
+    // they are the right defaults is to read every real level and see which of
+    // them it relies on: a level that sets `bgcolor` everywhere would mean the
+    // white default was never exercised, and a level that sets it nowhere would
+    // mean the value is untested in the other direction.
+    const globals = parseLd(lexFile("globals.ld").source, "globals.ld");
+    const versions = [
+      Version.of("1", "main"),
+      Version.of("2", "main"),
+      Version.of("1", "contrib", "hard"),
+    ];
+
+    const failures: string[] = [];
+    const setCounts = new Map<string, number>();
+    let levels = 0;
+    let withoutDescription = 0;
+    let withRandomGreys = 0;
+    let hexLevels = 0;
+    let noNumExplode = 0;
+
+    for (const name of ALL_LD_FILES) {
+      if (name === "summary.ld" || name === "globals.ld" || name === "example.ld") {
+        continue;
+      }
+      const file = parseLd(lexFile(name).source, name);
+      const levelSections = file.definitions.filter((d) => d.value.type === "section");
+      if (levelSections.length === 0) continue;
+
+      for (const version of versions) {
+        const root = rootScope(name, version);
+        root.defineAll(globals.definitions);
+        root.defineAll(file.definitions);
+        for (const def of levelSections) {
+          if (def.value.type !== "section") continue;
+          levels++;
+          const level = new DefinitionScope(def.name, root, version, name);
+          level.defineAll(def.value.definitions);
+          try {
+            const settings = readLevelSettings(level);
+            for (const header of level.definitionsInOrder()) {
+              const counted = setCounts.get(header.name) ?? 0;
+              setCounts.set(header.name, counted + 1);
+            }
+            if (settings.description === "") withoutDescription++;
+            if (settings.randomGreys !== NO_RANDOM_GREYS) withRandomGreys++;
+            if (isHexNeighbourMode(settings.neighbours)) hexLevels++;
+            if (settings.numExplode === UNDEFINED_EXPLODE) noNumExplode++;
+          } catch (error) {
+            failures.push(`${name} ${def.name}[${version}]: ${(error as Error).message}`);
+          }
+        }
+      }
+    }
+
+    expect(failures, `\n${failures.join("\n")}`).toEqual([]);
+
+    // Every one of these is a documented setting that at least one real level
+    // uses, so a reader of the corpus knows the readers are all reached.
+    for (const setting of [
+      "name",
+      "author",
+      "description",
+      "numexplode",
+      "neighbours",
+      "chaingrass",
+      "toptime",
+      "toppic",
+      "topoverlap",
+      "topstop",
+      "mirror",
+      "randomfallpos",
+      "randomgreys",
+      "nogreyprob",
+      "bgcolor",
+      "textcolor",
+      "topcolor",
+      "bgpic",
+      "emptypic",
+      "hexflip",
+    ]) {
+      expect(setCounts.get(setting) ?? 0, `${setting} never appears`).toBeGreaterThan(0);
+    }
+
+    // And the defaults are exercised rather than assumed. The description is the
+    // exception rather than the rule - 81 of 237 level reads leave it out - and a
+    // good number set no `numexplode` at all, relying on the per-kind ones.
+    expect(withoutDescription).toBeGreaterThan(0);
+    expect(withoutDescription).toBeLessThan(levels / 2);
+    expect(noNumExplode).toBeGreaterThan(0);
+    expect(withRandomGreys).toBeGreaterThan(0);
+    expect(hexLevels).toBeGreaterThan(0);
+    expect(levels).toBeGreaterThan(200);
   });
 
   it("finds the Cual blocks the runtime will need", () => {

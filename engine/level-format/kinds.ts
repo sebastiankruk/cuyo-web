@@ -287,7 +287,7 @@ function collectDeclarations(level: DefinitionScope): readonly Declaration[] {
 function readEmptyArtKey(level: DefinitionScope): string {
   // The empty list of a `emptypic` fallback, as upstream reads it: `""` means no
   // empty picture, and `Sorte` then sets everything on defaults.
-  const list = level.ownRuns("emptypic", "");
+  const list = level.ownRuns("emptypic", true);
   const first = list?.runs[0];
   if (first === undefined) return "";
   if (first.word === "nothing") return "";
@@ -352,7 +352,7 @@ function makeKind(
   // no picture list - and because `getKind` does not look at the parent, a bare
   // read here would be asking the *level's* `pics` for the wrong thing and then
   // finding nothing.
-  const ownPics = own?.ownRuns("pics", "");
+  const ownPics = own?.ownRuns("pics", true);
   const artKey = ownPics !== undefined && ownPics.runs.length > 0
     ? (ownPics.runs[0] as ResolvedRun).word
     : picture;

@@ -52,6 +52,19 @@ export interface ResolvedRuns {
   readonly version: Version;
 }
 
+/**
+ * A colour, as `src/color.h` models it.
+ *
+ * Channels are 0-255 and upstream does not range-check them, so neither does
+ * this: a level writing `bgcolor = 999, 0, 0` is passed through and the renderer
+ * clamps. Refusing it here would be a rule the original does not have.
+ */
+export interface Colour {
+  readonly r: number;
+  readonly g: number;
+  readonly b: number;
+}
+
 /** A definition as it was written: which name, which version, where. */
 export interface DefinitionHeader {
   readonly name: string;
@@ -239,16 +252,17 @@ export class DefinitionScope {
   }
 
   /**
-   * `getKind`, with a fallback: `name` as resolved for the active version,
-   * looking in this section only.
+   * `getKind`: `name` as resolved for the active version, looking in this
+   * section only.
    *
-   * `fallback` is the caller's default, and its presence is what tells
-   * `VersionSet` that an unqualified definition may be assumed - so passing
-   * `undefined` makes a name that is defined only for some versions an error,
-   * exactly as `defaultVorhanden = false` does upstream.
+   * `defaultPresent` is upstream's `defaultVorhanden`, and it is not a detail: it
+   * decides whether a name defined only for some versions may fall back to the
+   * caller's default or is an error. A colour always has a default, a name never
+   * does, and a name with no applicable version is a well-formedness failure
+   * rather than a silently absent one.
    */
-  own(name: string, fallback?: string): ResolvedDefinition | undefined {
-    const found = this.defs.bestApproximating(name, this.version, fallback !== undefined);
+  own(name: string, defaultPresent: boolean): ResolvedDefinition | undefined {
+    const found = this.defs.bestApproximating(name, this.version, defaultPresent);
     if (found === undefined) return undefined;
     return {
       values: this.values(found, name),
@@ -259,7 +273,7 @@ export class DefinitionScope {
 
   /** As {@link own}, but a name that is absent is an error. */
   requireOwn(name: string, pos: LdPos): ResolvedDefinition {
-    const found = this.own(name);
+    const found = this.own(name, false);
     if (found === undefined) this.fail(`${name} required but not defined`, pos);
     return found;
   }
@@ -273,7 +287,7 @@ export class DefinitionScope {
    * and a bare word are indistinguishable here.
    */
   ownWord(name: string, fallback?: string): string | undefined {
-    const found = this.own(name, fallback);
+    const found = this.own(name, fallback !== undefined);
     if (found === undefined) return fallback;
     const first = found.values[0];
     if (first === undefined) {
@@ -287,7 +301,7 @@ export class DefinitionScope {
 
   /** The first entry of a definition, as a number. */
   ownNumber(name: string, fallback: number): number {
-    const found = this.own(name, String(fallback));
+    const found = this.own(name, true);
     if (found === undefined) return fallback;
     const first = found.values[0];
     if (first === undefined) {
@@ -320,7 +334,55 @@ export class DefinitionScope {
 
   /** A whole definition, repeats expanded - `DatenDatei::getListenEintrag`. */
   ownList(name: string): ResolvedDefinition | undefined {
-    return this.own(name);
+    return this.own(name, true);
+  }
+
+  /**
+   * As {@link ownWord}, but a name that is absent is an error.
+   *
+   * `getWortEintragOhneDefault`, which is how `name` and `author` are read - a
+   * level without a name is not a level.
+   */
+  requireWord(name: string): string {
+    const found = this.own(name, false);
+    if (found === undefined) this.fail(`${name} required but not defined`, this.positionOf(name));
+    const first = found.values[0];
+    if (first === undefined) {
+      this.fail(`${name} is an empty list, which is not a word`, found.pos);
+    }
+    if (!isWord(first)) {
+      this.fail(`${name} is the number ${first.value} but a word was expected`, found.pos);
+    }
+    return first.text;
+  }
+
+  /**
+   * A colour, which is three numbers.
+   *
+   * `DatenDatei::getFarbEintragMitDefault` requires a list of exactly three and
+   * says "Color (r,g,b) expected" otherwise. Upstream reads the *list* rather
+   * than the first entry, so `bgcolor = 255, 255, 255` is a colour and
+   * `bgcolor = 255` is an error - the opposite of how `ownNumber` treats a
+   * single entry, which is the kind of asymmetry that is easy to get wrong.
+   */
+  ownColour(name: string, fallback: Colour): Colour {
+    const found = this.own(name, true);
+    if (found === undefined) return fallback;
+    const { values, pos } = found;
+    if (values.length !== 3) {
+      this.fail(
+        `${name} needs three numbers (r,g,b) but has ${values.length}`,
+        pos,
+      );
+    }
+    const channel = (i: number): number => {
+      const value = values[i];
+      if (value === undefined || value.type !== "number") {
+        this.fail(`${name} needs three numbers (r,g,b)`, pos);
+      }
+      return value.value;
+    };
+    return { r: channel(0), g: channel(1), b: channel(2) };
   }
 
   /**
@@ -331,8 +393,8 @@ export class DefinitionScope {
    * them, so flattening the list first would lose exactly the information the
    * arithmetic depends on.
    */
-  ownRuns(name: string, fallback?: string): ResolvedRuns | undefined {
-    const found = this.defs.bestApproximating(name, this.version, fallback !== undefined);
+  ownRuns(name: string, defaultPresent = false): ResolvedRuns | undefined {
+    const found = this.defs.bestApproximating(name, this.version, defaultPresent);
     if (found === undefined) return undefined;
     return { runs: this.runs(found, name), pos: found.pos, version: found.version };
   }
