@@ -15,6 +15,9 @@ dist/
 .env.local
 *.local
 
+#AI
+.caim
+
 # Editor / OS
 .DS_Store
 .idea/
