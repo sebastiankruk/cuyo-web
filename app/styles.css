@@ -349,3 +349,83 @@ button {
   font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
 }
+
+/*
+ * Landscape: put the controls beside the board instead of below it.
+ *
+ * The board is 10x20, so it is 1:2 and portrait suits it. On a tablet held
+ * sideways the viewport is short and wide, and height becomes the binding
+ * constraint: at 1000x645 the board can only be 238x475 out of 1000px of width,
+ * which is why it looked lost in the middle of the screen. It cannot be wider -
+ * making it wider would make it taller than the screen.
+ *
+ * So the width is not the thing to reclaim; the *height* is. Moving the controls
+ * out of the vertical stack gives their ~90px back to the board, which is worth
+ * about 20% of board height, and the controls sit in the empty space beside the
+ * board rather than underneath it. The board also stops being one lonely column
+ * in a sea of background.
+ *
+ * Portrait is still much better - roughly four times the board area - so a hint
+ * says so rather than leaving the layout to imply it is the intended shape.
+ */
+@media (orientation: landscape) and (min-width: 40rem) {
+  .play {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    column-gap: 0.5rem;
+  }
+
+  .play__hud {
+    grid-column: 1 / -1;
+  }
+
+  .play__controls {
+    grid-column: 2;
+    grid-row: 2;
+    /* Two columns of controls down the side, thumb-reachable on the right. */
+    grid-template-columns: 1fr 1fr;
+    align-content: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.9rem 0.5rem 0.25rem;
+    align-self: stretch;
+  }
+
+  .play__dev {
+    grid-column: 1 / -1;
+  }
+
+  /* Rotate and Fast are the two wide ones; side by side they read fine. */
+  .pad--wide {
+    font-size: 0.9rem;
+  }
+}
+
+/*
+ * The rotate hint, shown only where rotating would genuinely help: landscape and
+ * wide. Hidden again in portrait, and hidden from screen readers once dismissed by
+ * the surrounding `hidden` attribute rather than only visually, so it is not read
+ * out on every frame in a state where it no longer applies.
+ */
+.play__rotate {
+  display: none;
+}
+
+@media (orientation: landscape) and (min-width: 40rem) {
+  .play__rotate {
+    display: grid;
+    place-content: center;
+    gap: 0.2rem;
+    padding: 0.4rem 0.9rem;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    color: var(--muted);
+    font-size: 0.78rem;
+    text-align: center;
+  }
+
+  .play__rotate strong {
+    color: var(--text);
+    font-size: 0.95rem;
+  }
+}

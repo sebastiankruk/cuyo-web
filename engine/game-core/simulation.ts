@@ -317,16 +317,34 @@ export class Simulation {
     );
   }
 
-  /** The cells a piece currently occupies. */
-  piecePositions(piece: FallPiece): Array<{ x: number; y: number }> {
+  /**
+   * The cells a piece currently occupies, each with the blob that fills it.
+   *
+   * The blob is part of the answer rather than something the caller works out.
+   * Which blob sits where is not derivable from a column alone: for a vertical
+   * piece both cells share one column and differ only in their row, so a renderer
+   * guessing from the column drew the same colour in both - a blue-and-red piece
+   * standing up came out red-and-red, and the colours swapped back on the next
+   * rotation. Carrying the blob with the position makes that mistake impossible
+   * rather than merely avoidable.
+   */
+  piecePositions(
+    piece: FallPiece,
+  ): Array<{ x: number; y: number; blob: Blob }> {
     const base = Math.floor((piece.yPx + GRIC - 1) / GRIC);
-    const out: Array<{ x: number; y: number }> = [];
+    const out: Array<{ x: number; y: number; blob: Blob }> = [];
     if (piece.orientation === "horizontal") {
-      out.push({ x: piece.x, y: base }, { x: piece.x + 1, y: base });
+      out.push(
+        { x: piece.x, y: base, blob: piece.blobs[0] },
+        { x: piece.x + 1, y: base, blob: piece.blobs[1] },
+      );
     } else if (piece.orientation === "vertical") {
-      out.push({ x: piece.x, y: base - 1 }, { x: piece.x, y: base });
+      out.push(
+        { x: piece.x, y: base - 1, blob: piece.blobs[0] },
+        { x: piece.x, y: base, blob: piece.blobs[1] },
+      );
     } else {
-      out.push({ x: piece.x, y: base });
+      out.push({ x: piece.x, y: base, blob: piece.blobs[0] });
     }
     return out;
   }

@@ -21,12 +21,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { GRX, GRY, hexGeometry } from "../engine/game-core/constants.ts";
+import { GRIC, GRX, GRY, hexGeometry } from "../engine/game-core/constants.ts";
 import {
   boardSizing,
   boardHeight,
   boardWidth,
   cellOrigin,
+  colourFor,
 } from "./geometry.ts";
 import type { BoardFrame } from "./geometry.ts";
 import { render } from "./board.ts";
@@ -59,6 +60,31 @@ function recordingContext(): { ctx: CanvasRenderingContext2D; log: Recorded } {
     arcs: 0,
   };
   const state = { fillStyle: "#000000", strokeStyle: "#000000" };
+  /**
+   * Bounding box of the current path, accumulated from every point passed to it.
+   *
+   * `render` builds a cell with `moveTo` then four `arcTo` calls, so the shape has
+   * to be recovered from the path rather than read from the arguments of `fill`.
+   * An earlier version of this stub took the box from `moveTo`/`lineTo` only and
+   * left `arcTo` inert, which meant `fill()` reported the box belonging to whatever
+   * path came before it - the highlight line of the previous cell, usually. The
+   * recording was wrong, and it reported the renderer drawing one colour twice when
+   * the renderer was in fact correct.
+   */
+  let box: { x0: number; y0: number; x1: number; y1: number } | null = null;
+  const point = (x: number, y: number): void => {
+    if (box === null) box = { x0: x, y0: y, x1: x, y1: y };
+    else {
+      box.x0 = Math.min(box.x0, x);
+      box.y0 = Math.min(box.y0, y);
+      box.x1 = Math.max(box.x1, x);
+      box.y1 = Math.max(box.y1, y);
+    }
+  };
+  const boxRect = (): { x: number; y: number; w: number; h: number } | null => {
+    if (box === null) return null;
+    return { x: box.x0, y: box.y0, w: box.x1 - box.x0, h: box.y1 - box.y0 };
+  };
   const ctx = {
     get fillStyle() {
       return state.fillStyle;
@@ -81,16 +107,27 @@ function recordingContext(): { ctx: CanvasRenderingContext2D; log: Recorded } {
     fillRect(x: number, y: number, w: number, h: number) {
       log.fills.push({ x, y, w, h, style: state.fillStyle });
     },
-    beginPath() {},
+    beginPath() {
+      box = null;
+    },
     closePath() {},
-    moveTo() {},
-    lineTo() {},
-    arcTo() {},
-    arc() {
+    moveTo: point,
+    lineTo: point,
+    /**
+     * `arcTo(x1, y1, x2, y2, r)` passes through `(x1, y1)`, so both control points
+     * are part of the path and both belong in the box.
+     */
+    arcTo(x1: number, y1: number, x2: number, y2: number) {
+      point(x1, y1);
+      point(x2, y2);
+    },
+    arc(x: number, y: number, radius: number) {
+      point(x - radius, y - radius);
+      point(x + radius, y + radius);
       log.arcs++;
     },
     fill() {
-      const r = lastRect;
+      const r = boxRect();
       if (r !== null) log.fills.push({ ...r, style: state.fillStyle });
     },
     stroke() {
@@ -103,19 +140,6 @@ function recordingContext(): { ctx: CanvasRenderingContext2D; log: Recorded } {
       return { addColorStop() {} };
     },
   } as unknown as CanvasRenderingContext2D;
-  // `render` builds each cell with moveTo/arcTo then fill, so the rect has to be
-  // picked up from those rather than passed to fill.
-  let lastRect: { x: number; y: number; w: number; h: number } | null = null;
-  const track = ctx as unknown as Record<string, unknown>;
-  let ox = 0;
-  let oy = 0;
-  track["moveTo"] = (x: number, y: number) => {
-    ox = x;
-    oy = y;
-  };
-  track["lineTo"] = (x: number, y: number) => {
-    lastRect = { x: ox, y: oy, w: Math.abs(x - ox), h: Math.abs(y - oy) };
-  };
   return { ctx, log };
 }
 
@@ -353,6 +377,76 @@ describe("render fills the whole board", () => {
       const distinctYs = new Set(drawn.map((f) => f.y));
       expect(distinctXs.size).toBeGreaterThan(1);
       expect(distinctYs.size).toBeGreaterThan(1);
+    });
+
+    it("draws the piece's own colours, in every orientation", () => {
+      // The regression: the renderer inferred which blob occupied a cell from the
+      // column, which cannot work for a vertical piece because both of its cells
+      // share one column. The lower blob was reported for both, so a blue-and-red
+      // piece standing up came out red-and-red, and rotated once more it looked
+      // right again - which is what made it read as a rendering quirk rather than
+      // a bug.
+      //
+      // The piece is positioned by hand so both orientations are covered
+      // regardless of what the picker produced, and dropped far enough down the
+      // board that both of its cells are on-screen - a piece at spawn has its top
+      // cell above row 0, where it is deliberately not drawn.
+      for (const orientation of ["vertical", "horizontal"] as const) {
+        const sim = new Simulation(fixture.make(), { seed: 1 });
+        const piece = sim.fall;
+        expect(piece, "expected a piece to be in play").not.toBeNull();
+        // Give the two halves clearly different kinds so a swap is visible. The
+        // fixtures' own pair is already two distinct kinds, which is all this needs.
+        expect(piece!.blobs[0].kind).not.toBe(piece!.blobs[1].kind);
+        piece!.orientation = orientation;
+        // 14 rows down, so both cells are well inside the board.
+        piece!.yPx = 14 * GRIC + GRIC - 1;
+
+        // The board's own blobs are cleared before drawing, so only the piece is
+        // measured. The start layout is dense near the bottom of the board, and a
+        // settled blob of the same colour sitting in the right cell would otherwise
+        // satisfy the search for "a fill near this origin" - which is precisely how
+        // this test first failed, claiming the renderer drew one colour twice when
+        // the board underneath had simply answered the lookup.
+        for (const p of [...sim.board.occupied()])
+          sim.board.set(p.x, p.y, null);
+
+        const { ctx, log } = recordingContext();
+        const sizing = boardSizing(600, 900, 1);
+        render(ctx, sim, sizing.size);
+
+        const frame: BoardFrame = {
+          size: sizing.size,
+          hex: hexGeometry(level.neighbours),
+          mirror: level.mirror,
+        };
+        const drawn = sim.piecePositions(piece!).map((p) => {
+          const origin = cellOrigin(frame, p.x, p.y);
+          // The *nearest* fill to this cell's origin, not the first one within a
+          // cell of it. A one-cell tolerance overlaps with the neighbouring cell's
+          // tolerance, so `find` returned the previous cell's fill for the second
+          // cell of a vertical piece - which then read as "both cells drew the
+          // same colour" and sent me looking for a renderer bug that was not there.
+          let best: { fill: (typeof log.fills)[number]; d: number } | null =
+            null;
+          for (const fill of log.fills) {
+            const d = Math.hypot(fill.x - origin.x, fill.y - origin.y);
+            if (d >= sizing.size) continue;
+            if (best === null || d < best.d) best = { fill, d };
+          }
+          return best?.fill.style;
+        });
+        expect(drawn.length, `${orientation}: piece cells`).toBe(2);
+        expect(
+          new Set(drawn).size,
+          `${orientation}: both cells drew ${drawn[0]}`,
+        ).toBe(2);
+        // And they are the piece's own two colours, in order.
+        expect(drawn).toEqual([
+          colourFor(level.kinds[piece!.blobs[0].kind]!.artKey, 0),
+          colourFor(level.kinds[piece!.blobs[1].kind]!.artKey, 0),
+        ]);
+      }
     });
 
     it(`gives each kind a colour that is not the background`, () => {

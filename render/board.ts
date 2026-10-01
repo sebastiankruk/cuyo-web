@@ -14,9 +14,9 @@
 import {
   EXPLOSION_STEPS,
   GRIC,
+  GRY,
   hexGeometry,
 } from "../engine/game-core/constants.ts";
-import type { Blob } from "../engine/game-core/board.ts";
 import type { LevelDef } from "../engine/level-format/level-data.ts";
 import type { Simulation } from "../engine/game-core/simulation.ts";
 import {
@@ -217,29 +217,16 @@ export function render(
       right: false,
     };
     for (const p of sim.piecePositions(piece)) {
-      if (p.y < 0 || p.y >= 20) continue;
-      const blob = fallingBlob(piece, p.x);
-      drawCell(ctx, f, level, p.x, p.y, blob.kind, blob.version, isolated);
+      if (p.y < 0 || p.y >= GRY) continue;
+      // The blob comes from the position, not from a guess about which half of the
+      // piece sits where. `fallingBlob` inferred it from the column, which cannot
+      // work for a vertical piece: both of its cells share one column, so the
+      // lower blob was reported for both and a two-colour piece looked like a
+      // single colour until it was rotated again.
+      drawCell(ctx, f, level, p.x, p.y, p.blob.kind, p.blob.version, isolated);
     }
     ctx.globalAlpha = 1;
   }
 
   ctx.restore();
-}
-
-/**
- * Which half of the falling piece occupies column `x`.
- *
- * A vertical piece stacks blob 0 above blob 1; a horizontal or single piece has
- * blob 0 on the left.
- */
-function fallingBlob(
-  piece: { x: number; orientation: string; blobs: readonly Blob[] },
-  x: number,
-): Blob {
-  if (piece.orientation === "vertical") {
-    return (piece.blobs[1] ?? piece.blobs[0]) as Blob;
-  }
-  if (x === piece.x) return piece.blobs[0] as Blob;
-  return (piece.blobs[1] ?? piece.blobs[0]) as Blob;
 }

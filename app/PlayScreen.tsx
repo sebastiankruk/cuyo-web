@@ -302,6 +302,21 @@ export function PlayScreen({ level, seed, onExit }: Props) {
 
       <div className="play__board">
         <canvas ref={canvasRef} className="play__canvas" />
+        {/*
+          A hint, not a blocker. The board is 1:2, so in landscape on a wide
+          screen it can only be about a quarter of the width - not a layout bug,
+          just the shape of the thing. Portrait gives roughly four times the board
+          area, which is worth saying rather than leaving the layout to imply that
+          sideways is the intended way to play.
+
+          Hidden by CSS in portrait, so it costs nothing there, and `aria-hidden`
+          because it is advice about the device rather than about the game state.
+        */}
+        <p className="play__rotate" aria-hidden="true">
+          <strong>Turn your device upright</strong>
+          The board is twice as tall as it is wide, so portrait gives a much
+          larger one.
+        </p>
         {finished && (
           <div className="play__overlay">
             <h2>{hud.phase === "won" ? "Level complete" : "Game over"}</h2>
