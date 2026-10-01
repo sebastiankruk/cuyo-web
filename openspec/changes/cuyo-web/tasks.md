@@ -230,6 +230,17 @@ long enough that scrolling to the bottom is the only way to see what exists.
 - [ ] 12.5 Measure frame time with the development overlay on a mid-range device profile and verify the board stays within budget with a full board and active animations
 - [ ] 12.6 Verify the Standard track is playable end to end on a real phone, including touch controls, orientation change and offline start
 - [ ] 12.7 Verify every track loads and each level reaches a running state without a runtime error in its first steps
+- [ ] 12.8 Delete the last corpus-absence skip, in `render/palette.test.ts`
+
+  The suite reads the level files and returns early when they are missing, which reads
+  exactly like a pass. The level files are committed as of the `levels-in-tree` work, so
+  there is nothing left to guard against and the skip can go.
+
+  It could not be done in that same change: the palette suite and the vendored levels
+  arrived on separate branches, and the test can only point at `levels/upstream/` from a
+  branch that has it. It is recorded here rather than forced into either, because a test
+  that silently checks nothing is a small thing that hides a large one — the whole point
+  of the property is that two kinds in one level are never the same colour.
 
 ## 13. Coverage
 
