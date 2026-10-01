@@ -198,6 +198,36 @@ export function stubRadius(f: BoardFrame): number {
   return f.size * 0.16;
 }
 
+/**
+ * A marker drawn on a blob whose kind has a special role.
+ *
+ * Upstream tells goal and grey blobs apart by their artwork, which is per-kind and
+ * authored. There is no artwork here yet, so without a marker the only clue that a
+ * blob is the one to clear is the rule text in the HUD - which points at "marked"
+ * blobs that the board does not in fact mark.
+ *
+ * The marker is deliberately not colour: goal blobs already have their own colour,
+ * and tinting them further would work against the goal blobs being told apart *from
+ * each other*. A shape says "this one is special" and survives both a black
+ * background and a colour that happens to match.
+ */
+export type BlobMarker = "goal" | "grey" | null;
+
+/** The marker a kind's role calls for, or null for an ordinary colour. */
+export function markerForRole(role: string): BlobMarker {
+  if (role === "grass") return "goal";
+  if (role === "grey") return "grey";
+  return null;
+}
+
+/** Radius of the marker's inner shape, as a fraction of the cell. */
+export const MARKER_RADIUS = 0.16;
+
+/** A colour that reads against the blob's own, for the marker's inner shape. */
+export function markerInk(colour: string): string {
+  return shade(colour, 0.55);
+}
+
 // ------------------------------------------------------------------- colour
 
 /**

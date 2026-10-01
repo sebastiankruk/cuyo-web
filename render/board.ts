@@ -20,8 +20,11 @@ import {
 import type { LevelDef } from "../engine/level-format/level-data.ts";
 import type { Simulation } from "../engine/game-core/simulation.ts";
 import {
+  MARKER_RADIUS,
   borderBand,
   cellOrigin,
+  markerForRole,
+  markerInk,
   colourFor,
   explosionProgress,
   explosionRadius,
@@ -29,7 +32,13 @@ import {
   stubRadius,
   stubRect,
 } from "./geometry.ts";
-import type { BoardFrame, Contacts, Point, Rect } from "./geometry.ts";
+import type {
+  BlobMarker,
+  BoardFrame,
+  Contacts,
+  Point,
+  Rect,
+} from "./geometry.ts";
 
 function roundRect(
   ctx: CanvasRenderingContext2D,
@@ -55,6 +64,7 @@ function drawCell(
   kind: number,
   version: number,
   contacts: Contacts,
+  role: string,
 ): void {
   const origin = cellOrigin(f, x, y);
   const colour = colourFor(level.kinds[kind]?.artKey ?? "", version);
@@ -113,6 +123,36 @@ function drawCell(
     ctx.lineTo(rect.x + rect.w - (contacts.right ? 0 : f.size * 0.2), sy);
   }
   ctx.stroke();
+
+  drawMarker(ctx, f, origin, colour, markerForRole(role));
+}
+
+/**
+ * Marks a blob whose role makes it special: the goal blobs to clear, or the greys.
+ *
+ * A dot for the goal and a square for the grey, so the two are distinguishable from
+ * each other as well as from an ordinary blob - a player clearing greys and goals
+ * in the same level needs to tell them apart at a glance.
+ */
+function drawMarker(
+  ctx: CanvasRenderingContext2D,
+  f: BoardFrame,
+  origin: Point,
+  colour: string,
+  marker: BlobMarker,
+): void {
+  if (marker === null) return;
+  const cx = origin.x + f.size / 2;
+  const cy = origin.y + f.size / 2;
+  const r = f.size * MARKER_RADIUS;
+  ctx.fillStyle = markerInk(colour);
+  ctx.beginPath();
+  if (marker === "goal") {
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  } else {
+    ctx.rect(cx - r, cy - r, r * 2, r * 2);
+  }
+  ctx.fill();
 }
 
 /** A rect moved by an offset. */
@@ -197,12 +237,22 @@ export function render(
       const other = sim.board.at(x + dx, y + dy);
       return other !== null && other.kind === blob.kind;
     };
-    drawCell(ctx, f, level, x, y, blob.kind, blob.version, {
-      up: same(0, -1),
-      down: same(0, 1),
-      left: same(-1, 0),
-      right: same(1, 0),
-    });
+    drawCell(
+      ctx,
+      f,
+      level,
+      x,
+      y,
+      blob.kind,
+      blob.version,
+      {
+        up: same(0, -1),
+        down: same(0, 1),
+        left: same(-1, 0),
+        right: same(1, 0),
+      },
+      level.kinds[blob.kind]?.role ?? "colour",
+    );
   }
 
   // The falling piece is drawn above everything, as upstream does. It gets no
@@ -223,7 +273,17 @@ export function render(
       // work for a vertical piece: both of its cells share one column, so the
       // lower blob was reported for both and a two-colour piece looked like a
       // single colour until it was rotated again.
-      drawCell(ctx, f, level, p.x, p.y, p.blob.kind, p.blob.version, isolated);
+      drawCell(
+        ctx,
+        f,
+        level,
+        p.x,
+        p.y,
+        p.blob.kind,
+        p.blob.version,
+        isolated,
+        level.kinds[p.blob.kind]?.role ?? "colour",
+      );
     }
     ctx.globalAlpha = 1;
   }

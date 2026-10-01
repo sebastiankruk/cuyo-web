@@ -49,6 +49,10 @@ interface Recorded {
   /** Every fillStyle ever set, in order. */
   styles: string[];
   arcs: number;
+  /** Centres and radii of every arc, for asserting the goal/grey markers. */
+  arcAt: { x: number; y: number; r: number }[];
+  /** rect() calls, which the grey marker uses. */
+  rects: { x: number; y: number; w: number; h: number }[];
 }
 
 function recordingContext(): { ctx: CanvasRenderingContext2D; log: Recorded } {
@@ -58,6 +62,8 @@ function recordingContext(): { ctx: CanvasRenderingContext2D; log: Recorded } {
     clears: 0,
     styles: [],
     arcs: 0,
+    arcAt: [],
+    rects: [],
   };
   const state = { fillStyle: "#000000", strokeStyle: "#000000" };
   /**
@@ -125,6 +131,12 @@ function recordingContext(): { ctx: CanvasRenderingContext2D; log: Recorded } {
       point(x - radius, y - radius);
       point(x + radius, y + radius);
       log.arcs++;
+      log.arcAt.push({ x, y, r: radius });
+    },
+    rect(x: number, y: number, w: number, h: number) {
+      point(x, y);
+      point(x + w, y + h);
+      log.rects.push({ x, y, w, h });
     },
     fill() {
       const r = boxRect();
@@ -310,14 +322,25 @@ describe("render fills the whole board", () => {
       render(ctx, sim, sizing.size);
 
       // `occupied()` is a generator, so it has to be drained before counting.
-      const occupied = [...sim.board.occupied()].length;
+      const occupied = [...sim.board.occupied()];
       const piece = sim.fall === null ? 0 : sim.piecePositions(sim.fall).length;
       // If a test silently counted zero blobs the assertion below would pass
       // vacuously, so the inputs are stated rather than assumed.
       expect(sim.fall, "no falling piece to draw").not.toBeNull();
-      // One background fill, then one fill per blob.
-      expect(log.fills.length).toBe(1 + occupied + piece);
-      expect(occupied).toBeGreaterThan(0);
+
+      // One background fill, one per blob, one per piece cell, and one more for
+      // every blob that carries a goal or grey marker - a marker is a fill of its
+      // own, so leaving it out here would have made this count wrong the moment
+      // markers were added.
+      const marked = occupied.filter((p) => {
+        const role = sim.kindAt(p.x, p.y)?.role;
+        return role === "grass" || role === "grey";
+      }).length;
+      expect(
+        log.fills.length,
+        `background + ${occupied.length} blobs + ${piece} piece cells + ${marked} markers`,
+      ).toBe(1 + occupied.length + piece + marked);
+      expect(occupied.length).toBeGreaterThan(0);
     });
 
     it(`draws every cell inside the canvas`, () => {
@@ -446,6 +469,73 @@ describe("render fills the whole board", () => {
           colourFor(level.kinds[piece!.blobs[0].kind]!.artKey, 0),
           colourFor(level.kinds[piece!.blobs[1].kind]!.artKey, 0),
         ]);
+      }
+    });
+
+    it("marks the goal and grey blobs so they can be found on the board", () => {
+      // The rules panel points at "marked" blobs, so the board has to mark them.
+      // Without this the text describes something the player cannot see, which is
+      // worse than saying nothing: it makes the board look wrong.
+      //
+      // A shape rather than a tint, because goal blobs already have their own
+      // colour and recolouring them would work against telling them apart from each
+      // other. And the two marks differ - a dot for the goal, a square for the grey -
+      // so a level with both is readable at a glance.
+      const sim = simulate(fixture.make);
+      const sizing = boardSizing(600, 900, 1);
+      const { ctx, log } = recordingContext();
+      render(ctx, sim, sizing.size);
+
+      const frame: BoardFrame = {
+        size: sizing.size,
+        hex: hexGeometry(level.neighbours),
+        mirror: level.mirror,
+      };
+      const blobs = [...sim.board.occupied()];
+      const goals = blobs.filter((p) => sim.kindAt(p.x, p.y)?.role === "grass");
+      const greys = blobs.filter((p) => sim.kindAt(p.x, p.y)?.role === "grey");
+
+      const centreOf = (p: { x: number; y: number }) => {
+        const o = cellOrigin(frame, p.x, p.y);
+        return { x: o.x + sizing.size / 2, y: o.y + sizing.size / 2 };
+      };
+      const marked = (p: { x: number; y: number }) => {
+        const c = centreOf(p);
+        return (
+          log.arcAt.some((a) => Math.hypot(a.x - c.x, a.y - c.y) < 2) ||
+          log.rects.some(
+            (r) =>
+              Math.abs(r.x + r.w / 2 - c.x) < 2 &&
+              Math.abs(r.y + r.h / 2 - c.y) < 2,
+          )
+        );
+      };
+
+      // Every goal and grey blob carries a mark.
+      for (const p of [...goals, ...greys]) {
+        expect(
+          marked(p),
+          `no marker on ${sim.kindAt(p.x, p.y)?.name} at ${p.x},${p.y}`,
+        ).toBe(true);
+      }
+      // And an ordinary colour blob does not, or the marks mean nothing.
+      const plain = blobs.filter(
+        (p) => sim.kindAt(p.x, p.y)?.role === "colour",
+      );
+      if (plain.length > 0) {
+        const unmarked = plain.filter((p) => !marked(p));
+        expect(unmarked.length, "ordinary blobs must not be marked").toBe(
+          plain.length,
+        );
+      }
+      // The two roles use different marks, when the level has both.
+      if (goals.length > 0 && greys.length > 0) {
+        const isDot = (p: { x: number; y: number }): boolean => {
+          const c = centreOf(p);
+          return log.arcAt.some((a) => Math.hypot(a.x - c.x, a.y - c.y) < 2);
+        };
+        expect(isDot(goals[0]!)).toBe(true);
+        expect(isDot(greys[0]!)).toBe(false);
       }
     });
 
