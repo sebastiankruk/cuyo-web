@@ -49,11 +49,7 @@ export type Orientation = "horizontal" | "vertical" | "single";
  * `richtung_einzel`. A single piece always falls at the fast rate, so the fast
  * flag is inherited from the piece rather than forced on.
  */
-function survivingHalf(
-  attempted: FallPiece,
-  x: number,
-  blob: Blob,
-): FallPiece {
+function survivingHalf(attempted: FallPiece, x: number, blob: Blob): FallPiece {
   return {
     ...attempted,
     x,
@@ -125,8 +121,7 @@ export class Simulation {
 
   constructor(level: LevelDef, options: SimulationOptions = {}) {
     this.level = level;
-    this.random =
-      options.random ?? new Prng([options.seed ?? 0x9e3779b9]);
+    this.random = options.random ?? new Prng([options.seed ?? 0x9e3779b9]);
     this.reset();
   }
 
@@ -247,14 +242,14 @@ export class Simulation {
     this.phase = "falling";
   }
 
-/**
- * `src/blopgitter.cpp:BlopGitter::testPlatzSpalte`.
- *
- * True when a blob may occupy column `x` at row `y`. The cell itself must be
- * free, and the first blob above it must float *and* be separated by at least
- * one empty cell - so a blob sitting directly overhead blocks, which is what
- * stops a piece from being steered in under a stack.
- */
+  /**
+   * `src/blopgitter.cpp:BlopGitter::testPlatzSpalte`.
+   *
+   * True when a blob may occupy column `x` at row `y`. The cell itself must be
+   * free, and the first blob above it must float *and* be separated by at least
+   * one empty cell - so a blob sitting directly overhead blocks, which is what
+   * stops a piece from being steered in under a stack.
+   */
   private canOccupy(x: number, y: number): boolean {
     if (x < 0 || x >= GRX) return false;
     if (y >= GRY) return false;
@@ -317,7 +312,8 @@ export class Simulation {
    */
   private spawnMarginRow(): number {
     return (
-      Math.floor((this.borderPx + GREY_SPAWN_OFFSET_PX) / GRIC) + NEW_FALL_MARGIN
+      Math.floor((this.borderPx + GREY_SPAWN_OFFSET_PX) / GRIC) +
+      NEW_FALL_MARGIN
     );
   }
 
@@ -365,7 +361,8 @@ export class Simulation {
     if (piece === null || piece.orientation === "single") return;
     const turned: FallPiece = {
       ...piece,
-      orientation: piece.orientation === "horizontal" ? "vertical" : "horizontal",
+      orientation:
+        piece.orientation === "horizontal" ? "vertical" : "horizontal",
     };
     // Upstream swaps blob order so the rotation reads as clockwise. A mirrored
     // level is already drawn flipped, so the swap is inverted for it:
@@ -434,7 +431,8 @@ export class Simulation {
     const piece = this.fall;
     if (piece === null) return;
 
-    if (piece.slideRemaining > 0) piece.slideRemaining = Math.max(0, piece.slideRemaining - 8);
+    if (piece.slideRemaining > 0)
+      piece.slideRemaining = Math.max(0, piece.slideRemaining - 8);
 
     const speed =
       piece.fast || piece.orientation === "single"
@@ -575,7 +573,9 @@ export class Simulation {
    * the whole step machine.
    */
   testExplosions(): void {
-    const animating = this.board.cells.some((c) => c !== null && c.exploding !== 0);
+    const animating = this.board.cells.some(
+      (c) => c !== null && c.exploding !== 0,
+    );
     if (animating) {
       this.phase = "testing";
       return;
@@ -681,48 +681,65 @@ export class Simulation {
     // collapsing them keeps a piece cycle down to roughly its true length.
     for (let guard = 0; guard < 8; guard++) {
       switch (this.phase) {
-      case "falling": {
-        // A new piece is only introduced once the field has drained, so while
-        // one is in play there is nothing else to do.
-        if (this.fall !== null) return;
-        this.phase = "testing";
-        continue;
-      }
-      case "testing":
-        this.testExplosions();
-        continue;
-      case "exploding": {
-        const stillExploding = this.board.cells.some(
-          (c) => c !== null && c.exploding !== 0,
-        );
-        if (stillExploding) return;
-        this.finishExplosions();
-        this.phase = "settling";
-        continue;
-      }
-      case "settling": {
-        if (this.applyGravity()) continue;
-        this.phase = "spawningGreys";
-        continue;
-      }
-      case "spawningGreys": {
-        if (this.spawnGreys()) continue;
-        if (this.goalCount === 0) {
-          this.phase = "timeBonus";
-          return;
+        case "falling": {
+          // A new piece is only introduced once the field has drained, so while
+          // one is in play there is nothing else to do.
+          if (this.fall !== null) return;
+          this.phase = "testing";
+          continue;
         }
-        // Upstream stays in `modus_neue_graue` while `rutschnach_viel` is
-        // reported, giving the field another step to come down before a piece is
-        // sent. Returning to `settling` is the equivalent here.
-        if (this.settledAboveMargin) {
+        case "testing":
+          this.testExplosions();
+          continue;
+        case "exploding": {
+          // Advance the animation *first*, then ask whether anything is still
+          // exploding.
+          //
+          // The order is the whole bug. Asking first and returning on a true answer
+          // meant the only call to `finishExplosions` sat behind a condition that
+          // could never be false: `exploding` is set to 1 when the detonation is
+          // scheduled, and `finishExplosions` is what increments it past that, so
+          // nothing ever incremented it and the game sat in this phase forever. The
+          // visible symptom was an explosion animation that started and never
+          // finished, with the game frozen behind it - and since the border and the
+          // piece both stop advancing, it looked like the game had ended rather than
+          // hung.
+          //
+          // Upstream keeps the same separation: `spielSchritt` only *waits* on
+          // `getWasAmPlatzen()`, while the animation itself is driven by
+          // `BlopGitter::animiere()`. Here one `step()` is both, so it has to do the
+          // animating as well as the waiting.
+          this.finishExplosions();
+          const stillExploding = this.board.cells.some(
+            (c) => c !== null && c.exploding !== 0,
+          );
+          if (stillExploding) return;
           this.phase = "settling";
           continue;
         }
-        this.spawnPiece();
-        continue;
-      }
-      default:
-        return;
+        case "settling": {
+          if (this.applyGravity()) continue;
+          this.phase = "spawningGreys";
+          continue;
+        }
+        case "spawningGreys": {
+          if (this.spawnGreys()) continue;
+          if (this.goalCount === 0) {
+            this.phase = "timeBonus";
+            return;
+          }
+          // Upstream stays in `modus_neue_graue` while `rutschnach_viel` is
+          // reported, giving the field another step to come down before a piece is
+          // sent. Returning to `settling` is the equivalent here.
+          if (this.settledAboveMargin) {
+            this.phase = "settling";
+            continue;
+          }
+          this.spawnPiece();
+          continue;
+        }
+        default:
+          return;
       }
     }
   }
@@ -803,7 +820,10 @@ export class Simulation {
 
     let spawned = false;
     while (this.pendingGreys > 0 && freeColumns.length > 0) {
-      const column = freeColumns.splice(this.random.int(freeColumns.length), 1)[0];
+      const column = freeColumns.splice(
+        this.random.int(freeColumns.length),
+        1,
+      )[0];
       if (column === undefined) break;
       // `nogreyprob` is a weight on *no* grey appearing, rolled per scheduled
       // grey rather than folded into the kind weights, so it has to sit in the

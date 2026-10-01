@@ -24,7 +24,7 @@ import react from "@vitejs/plugin-react";
  * DNS-rebinding guard: without it, a page on the open internet could point a
  * hostname at your loopback interface and have the dev server serve it to
  * whoever loaded that page. Coming through the Cloudflare tunnel the header is
- * `dev.cuyo.kruk.me` rather than `localhost`, so the guard fires and the tunnel
+ * `dev-cuyo.kruk.me` rather than `localhost`, so the guard fires and the tunnel
  * sees "Blocked request".
  *
  * The hostname is allowed by name rather than by turning the check off with
@@ -35,8 +35,13 @@ import react from "@vitejs/plugin-react";
  * `CUYO_ALLOWED_HOSTS` overrides the list, comma-separated, for another tunnel
  * hostname or a second one. localhost, 127.0.0.1 and the machine's own address are
  * allowed by Vite already and are not repeated here.
+ *
+ * The hostname has changed once already (`dev.cuyo.kruk.me` to `dev-cuyo.kruk.me`),
+ * and it is written out in `docs/tunnel-dev.md` as well. Those two places plus this
+ * one are the whole list: the tunnel's ingress config in `~/.cloudflared/` and the
+ * Cloudflare DNS record are yours, not the repository's.
  */
-const ALLOWED_HOSTS = (process.env["CUYO_ALLOWED_HOSTS"] ?? "dev.cuyo.kruk.me")
+const ALLOWED_HOSTS = (process.env["CUYO_ALLOWED_HOSTS"] ?? "dev-cuyo.kruk.me")
   .split(",")
   .map((h) => h.trim())
   .filter((h) => h !== "");

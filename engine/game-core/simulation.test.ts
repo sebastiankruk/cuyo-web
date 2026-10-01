@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { EXPLOSION_STEPS, FALLING_SPEED, FLOATS, GRX, GRY } from "./constants.ts";
+import {
+  EXPLOSION_STEPS,
+  FALLING_SPEED,
+  FLOATS,
+  GRX,
+  GRY,
+} from "./constants.ts";
 import { Blob } from "./board.ts";
 import { Simulation } from "./simulation.ts";
 import { ScriptedPrng } from "../testing/prng-stub.ts";
@@ -12,7 +18,10 @@ function fixedKindPicker(kindId: number): ScriptedPrng {
   return new ScriptedPrng(values);
 }
 
-function makeSim(level = nasenkugeln(), random = fixedKindPicker(0)): Simulation {
+function makeSim(
+  level = nasenkugeln(),
+  random = fixedKindPicker(0),
+): Simulation {
   return new Simulation(level, { random });
 }
 
@@ -224,6 +233,53 @@ describe("Simulation: explosions", () => {
       expect(sim.board.at(x, 5), `cell ${x} survived the animation`).toBeNull();
     }
   });
+
+  it("finishes the explosion animation without being driven by hand", () => {
+    // The regression, and the reason it survived so long: every other test in this
+    // file calls `testExplosions` and `finishExplosions` directly, which is the
+    // honest way to test the two halves in isolation - and left the wiring between
+    // them untested. The step machine was supposed to call the second one, and it
+    // never did: the "exploding" branch asked whether anything was still
+    // exploding and returned early, but `finishExplosions` is what decrements the
+    // counter, so the question's answer could never change.
+    //
+    // In the browser this froze the game permanently on the first detonation: the
+    // animation started, never finished, and neither the border nor the piece
+    // advanced again. A level whose first explosion you reach by playing normally
+    // was therefore unwinnable, which is worse than a crash - there was no error,
+    // just a board that stopped responding.
+    const sim = makeSim();
+    layRow(sim, 0, 6);
+    sim.fall = null;
+    sim.phase = "testing";
+
+    for (let i = 0; i < EXPLOSION_STEPS * 4; i++) sim.step();
+
+    const stillExploding = [...sim.board.occupied()].filter(
+      (p) => sim.board.at(p.x, p.y)?.exploding !== 0,
+    ).length;
+    expect(stillExploding, "explosion never finished").toBe(0);
+    // And the machine moved on rather than sitting in "exploding" for ever.
+    expect(sim.phase).not.toBe("exploding");
+  });
+
+  it("advances the explosion over several steps, not all at once", () => {
+    // Guards against "fixing" the freeze by finishing the animation immediately:
+    // the blobs would vanish on the detonation step and the animation would never
+    // be seen. Each step must move the counter on by exactly one.
+    const sim = makeSim();
+    layRow(sim, 0, 6);
+    sim.fall = null;
+    sim.phase = "testing";
+
+    sim.step();
+    expect(sim.board.at(0, 5)?.exploding).toBe(2);
+    sim.step();
+    expect(sim.board.at(0, 5)?.exploding).toBe(3);
+    // Still present midway, still gone only once the last step has run.
+    for (let i = 0; i < EXPLOSION_STEPS - 4; i++) sim.step();
+    expect(sim.board.at(0, 5)).not.toBeNull();
+  });
 });
 
 describe("Simulation: chase border", () => {
@@ -274,7 +330,9 @@ describe("Simulation: lifecycle", () => {
       return {
         score: sim.score,
         phase: sim.phase,
-        board: sim.board.cells.map((c) => (c === null ? "." : String(c.kind))).join(""),
+        board: sim.board.cells
+          .map((c) => (c === null ? "." : String(c.kind)))
+          .join(""),
       };
     };
     expect(play()).toEqual(play());
@@ -282,10 +340,17 @@ describe("Simulation: lifecycle", () => {
 
   it("is reproducible with an injected random source", () => {
     const play = () => {
-      const values = Array.from({ length: 5000 }, (_, i) => ((i * 37) % 1000) / 1000);
-      const sim = new Simulation(hormone(), { random: new ScriptedPrng(values) });
+      const values = Array.from(
+        { length: 5000 },
+        (_, i) => ((i * 37) % 1000) / 1000,
+      );
+      const sim = new Simulation(hormone(), {
+        random: new ScriptedPrng(values),
+      });
       for (let i = 0; i < 400; i++) sim.step();
-      return sim.board.cells.map((c) => (c === null ? "." : String(c.kind))).join("");
+      return sim.board.cells
+        .map((c) => (c === null ? "." : String(c.kind)))
+        .join("");
     };
     expect(play()).toEqual(play());
   });

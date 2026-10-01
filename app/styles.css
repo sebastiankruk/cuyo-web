@@ -18,7 +18,25 @@
 html,
 body,
 #root {
+  /*
+   * 100dvh, not 100%.
+   *
+   * `height: 100%` resolves against the *layout* viewport, which on a phone is
+   * sized for the browser chrome being hidden. With the chrome shown - the normal
+   * state - the layout viewport is taller than the visible area, so a board sized
+   * to it runs underneath the URL bar and its bottom row is unreachable. That was
+   * the "bottom of the screen is cut out": not a clipping bug in the layout, but
+   * the layout correctly filling a viewport larger than the screen.
+   *
+   * `dvh` tracks the viewport as the chrome collapses and expands, and it moves
+   * live, which is why it also fixes the case where the URL bar hides on scroll
+   * and the board would otherwise keep a stale size.
+   *
+   * `100%` is kept as a fallback for anything that does not understand `dvh`. A
+   * bare `dvh` in the same declaration would discard it.
+   */
   height: 100%;
+  height: 100dvh;
   margin: 0;
 }
 
@@ -128,8 +146,23 @@ button {
 
 .play {
   display: grid;
-  grid-template-rows: auto 1fr auto auto;
+  /*
+   * Rows: HUD, board, controls, dev footer.
+   *
+   * The board takes the slack and the controls are `auto`, so a board that wants
+   * more than its share must not be able to take it. `minmax(0, 1fr)` rather than
+   * `1fr` is what enforces that: a bare `1fr` has an implicit `min-content` floor,
+   * so a tall child - the canvas, which is twice as tall as it is wide - can push
+   * the grid past the viewport and shove the controls off the bottom of a phone.
+   */
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   height: 100%;
+  /*
+   * Fixed to the visible viewport rather than the flow, because the flow includes
+   * whatever the browser decides to overlay. Combined with `100dvh` above, this is
+   * what keeps the last row of the board and the controls reachable.
+   */
+  overflow: hidden;
   padding-top: env(safe-area-inset-top);
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
@@ -178,19 +211,21 @@ button {
 
 .play__canvas {
   /*
-   * The canvas is sized from the space available, not stretched to fill.
+   * Deliberately *not* sized here.
    *
-   * `width: 100%` with `max-height: 100%` looks right but is not: when the height
-   * clamp bites, the element's width stays at 100% while its height is capped, so
-   * the 1:2 proportion the backing store relies on is violated and the board is
-   * squashed. Letting the element take the canvas's own pixel dimensions and
-   * bounding it with max-width/max-height keeps the two in step, and the element
-   * then scales down to fit whatever the layout gives it.
+   * The canvas gets its width and height in CSS pixels from `PlayScreen`, which
+   * measures the space available and derives both from the same cell size the
+   * renderer draws with. An earlier version left it to `aspect-ratio` plus
+   * `max-width`/`max-height`, applied to a canvas whose intrinsic size is its
+   * backing store - and the two clamps disagreed, producing a board roughly square
+   * in a large landscape viewport with dead space above it.
+   *
+   * The bounds below are a backstop for the one frame before that measurement
+   * lands, and for the zero-space case, so the canvas never overflows its row while
+   * PlayScreen is not in control of it.
    */
   max-width: 100%;
   max-height: 100%;
-  /* The board is 10x20, so exactly half as tall as it is wide. */
-  aspect-ratio: 1 / 2;
   border: 1px solid var(--line);
   border-radius: 8px;
   /* Hand the gesture to the game rather than scrolling or zooming the page. */

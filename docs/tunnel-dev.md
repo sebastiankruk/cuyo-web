@@ -30,14 +30,14 @@ Vite refuses a request whose `Host` header it does not recognise, so the first
 time the tunnel is pointed at the dev server the page says:
 
 ```text
-Blocked request. This host ("dev.cuyo.kruk.me") is not allowed.
+Blocked request. This host ("dev-cuyo.kruk.me") is not allowed.
 ```
 
 That is a DNS-rebinding guard, and it is working as intended: without it, a page
 anywhere on the internet could point a hostname at your loopback interface and
 have the dev server serve it to whoever loaded that page.
 
-`dev.cuyo.kruk.me` is allowed **by name** in `vite.config.ts`, for both the dev
+`dev-cuyo.kruk.me` is allowed **by name** in `vite.config.ts`, for both the dev
 server and `vite preview`. The alternative — `host: true`, which allows any
 header — would have worked and would have removed the guard, which is the thing
 to avoid. A hostname added later fails loudly instead of quietly working.
@@ -67,7 +67,7 @@ For a named tunnel, add to `/etc/cloudflared/config.yml`:
 
 ```yaml
 ingress:
-  - hostname: dev.cuyo.kruk.me
+  - hostname: dev-cuyo.kruk.me
     service: http://localhost:5173
   - service: http_status:404
 ```

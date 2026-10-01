@@ -33,32 +33,26 @@ export interface GestureOptions {
    */
   readonly cellSize?: number;
   /**
-   * Distance in pixels that counts as a flick rather than a drag.
+   * Distance in pixels a touch may wander and still count as a tap.
    *
-   * Below this, horizontal movement is still handled as a drag; above it, a
-   * horizontal flick moves the piece one cell and stops following the finger.
-   * Set high enough that an ordinary drag never trips it.
-   */
-  readonly flickDistance?: number;
-  /**
-   * Distance in pixels before a tap is treated as a swipe at all. Below this the
-   * gesture is a tap, which drops the piece where it is.
+   * A tap rotates, so this threshold is the cost of an accidental rotate: too
+   * tight and holding a touch to steady your hand rotates the piece; too loose and
+   * a short drag stops steering. 10px is below the jitter of a deliberate press
+   * and above the drift of a thumb resting on glass.
    */
   readonly tapDistance?: number;
 }
 
 /**
- * Decides what a drag from `from` to `to` means, given where the piece is.
+ * Decides what a drag from `from` to `to` means.
  *
- * `cellSize` is the distance one move covers, so `floor` division gives the
- * number of cells travelled without needing the piece's own column. `origin`
- * matters only for the sign: dragging right moves right regardless of where the
- * piece started.
+ * `cellSize` is the distance one move covers, so `floor` division gives the number
+ * of cells travelled without needing the piece's own column. The sign comes from
+ * the drag, not the start point: dragging right moves right wherever the piece is.
  *
- * The comparison is on the dominant axis, which is what makes the gesture feel
- * right on a board that is twice as tall as it is wide: on a portrait phone most
- * swipes are up or down, and a vertical flick should drop the piece rather than
- * nudge it sideways by a pixel.
+ * The axis comparison is what makes this feel right on a board twice as tall as it
+ * is wide. On a portrait phone most swipes are up or down, so a mostly-vertical
+ * drag drops the piece rather than nudging it sideways by a pixel.
  */
 export function readGesture(
   from: PointerSample,
@@ -66,24 +60,25 @@ export function readGesture(
   options: GestureOptions = {},
 ): Gesture | null {
   const cellSize = options.cellSize ?? 32;
-  const flickDistance = options.flickDistance ?? cellSize * 1.5;
   const tapDistance = options.tapDistance ?? 10;
 
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const distance = Math.hypot(dx, dy);
-  // A tap, or a press that did not move: nothing to do. Returning null is what
-  // lets the caller leave the piece alone rather than guessing.
-  if (distance < tapDistance) return null;
+  // A tap rotates. This is the most repeated action in the game by a wide margin,
+  // and it used to be an upward flick - which meant every rotate was a gesture
+  // large enough to be mistaken for something else, and on a board where the
+  // piece cannot rise an upward drag did nothing at all. A tap is unambiguous:
+  // press and lift without moving is never a drag.
+  if (distance < tapDistance) return { kind: "rotate" };
 
   // Vertical wins ties, because dropping a piece is the common intent on a tall
   // board and a sideways nudge is not.
   if (Math.abs(dy) >= Math.abs(dx)) {
     if (dy > 0) return { kind: "fast" };
-    // Up. A short upward flick is a rotate, which is the single most repeated
-    // action in the game; a long one is a drag upwards, which moves nothing since
-    // the piece cannot rise, so it is left to the caller as no movement.
-    if (distance < flickDistance) return { kind: "rotate" };
+    // Up. A piece cannot rise, so an upward drag has nothing to act on and is
+    // ignored - which is why rotate moved to the tap: an upward flick that did
+    // nothing was the most common misfire on a phone.
     return null;
   }
 
@@ -100,7 +95,10 @@ export interface GestureTarget {
   toggleFast(): void;
 }
 
-export function applyGesture(target: GestureTarget, gesture: Gesture | null): boolean {
+export function applyGesture(
+  target: GestureTarget,
+  gesture: Gesture | null,
+): boolean {
   if (gesture === null) return false;
   switch (gesture.kind) {
     case "move": {

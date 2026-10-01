@@ -76,6 +76,43 @@ function drawCell(
   ctx.moveTo(rect.x + f.size * 0.16, rect.y + band);
   ctx.lineTo(rect.x + rect.w - f.size * 0.16, rect.y + band);
   ctx.stroke();
+
+  // A seam along each edge that touches a same-kind neighbour.
+  //
+  // Touching blobs deliberately meet with no gap, so that a run of them reads as
+  // one shape - that is the whole point of the connection artwork upstream, and it
+  // is how you tell at a glance which blobs are joined. But with no seam at all a
+  // six-blob group renders as one large rectangle of colour, and counting the
+  // blobs is impossible, which is not a small thing when the win condition is
+  // "connect six of these".
+  //
+  // So the shared edge is drawn rather than the gap. The silhouette stays joined
+  // while each cell remains countable, which is what the original artwork does:
+  // the connection variants tile continuously but each tile keeps its edge.
+  ctx.strokeStyle = shade(colour, -0.28);
+  ctx.lineWidth = Math.max(1, f.size * 0.05);
+  ctx.beginPath();
+  if (contacts.left) {
+    const sx = rect.x;
+    ctx.moveTo(sx, rect.y + (contacts.up ? 0 : f.size * 0.2));
+    ctx.lineTo(sx, rect.y + rect.h - (contacts.down ? 0 : f.size * 0.2));
+  }
+  if (contacts.right) {
+    const sx = rect.x + rect.w;
+    ctx.moveTo(sx, rect.y + (contacts.up ? 0 : f.size * 0.2));
+    ctx.lineTo(sx, rect.y + rect.h - (contacts.down ? 0 : f.size * 0.2));
+  }
+  if (contacts.up) {
+    const sy = rect.y;
+    ctx.moveTo(rect.x + (contacts.left ? 0 : f.size * 0.2), sy);
+    ctx.lineTo(rect.x + rect.w - (contacts.right ? 0 : f.size * 0.2), sy);
+  }
+  if (contacts.down) {
+    const sy = rect.y + rect.h;
+    ctx.moveTo(rect.x + (contacts.left ? 0 : f.size * 0.2), sy);
+    ctx.lineTo(rect.x + rect.w - (contacts.right ? 0 : f.size * 0.2), sy);
+  }
+  ctx.stroke();
 }
 
 /** A rect moved by an offset. */
@@ -118,7 +155,11 @@ export function render(
   size: number,
 ): void {
   const level = sim.level;
-  const f: BoardFrame = { size, hex: hexGeometry(level.neighbours), mirror: level.mirror };
+  const f: BoardFrame = {
+    size,
+    hex: hexGeometry(level.neighbours),
+    mirror: level.mirror,
+  };
   const width = 10 * size;
   const height = 20 * size;
 
@@ -144,7 +185,10 @@ export function render(
   for (const { x, y } of sim.board.occupied()) {
     const blob = sim.board.at(x, y);
     if (blob === null) continue;
-    const colour = colourFor(level.kinds[blob.kind]?.artKey ?? "", blob.version);
+    const colour = colourFor(
+      level.kinds[blob.kind]?.artKey ?? "",
+      blob.version,
+    );
     if (blob.exploding !== 0) {
       drawExplosion(ctx, f, x, y, colour, blob.exploding);
       continue;
@@ -166,7 +210,12 @@ export function render(
   const piece = sim.fall;
   if (piece !== null) {
     ctx.globalAlpha = 0.95;
-    const isolated: Contacts = { up: false, down: false, left: false, right: false };
+    const isolated: Contacts = {
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+    };
     for (const p of sim.piecePositions(piece)) {
       if (p.y < 0 || p.y >= 20) continue;
       const blob = fallingBlob(piece, p.x);

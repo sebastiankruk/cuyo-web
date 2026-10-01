@@ -8,11 +8,7 @@
  * smell pointing at logic in the wrong place.
  */
 
-import {
-  GRX,
-  GRY,
-  columnShift,
-} from "../engine/game-core/constants.ts";
+import { GRX, GRY, columnShift } from "../engine/game-core/constants.ts";
 import type { HexGeometry } from "../engine/game-core/constants.ts";
 
 /** The level properties that affect board geometry. */
@@ -116,9 +112,7 @@ export function boardSizing(
   // Same for the width, except that zero is a genuine constraint there and must
   // not become a fallback size: no room means no board, not a default board.
   const width = Number.isFinite(availableWidth) ? availableWidth : 0;
-  const fitted = heightUsable
-    ? fitBoard(width, availableHeight).width
-    : width;
+  const fitted = heightUsable ? fitBoard(width, availableHeight).width : width;
   const size = fitted / GRX;
   // A zero or non-finite ratio would make the backing store 0x0, which renders as
   // a blank canvas even though `size` is perfectly good - the same symptom one
@@ -165,10 +159,7 @@ export function dragCells(f: BoardFrame, dx: number): number {
  * The border descends from the top, or from the bottom in a mirrored level.
  * `borderCell` is the border position expressed in cells.
  */
-export function borderBand(
-  f: BoardFrame,
-  borderCell: number,
-): Rect {
+export function borderBand(f: BoardFrame, borderCell: number): Rect {
   const height = boardHeight(f.size);
   const travelled = Math.max(0, Math.min(height, borderCell * f.size));
   return f.mirror

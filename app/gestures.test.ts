@@ -15,12 +15,36 @@ function drag(dx: number, dy: number): ReturnType<typeof readGesture> {
 }
 
 describe("readGesture", () => {
-  it("treats a stationary press as no gesture at all", () => {
-    expect(readGesture({ x: 10, y: 10 }, { x: 10, y: 10 })).toBeNull();
-    // Below the tap threshold, in every direction.
-    expect(drag(2, 0)).toBeNull();
-    expect(drag(0, 2)).toBeNull();
-    expect(drag(-3, 3)).toBeNull();
+  it("rotates on a tap", () => {
+    // Rotate used to be an upward flick, which meant every rotation was a
+    // gesture big enough to be confused with something else - and on a board
+    // where a piece cannot rise, the upward drag that could not be mistaken for
+    // anything did nothing at all. A tap is the common case for the most
+    // repeated action in the game, so it is the one that has to be cheap.
+    expect(readGesture({ x: 10, y: 10 }, { x: 10, y: 10 })).toEqual({
+      kind: "rotate",
+    });
+    expect(drag(2, 0)).toEqual({ kind: "rotate" });
+    expect(drag(0, 2)).toEqual({ kind: "rotate" });
+    expect(drag(-3, 3)).toEqual({ kind: "rotate" });
+    expect(drag(0, 9)).toEqual({ kind: "rotate" });
+  });
+
+  it("stops treating a tap as a rotate once it passes the threshold", () => {
+    // The boundary is the cost of an accidental rotate, so it is pinned on both
+    // sides: a press that drifts less than the tap distance rotates, one that
+    // drifts further is a drag and does whatever its direction says.
+    //
+    // Note the gap this exposes. A drag just past the tap distance has not yet
+    // crossed a cell boundary, so it is neither a tap nor a move and nothing
+    // happens. That is intentional - the caller keeps its anchor point, so the
+    // drag starts steering as soon as it crosses, rather than snapping by a
+    // fraction of a cell on release - but it means "moved" and "acted" are not
+    // the same thing, which is why `applyGesture` reports whether it did anything.
+    expect(drag(10, 0)).toBeNull();
+    expect(drag(0, -10)).toBeNull();
+    // Past a cell, the same gesture steers.
+    expect(drag(32, 0)).toEqual({ kind: "move", cells: 1 });
   });
 
   it("moves right for a horizontal drag and left for a leftward one", () => {
@@ -39,14 +63,13 @@ describe("readGesture", () => {
     expect(drag(97, 0)).toEqual({ kind: "move", cells: 3 });
   });
 
-  it("rotates on a short upward flick", () => {
-    expect(drag(0, -20)).toEqual({ kind: "rotate" });
-  });
-
-  it("does nothing on a long upward drag, because a piece cannot rise", () => {
-    // Longer than the flick distance, so it is not a flick. Returning null
-    // leaves the piece where it is rather than dropping it.
+  it("does nothing on an upward drag, because a piece cannot rise", () => {
+    // Any length, short or long. Returning null leaves the piece where it is
+    // rather than dropping it, so an upward drag is simply inert - which is why
+    // rotate had to move off it.
+    expect(drag(0, -20)).toBeNull();
     expect(drag(0, -80)).toBeNull();
+    expect(drag(0, -400)).toBeNull();
   });
 
   it("drops the piece on a downward drag of any length", () => {
@@ -59,30 +82,34 @@ describe("readGesture", () => {
     // mostly-downward drag drops rather than nudging sideways - and a mostly-upward
     // one rotates rather than nudging sideways either.
     expect(drag(10, 40)).toEqual({ kind: "fast" });
-    expect(drag(-10, -40)).toEqual({ kind: "rotate" });
+    // Upward and diagonal-upward: inert, since a piece cannot rise.
+    expect(drag(-10, -40)).toBeNull();
     // Equal on both axes counts as vertical too.
     expect(drag(30, 30)).toEqual({ kind: "fast" });
   });
 
   it("is deliberately not symmetric vertically", () => {
-    // Up and down mean different things, so a mirrored vertical gesture is a
-    // different action rather than the reverse of the first. Stated explicitly
-    // because it is the one place direction is not symmetric, and a reader would
-    // otherwise assume it was a bug.
+    // Up and down mean different things: down drops, up does nothing. Stated
+    // explicitly because it is the one place direction is not symmetric, and a
+    // reader would otherwise assume it was a bug.
     expect(drag(0, 25)).toEqual({ kind: "fast" });
-    expect(drag(0, -25)).toEqual({ kind: "rotate" });
+    expect(drag(0, -25)).toBeNull();
   });
 
-  it("scales its thresholds with the cell size", () => {
+  it("scales the drag threshold with the cell size", () => {
     // A bigger board means bigger pixels per cell, so the same physical swipe
-    // covers fewer cells. The tap threshold must follow, or a large-cell board
-    // would need a bigger movement before registering at all.
+    // covers fewer cells. The tap threshold deliberately does *not* follow: it is
+    // a property of the finger, not of the board, and scaling it with the cell
+    // would mean a large-cell board needed a bigger movement before a tap
+    // registered at all.
     const big = { cellSize: 64 };
     expect(readGesture({ x: 0, y: 0 }, { x: 70, y: 0 }, big)).toEqual({
       kind: "move",
       cells: 1,
     });
-    expect(readGesture({ x: 0, y: 0 }, { x: 7, y: 0 }, big)).toBeNull();
+    expect(readGesture({ x: 0, y: 0 }, { x: 7, y: 0 }, big)).toEqual({
+      kind: "rotate",
+    });
   });
 
   it("mirrors horizontal drags, so direction comes from the drag not the start", () => {

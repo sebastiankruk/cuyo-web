@@ -51,7 +51,13 @@ interface Recorded {
 }
 
 function recordingContext(): { ctx: CanvasRenderingContext2D; log: Recorded } {
-  const log: Recorded = { fills: [], strokes: 0, clears: 0, styles: [], arcs: 0 };
+  const log: Recorded = {
+    fills: [],
+    strokes: 0,
+    clears: 0,
+    styles: [],
+    arcs: 0,
+  };
   const state = { fillStyle: "#000000", strokeStyle: "#000000" };
   const ctx = {
     get fillStyle() {
@@ -113,7 +119,9 @@ function recordingContext(): { ctx: CanvasRenderingContext2D; log: Recorded } {
   return { ctx, log };
 }
 
-function simulate(make: () => ReturnType<typeof FIXTURES[number]["make"]>): Simulation {
+function simulate(
+  make: () => ReturnType<(typeof FIXTURES)[number]["make"]>,
+): Simulation {
   const sim = new Simulation(make(), { seed: 1 });
   // A few steps so a piece is falling and the start layout has settled.
   for (let i = 0; i < 6; i++) sim.step();
@@ -143,6 +151,50 @@ describe("boardSizing", () => {
     expect(two.size).toBe(one.size);
     expect(two.pixelsX).toBe(one.pixelsX * 2);
     expect(two.pixelsY).toBe(one.pixelsY * 2);
+  });
+
+  it("keeps the backing store an exact multiple of the board's CSS size", () => {
+    // The canvas element's box is set in CSS pixels and its backing store in
+    // device pixels, and they have to agree or the board is scaled - which is what
+    // happened on a tablet when the two were left to be reconciled by CSS against
+    // an element whose intrinsic size was in device pixels: the board came out
+    // roughly square in a wide viewport.
+    //
+    // Pinned for a range of viewports and ratios, because it only misbehaved on
+    // the large-and-landscape ones.
+    for (const dpr of [1, 1.5, 2, 3]) {
+      for (const [w, h] of [
+        [1024, 768],
+        [834, 1112],
+        [1112, 834],
+        [390, 844],
+        [2048, 1536],
+      ]) {
+        const s = boardSizing(w, h, dpr);
+        // Rounded, because the backing store is an integer number of device pixels
+        // and a fractional CSS size times a fractional ratio need not be. The point
+        // being pinned is that the multiple is exact to within that rounding, not
+        // that it is never fractional.
+        expect(s.pixelsX, `${w}x${h} @${dpr}`).toBe(
+          Math.round(boardWidth(s.size) * dpr),
+        );
+        expect(s.pixelsY, `${w}x${h} @${dpr}`).toBe(
+          Math.round(boardHeight(s.size) * dpr),
+        );
+      }
+    }
+  });
+
+  it("fills the available box on a landscape tablet rather than shrinking", () => {
+    // The regression, in the shape it actually appeared: an 11x8.5in tablet in
+    // landscape has far more width than height, so height binds and the board
+    // should be as tall as the box allows. It came out roughly square and small
+    // instead, which meant it was not using the space it had.
+    const s = boardSizing(1112, 834, 2);
+    expect(boardHeight(s.size)).toBeCloseTo(834, 6);
+    expect(boardWidth(s.size)).toBeCloseTo(417, 6);
+    // Sanity on the shape it actually had: about 380x375, i.e. not 1:2 at all.
+    expect(boardHeight(s.size) / boardWidth(s.size)).toBeCloseTo(GRY / GRX, 6);
   });
 
   it("is bounded by whichever of width and height is tighter", () => {
@@ -290,9 +342,10 @@ describe("render fills the whole board", () => {
             Math.abs(f.x - origin.x) < sizing.size &&
             Math.abs(f.y - origin.y) < sizing.size,
         );
-        expect(near, `no fill near cell (${x},${y}) at ${origin.x},${origin.y}`).toBe(
-          true,
-        );
+        expect(
+          near,
+          `no fill near cell (${x},${y}) at ${origin.x},${origin.y}`,
+        ).toBe(true);
       }
       // And the drawn fills must not all be in the same place, which is the
       // shape of the bug: many cells, one position.

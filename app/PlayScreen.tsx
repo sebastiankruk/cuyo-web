@@ -5,7 +5,7 @@ import type { Phase } from "../engine/game-core/simulation.ts";
 import type { LevelDef } from "../engine/level-format/level-data.ts";
 import { GRX, GRY } from "../engine/game-core/constants.ts";
 import { render } from "../render/board.ts";
-import { boardSizing } from "../render/geometry.ts";
+import { boardHeight, boardSizing, boardWidth } from "../render/geometry.ts";
 import { applyGesture, readGesture } from "./gestures.ts";
 import type { PointerSample } from "./gestures.ts";
 
@@ -15,6 +15,16 @@ const DAS_RATE = 55;
 
 /** How often the HUD is allowed to re-render. */
 const HUD_INTERVAL_MS = 100;
+
+/**
+ * How far a touch may wander and still count as a tap, in CSS pixels.
+ *
+ * Shared with `readGesture`, which uses the same number to decide whether a move
+ * is a tap. Kept here as a named constant because the event handler needs it too:
+ * a drag has to be recognised as a drag *during* the move, to suppress the tap on
+ * release, and that check cannot wait for the release.
+ */
+const TAP_PIXELS = 10;
 
 interface Props {
   level: LevelDef;
@@ -97,6 +107,19 @@ export function PlayScreen({ level, seed, onExit }: Props) {
       // transform is set again or every frame would be drawn untransformed.
       canvas.width = sizing.pixelsX;
       canvas.height = sizing.pixelsY;
+      // The element's own box is set explicitly, in CSS pixels, to exactly the
+      // board's size.
+      //
+      // This used to be left to CSS: `aspect-ratio: 1 / 2` plus `max-width` and
+      // `max-height` on a canvas whose intrinsic size is its backing store. That
+      // is ambiguous, and on a tablet it resolved badly - the board came out
+      // roughly square in the middle of a large landscape viewport, with a wide
+      // band of dead space above it, because the two clamps fought each other over
+      // an element whose intrinsic size was in device pixels. Saying "the element
+      // is exactly this many CSS pixels, and the backing store is that times the
+      // device ratio" leaves nothing for the stylesheet to disagree about.
+      canvas.style.width = `${boardWidth(sizing.size)}px`;
+      canvas.style.height = `${boardHeight(sizing.size)}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       return sizing.size;
     };
@@ -173,24 +196,39 @@ export function PlayScreen({ level, seed, onExit }: Props) {
     const canvas = canvasRef.current;
     if (canvas === null) return;
     let start: PointerSample | null = null;
+    let moved = false;
 
     const onDown = (e: PointerEvent): void => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
       start = { x: e.offsetX, y: e.offsetY };
+      moved = false;
       canvas.setPointerCapture(e.pointerId);
     };
     const onMove = (e: PointerEvent): void => {
       if (start === null) return;
-      // Applied per crossing, so a drag follows the finger and stops at a wall.
-      // `cellSize` comes from the same sizing the board was drawn with, so a
-      // finger-width always means one cell however large the board is drawn.
-      const gesture = readGesture(start, { x: e.offsetX, y: e.offsetY }, {
-        cellSize: sizeRef.current,
-      });
+      // Past the tap threshold this is a drag, not a tap. Set before applying
+      // anything, because `applyGesture` acting is not the same as the finger
+      // having moved: a drag into a wall applies no move but must still suppress
+      // the tap on release.
+      if (Math.hypot(e.offsetX - start.x, e.offsetY - start.y) > TAP_PIXELS) {
+        moved = true;
+      }
+      const gesture = readGesture(
+        start,
+        { x: e.offsetX, y: e.offsetY },
+        {
+          cellSize: sizeRef.current,
+        },
+      );
       if (applyGesture(sim, gesture)) start = { x: e.offsetX, y: e.offsetY };
     };
     const onUp = (e: PointerEvent): void => {
+      // A tap rotates, so it is decided here on release rather than during the
+      // move: a press that never travelled is a tap, and one that travelled is a
+      // drag whatever the drag did.
+      if (start !== null && !moved) applyGesture(sim, { kind: "rotate" });
       start = null;
+      moved = false;
       if (canvas.hasPointerCapture(e.pointerId)) {
         canvas.releasePointerCapture(e.pointerId);
       }
