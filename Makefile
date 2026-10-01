@@ -18,7 +18,7 @@
 # usable without make. What the Makefile adds is the AI mode.
 #
 # See the "AiOps Environment Mode Directive" in .agents/rules/cuyo-standards.md.
-.PHONY: help init dev dev-host check lint lint-code lint-types lint-docs \
+.PHONY: help init dev dev-lan check lint lint-code lint-types lint-docs \
         lint-specs lint-shell check-art corpus test test-engine build \
         preview preview-host clean distclean
 
@@ -79,7 +79,7 @@ help:
 	@echo ""
 	@echo "Development:"
 	@echo "  make dev          - Dev server (all interfaces)"
-	@echo "  make dev-host     - Dev server on 127.0.0.1:5173, strictPort"
+	@echo "  make dev-lan      - Dev server reachable from a phone on the LAN"
 	@echo ""
 	@echo "Code quality:"
 	@echo "  make lint         - Everything CI runs: code, types, docs, specs"
@@ -113,8 +113,12 @@ init:
 dev:
 	@$(NPM) $(NPM_RUN) run dev
 
-dev-host:
-	@$(NPM) $(NPM_RUN) run dev:host
+# Exposed on all interfaces, so a phone on the same network can load it. This is
+# the whole point of a project that targets phones, and the reason `dev` alone is
+# not enough: it binds loopback only, so nothing but this machine can reach it.
+# On an untrusted network, so be aware.
+dev-lan:
+	@$(NPM) $(NPM_RUN) run dev:lan
 
 # The corpus tests read .context/upstream-cuyo and fail loudly without it, so
 # `make corpus` is something a fresh clone needs rather than something to

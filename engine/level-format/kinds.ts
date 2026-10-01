@@ -103,15 +103,28 @@ export const UNDEFINED_EXPLODE = -1;
 export const DEFAULT_DIST_KEY = "A";
 
 /**
- * `distkey_leer`, the key that means "the empty kind".
+ * `src/leveldaten.h`: the sentinel keys, negative so that no base-62 number can
+ * collide with them.
  *
- * The five single-character keys in `liesDistKey` are the ones `startdist` uses
- * for its special cells; the rest are ordinary base-62 names. Only the empty one
- * is here, because it is the only one this module needs to recognise, and
- * guessing at the rest would put numbers in a table that 2.8 re-derives from
- * `startdist` anyway.
+ * `liesDistKey` maps the six characters `.` `+` `-` `*` `%` `&` onto the first six
+ * of these. The order in that header is descending by value and it does not match
+ * the order the characters are written in, which is worth knowing when reading
+ * `liesDistKey`'s switch.
+ *
+ * These were first introduced here for the empty key only, with the value -2 and
+ * with the reasoning that the rest belonged to `startdist`. Both were wrong: the
+ * value is -1, and a `startdist` cell that is not a named kind needs all six.
  */
-export const DIST_KEY_EMPTY = -2;
+export const DIST_KEY_LEER = -1;
+export const DIST_KEY_GRAS = -2;
+export const DIST_KEY_GRAU = -3;
+export const DIST_KEY_FARBE = -4;
+export const DIST_KEY_NEIGHBOURS = -5;
+export const DIST_KEY_CHAINREACTION = -6;
+export const DIST_KEY_UNDEF = -7;
+
+/** The empty key, for the name this project uses elsewhere. */
+export const DIST_KEY_EMPTY = DIST_KEY_LEER;
 
 /** The kinds a level declares, plus what was needed to number them. */
 export interface KindTable {
@@ -244,16 +257,35 @@ export function buildKinds(level: DefinitionScope, defaults: KindDefaults): Kind
 }
 
 /**
- * `liesDistKey`, restricted to what a `distkey` declaration may be.
+ * `liesDistKey`: what a `startdist` cell key or a `distkey` declaration means.
  *
- * Returns undefined for what upstream rejects. A `distkey` is read as base 62
- * over `0-9A-Za-z`, with a leading space allowed once so that a multi-character
- * key can be padded, and all-spaces is refused because it would be version 0 of
- * nothing in particular.
+ * Returns undefined for what upstream refuses. The six single characters map to
+ * the sentinels above and are matched on the *first* character only, which is
+ * what makes a multi-character key starting with one of them mean that key - the
+ * man page's multichar extension.
+ *
+ * Anything else is read as base 62 over `0-9A-Za-z`, with a leading space allowed
+ * once so that a multi-character key can be padded, and an all-space key refused
+ * because it would be version 0 of nothing in particular.
  */
 export function decodeDistKey(key: string): number | undefined {
   if (key === "") return undefined;
-  if (key[0] === ".") return DIST_KEY_EMPTY;
+  switch (key[0]) {
+    case ".":
+      return DIST_KEY_LEER;
+    case "+":
+      return DIST_KEY_FARBE;
+    case "-":
+      return DIST_KEY_GRAU;
+    case "*":
+      return DIST_KEY_GRAS;
+    case "%":
+      return DIST_KEY_NEIGHBOURS;
+    case "&":
+      return DIST_KEY_CHAINREACTION;
+    default:
+      break;
+  }
   let n = 0;
   let atStart = true;
   for (const c of key) {

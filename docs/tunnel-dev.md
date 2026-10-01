@@ -63,7 +63,7 @@ cleanest route.
 ## 3. Run the dev server
 
 ```sh
-npm run dev:host     # binds 127.0.0.1:5173, pinned
+npm run dev:lan      # --host, pinned to 5173; reachable from a phone
 ```
 
 `--strictPort` is deliberate: without it Vite silently moves to another port and

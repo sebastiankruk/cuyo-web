@@ -39,7 +39,14 @@ level reads leave the description out, so the empty default is the exception
 rather than the rule. At 2.7 it said five levels override the neighbour mode per
 kind, covering six of the seven rectangular modes, and that no level anywhere puts
 a hex mode on a kind in a rectangular board - so the mode/geometry separation is
-asserted as an absence, and only the unit tests cover it.
+asserted as an absence, and only the unit tests cover it. At 2.8 it said every
+real level's `startdist` decodes at four version/player combinations, and that no
+level uses the multi-character distkey extension at all - so `distKeyLen` is 1
+across the whole corpus and the wide-key paths are unit-test-only. Writing it
+turned up three transcription bugs: `distkey_leer` is -1 and not -2, five of the
+six sentinel keys were missing from `decodeDistKey` entirely, and the right
+player's informational keys are read at index `7-i` rather than as a reversed
+half.
 
 Groups 7, 9 and 10 have substantial code but no task is complete against its own
 bar: 7.2, 7.3, 7.9-7.11, 7.13 need Cual or the art pipeline; the rest are
@@ -64,7 +71,7 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [x] 2.5 Implement kind declaration lists (`pics`, `greypic`, `startpic`, `emptypic`), the successive kind constants, first-use-wins naming and per-kind overrides, and verify the apple/orange/pear/banana/pineapple example from the man page
 - [x] 2.6 Implement level-wide setting extraction with documented defaults (`toptime` 50, `chaingrass` 0, `mirror` 0, colours, `randomfallpos`, `randomgreys`, `nogreyprob`) and verify defaults apply when omitted
 - [ ] 2.7 Implement `neighbours` mode parsing including the hex-mode flag, and verify each of the ten modes resolves correctly
-- [ ] 2.8 Implement `startdist` decoding (row alignment, `.`/`+`/`-`/`*`, `distkey` version offsets, the 4- and 8-character informational last row) and verify the man page's example rows
+- [x] 2.8 Implement `startdist` decoding (row alignment, `.`/`+`/`-`/`*`, `distkey` version offsets, the 4- and 8-character informational last row) and verify the man page's example rows
 - [ ] 2.9 Implement the random-cell neighbour-avoidance retry used for `+` cells and verify a filled start layout contains no accidental same-kind adjacency beyond what the layout declares
 - [ ] 2.10 Implement picture names as logical art keys resolved through the art manifest with no filesystem access, and verify a declared key resolves to a manifest entry and an unregistered key fails with the key and kind named
 - [ ] 2.11 Implement the build step that scans every bundled `.ld`, extracts the full set of referenced picture names and emits the art-key manifest, and verify every referenced key is registered with an entry

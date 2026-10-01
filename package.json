@@ -18,7 +18,7 @@
     "check:art": "bash scripts/check-no-upstream-art.sh",
     "fetch:corpus": "bash scripts/fetch-cuyo.sh",
     "typecheck": "tsc --noEmit",
-    "dev:host": "vite --port 5173 --strictPort --host 127.0.0.1"
+    "dev:lan": "vite --port 5173 --strictPort --host"
   },
   "dependencies": {
     "react": "^19.3.0",

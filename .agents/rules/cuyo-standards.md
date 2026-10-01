@@ -85,6 +85,7 @@ always equivalent and neither has to be learned twice.
 
 ```sh
 make check         # lint + test + build, exactly what CI runs
+make dev-lan       # dev server reachable from a phone, not just loopback
 make lint          # eslint, tsc, markdownlint, openspec validate --strict
 make test          # engine + level-format tests
 make build         # typecheck + production bundle

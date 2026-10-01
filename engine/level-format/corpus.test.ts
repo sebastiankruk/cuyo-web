@@ -29,6 +29,7 @@ import {
   readLevelSettings,
 } from "./settings.ts";
 import { boardHex, readNeighbourOverrides, requireNeighbourMode } from "./neighbours.ts";
+import { placeRows, readStartDist } from "./startdist.ts";
 
 const DATA_DIR =
   process.env["CUYO_DATA_DIR"] ??
@@ -621,6 +622,99 @@ describe("upstream corpus: the parser reads it", () => {
     // `neighbours.test.ts`, so nobody reads a green corpus run as evidence that
     // it is exercised by the level data.
     expect(perKindHexInRectBoard).toBe(0);
+  });
+
+  it("decodes the startdist of every level in the corpus", () => {
+    // Task 2.8's oracle. `startdist` is where the level format stops being
+    // readable and starts being arithmetic - a base-62 predecessor search over
+    // the kinds' distkeys, four or eight keys that may run backwards - so the only
+    // way to know the transcription is right is to run it over the real data.
+    //
+    // Several levels declare `startdist` more than once for different versions or
+    // player counts, so this exercises version resolution too: `maze.ld` has four
+    // declarations and the two players get different boards out of the same file.
+    const globals = parseLd(lexFile("globals.ld").source, "globals.ld");
+    const versions = [
+      Version.of("1", "main"),
+      Version.of("2", "main"),
+      Version.of("1", "contrib", "hard"),
+    ];
+
+    const failures: string[] = [];
+    let decoded = 0;
+    let cells = 0;
+    let infoRows = 0;
+    let twoPlayer = 0;
+    let multiKey = 0;
+    const characters = new Set<string>();
+
+    for (const name of ALL_LD_FILES) {
+      if (name === "summary.ld" || name === "globals.ld" || name === "example.ld") {
+        continue;
+      }
+      const file = parseLd(lexFile(name).source, name);
+      const levelSections = file.definitions.filter((d) => d.value.type === "section");
+      if (levelSections.length === 0) continue;
+
+      for (const version of versions) {
+        const root = rootScope(name, version);
+        root.defineAll(globals.definitions);
+        root.defineAll(file.definitions);
+        for (const def of levelSections) {
+          if (def.value.type !== "section") continue;
+          const level = new DefinitionScope(def.name, root, version, name);
+          level.defineAll(def.value.definitions);
+          if (!level.hasOwn("startdist")) continue;
+          for (const two of [false, true]) {
+            try {
+              const settings = readLevelSettings(level);
+              const table = buildKinds(level, kindDefaultsFrom(settings));
+              const dist = readStartDist(level, table, two);
+              decoded++;
+              if (dist.keyLen > 1) multiKey++;
+              if (dist.twoPlayers) twoPlayer++;
+              if (dist.info !== null) infoRows++;
+              // Every placed cell, which is rows times 10 for each mode.
+              for (const boardRow of placeRows(dist)) cells += boardRow.length;
+              const list = level.ownList("startdist");
+              for (const v of list?.values ?? []) {
+                if (v.type === "number") continue;
+                for (const ch of v.text) characters.add(ch);
+              }
+            } catch (error) {
+              failures.push(
+                `${name} ${def.name}[${version}]${two ? " 2P" : ""}: ${(error as Error).message}`,
+              );
+            }
+          }
+        }
+      }
+    }
+
+    expect(failures, `\n${failures.join("\n")}`).toEqual([]);
+    expect(decoded).toBeGreaterThan(200);
+    expect(cells).toBeGreaterThan(20000);
+
+    // Every construct the decoder implements, reached by the real data rather than
+    // only by the unit tests: the informational rows, the two-player rows, the
+    // multi-character keys, and the six single-character keys.
+    expect(infoRows).toBeGreaterThan(0);
+    expect(twoPlayer).toBeGreaterThan(0);
+    // The six sentinels, and one character from each base-62 branch - a digit, an
+    // uppercase letter and a lowercase one. `A` is the one that matters most: it is
+    // the default distkey, so almost every named cell in the corpus uses it.
+    const required = [".", "+", "-", "*", "%", "&", "1", "A", "a"];
+    const missing = required.filter((ch) => !characters.has(ch));
+    expect(missing, `never appears in a startdist: ${missing.join(" ")}`).toEqual([]);
+
+    // What the corpus does *not* have: a level whose kinds declare a multi-character
+    // distkey, so that every cell is two or more characters wide. The extension is
+    // documented in cual.6 and no shipped level uses it, which means `distKeyLen`
+    // is 1 everywhere here and the multi-character paths - and the error for
+    // distkeys of differing lengths - are covered only by `startdist.test.ts`.
+    // Asserted as an absence on purpose, so a green corpus run is never read as
+    // evidence that they are exercised.
+    expect(multiKey).toBe(0);
   });
 
   it("finds the Cual blocks the runtime will need", () => {

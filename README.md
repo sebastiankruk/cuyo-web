@@ -112,7 +112,8 @@ Under construction. The plan lives in [`openspec/changes/cuyo-web`](openspec/cha
 ```sh
 make init          # npm install
 make corpus        # fetch the upstream tree (once; see above)
-make dev           # dev server
+make dev           # dev server, this machine only
+make dev-lan       # dev server a phone on the same network can reach
 make check         # lint + test + build — exactly what CI runs
 ```
 
