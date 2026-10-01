@@ -35,6 +35,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 DATA_DIR="${CUYO_DATA_DIR:-.context/upstream-cuyo/data}"
+CONTRIB_DIR="levels"
 OUT="public/levels"
 
 if [[ ! -d "$DATA_DIR" ]]; then
@@ -55,18 +56,35 @@ mkdir -p "$OUT"
 rm -f "$OUT"/*.ld 2>/dev/null || true
 
 copied=0
+# `levels/` first, then the upstream checkout, so a contributed file with the same name
+# as an upstream one wins - matching levels-sources.ts, so a level can be corrected in
+# place without a rename.
 while read -r name; do
   [[ -z "$name" ]] && continue
-  if [[ ! -f "$DATA_DIR/$name" ]]; then
-    echo "copy-level-data: $name is referenced but missing from $DATA_DIR." >&2
+  if [[ -f "$CONTRIB_DIR/$name" ]]; then
+    cp "$CONTRIB_DIR/$name" "$OUT/$name"
+  elif [[ -f "$DATA_DIR/$name" ]]; then
+    cp "$DATA_DIR/$name" "$OUT/$name"
+  else
+    echo "copy-level-data: $name is referenced but in neither $CONTRIB_DIR nor $DATA_DIR." >&2
     exit 1
   fi
-  cp "$DATA_DIR/$name" "$OUT/$name"
   copied=$((copied + 1))
 done < <(
   grep -o 'filename: "[^"]*"' levels-src/generated/level-index.ts \
     | sed 's/filename: "//; s/"$//' | sort -u
 )
+
+# A contributed level may need a picture the corpus does not reference, which the
+# catalogue cannot tell us about. Anything in levels/ that the index does not name is
+# still a level file the browser may be asked to load, so it is copied too.
+while read -r path; do
+  name="$(basename "$path")"
+  [[ "$name" == "summary.ld" ]] && continue
+  [[ -f "$OUT/$name" ]] && continue
+  cp "$path" "$OUT/$name"
+  copied=$((copied + 1))
+done < <(find "$CONTRIB_DIR" -maxdepth 1 -name '*.ld' 2>/dev/null | sort)
 
 cp "$DATA_DIR/globals.ld" "$OUT/globals.ld"
 

@@ -22,7 +22,6 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import { parseLd } from "../engine/level-format/parser.ts";
-import { decodeLatin1 } from "../engine/level-format/lexer.ts";
 import { Version } from "../engine/level-format/version.ts";
 import { DefinitionScope, rootScope } from "../engine/level-format/scope.ts";
 import { buildKinds } from "../engine/level-format/kinds.ts";
@@ -43,12 +42,16 @@ import type {
   LevelIndexEntry,
   Track,
 } from "../engine/level-format/index-data.ts";
+import {
+  UPSTREAM_DIR,
+  contribSummary,
+  levelFileExists,
+  readGlobals,
+  readLevelFile,
+} from "./level-sources.ts";
 import { DIFFICULTIES } from "../engine/level-format/index-data.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR =
-  process.env["CUYO_DATA_DIR"] ??
-  resolve(HERE, "../.context/upstream-cuyo/data");
 const OUT = resolve(HERE, "generated/level-index.ts");
 
 /**
@@ -75,8 +78,8 @@ interface SummarySection {
 }
 
 /** Reads the `Name = { filename = ... name = ... author = ... }` sections. */
-function summarySections(source: string): SummarySection[] {
-  const parsed = parseLd(source, "summary.ld");
+function summarySections(source: string, label: string): SummarySection[] {
+  const parsed = parseLd(source, label);
   const out: SummarySection[] = [];
   for (const def of parsed.definitions) {
     if (def.value.type !== "section") continue;
@@ -84,7 +87,7 @@ function summarySections(source: string): SummarySection[] {
       def.name,
       undefined,
       Version.of("1", "main"),
-      "summary.ld",
+      label,
     );
     section.defineAll(def.value.definitions);
     out.push({
@@ -215,10 +218,9 @@ function compile(
   greyKinds: number;
 } {
   const version = versionFor(track, difficulty);
-  const parsed = parseLd(
-    decodeLatin1(readFileSync(resolve(DATA_DIR, file))),
-    file,
-  );
+  // From whichever source holds it, so a contributed level compiles exactly like an
+  // upstream one and there is no second code path to keep in step.
+  const parsed = parseLd(readLevelFile(file), file);
   const def = parsed.definitions.find(
     (d) => d.value.type === "section" && d.name === section.id,
   );
@@ -267,16 +269,96 @@ function compile(
 }
 
 function main(): void {
-  const summaryPath = resolve(DATA_DIR, "summary.ld");
-  const source = decodeLatin1(readFileSync(summaryPath));
-  const globals = parseLd(
-    decodeLatin1(readFileSync(resolve(DATA_DIR, "globals.ld"))),
-    "globals.ld",
+  const upstreamSummary = readFileSync(
+    resolve(UPSTREAM_DIR, "summary.ld"),
+    "latin1",
   );
+  const globals = parseLd(readGlobals(), "globals.ld");
 
-  const sections = summarySections(source);
-  const { lists, variants, ordered, authored } = summaryTracks(source);
+  // Both summaries, upstream first so its levels take the canonical positions when a
+  // contributed level lands on a track it also uses.
+  const contributed = contribSummary();
+  const contributedSections =
+    contributed === null
+      ? []
+      : summarySections(contributed, "levels/summary.ld");
+  const sections = [
+    ...summarySections(upstreamSummary, "summary.ld"),
+    ...contributedSections,
+  ];
+  // Each summary is parsed on its own, then merged - not concatenated and scanned.
+  //
+  // Concatenating looks equivalent and is not. `summaryTracks` finds a list's body by
+  // scanning forward to the next line starting in column 0, which is how it reads
+  // `level[contrib]=A,B,C` followed by `ordered[contrib]=0`. Joining two files put
+  // upstream's `ordered[...]` line where the contributed list's body should end, and
+  // contrib's seven levels lost their list entirely - every one of them silently
+  // dropped to "on no track". A parser that has to survive its input being
+  // concatenated is a parser with a hidden assumption about what follows it.
+  const parsedTracks = [upstreamSummary, contributed]
+    .filter((t): t is string => t !== null)
+    .map(summaryTracks);
+  const lists = new Map<Track, readonly string[]>();
+  const ordered = new Map<Track, boolean>();
+  const authored = new Map<Track, number>();
+  for (const part of parsedTracks) {
+    /*
+     * Union, not first-wins.
+     *
+     * A contributed level goes on `contrib` - upstream's own track for community levels
+     * - and upstream's summary already defines that track with seven names in it. So
+     * "later summaries do not overwrite earlier ones" silently discarded every
+     * contributed level on any track upstream already has, and the level came out on no
+     * track at all. The build failed with "no section TestLevel for all/normal", which
+     * is true and says nothing about the cause.
+     *
+     * Names are appended in order and deduplicated, so a contributed level lands after
+     * the ones the author listed rather than displacing them.
+     */
+    for (const [track, names] of part.lists) {
+      const merged = [...(lists.get(track) ?? [])];
+      for (const name of names) if (!merged.includes(name)) merged.push(name);
+      lists.set(track, merged);
+    }
+    for (const [track, flag] of part.ordered) ordered.set(track, flag);
+    for (const [track, count] of part.authored) {
+      if (!authored.has(track)) authored.set(track, count);
+    }
+  }
+  const variants = new Map<Track, Map<Difficulty, readonly string[]>>();
+  for (const part of parsedTracks) {
+    // Same union, for the same reason: a contributed level offered on `contrib,easy`
+    // must not vanish because upstream already declared that variant.
+    for (const [track, perDifficulty] of part.variants) {
+      const existing = variants.get(track) ?? new Map<Difficulty, readonly string[]>();
+      for (const [difficulty, names] of perDifficulty) {
+        const merged = [...(existing.get(difficulty) ?? [])];
+        for (const name of names) if (!merged.includes(name)) merged.push(name);
+        existing.set(difficulty, merged);
+      }
+      variants.set(track, existing);
+    }
+  }
   const byId = new Map(sections.map((s) => [s.id, s]));
+
+  /*
+   * A summary may name a file that is not there.
+   *
+   * The missing-file case is a plain build failure with the filename in it, because a
+   * contributor who has written a level but not saved it should be told that, not
+   * shown a confusing error from further down.
+   *
+   * But a stale *committed* index is the case that matters more. The generated file is
+   * what the tests read, so if a level is removed from `levels/` and the index is not
+   * regenerated, every test fails on a file that no longer exists and the reason is
+   * invisible from the failure. That happened while building this: it reads as "seven
+   * unrelated tests broke", which is the worst possible error message.
+   *
+   * So a missing file drops the level and is reported, rather than crashing the
+   * generator. `make level-index && git commit` regenerates; the drift checks fail if it
+   * was not.
+   */
+  const missingFiles: string[] = [];
 
   const tracksSeen = new Set<Track>();
   for (const track of lists.keys()) tracksSeen.add(track);
@@ -294,6 +376,13 @@ function main(): void {
   for (const section of sections) {
     if (section.filename === "") {
       missing.push(`${section.id}: no filename`);
+      continue;
+    }
+    if (!levelFileExists(section.filename)) {
+      missingFiles.push(
+        `${section.id}: ${section.filename} is in neither levels/ nor the upstream ` +
+          `checkout`,
+      );
       continue;
     }
     // Positions come from the track's own list where it appears there, so the
@@ -327,10 +416,16 @@ function main(): void {
       if (!wanted.has(difficulty)) continue;
       // Compiled at the first track that offers this difficulty, so the number matches
       // a version a player can actually reach.
+      //
+      // The fallback is the level's *own* track rather than `"main"`. A contributed
+      // level on `contrib` has no `main` entry, so resolving `normal` against `main`
+      // asked for a version that does not contain it - and the generator died with
+      // "no section TestLevel for main/normal", which is both true and useless. The
+      // default only ever mattered because upstream's levels are all on `main` too.
       const track =
         [...trackPositions.keys()].find((t) =>
           (variants.get(t)?.get(difficulty) ?? []).includes(section.id),
-        ) ?? "main";
+        ) ?? trackPositions.keys().next().value ?? "all";
       const compiled = compile(
         globals,
         section.filename,
@@ -368,7 +463,15 @@ function main(): void {
   }
 
   if (missing.length > 0) {
-    throw new Error(`summary.ld is inconsistent:\n  ${missing.join("\n  ")}`);
+    throw new Error(`A summary is inconsistent:\n  ${missing.join("\n  ")}`);
+  }
+  if (missingFiles.length > 0) {
+    process.stderr.write(
+      `level-index: WARNING - ${missingFiles.length} level(s) indexed but their file ` +
+        `is missing; they are omitted from the catalogue:\n  ` +
+        `${missingFiles.join("\n  ")}\n` +
+        `level-index: run "make level-index" and commit, or restore the file.\n`,
+    );
   }
   // Levels in no `level[...]` list at all. Upstream's menu is built from those lists,
   // so such a level is unreachable there - `UnterWasser` is the one, and it is a
@@ -378,8 +481,8 @@ function main(): void {
   const untracked = levels.filter((l) => l.tracks.size === 0).map((l) => l.id);
   if (untracked.length > 0) {
     process.stdout.write(
-      `level-index: note - ${untracked.length} level(s) in no summary.ld track, ` +
-        `unreachable from the upstream menu: ${untracked.join(", ")}\n`,
+      `level-index: note - ${untracked.length} level(s) in no level[track] list, so ` +
+        `unreachable from the menu: ${untracked.join(", ")}\n`,
     );
   }
   // Every name in every list must resolve to a section, or a level would be listed and

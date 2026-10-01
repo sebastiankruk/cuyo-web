@@ -841,106 +841,118 @@ describe("upstream corpus: start layouts", () => {
    */
   const MAX_ACCIDENTAL_PAIRS = 1;
 
-  it("materialises every real level's startdist, with few accidental adjacencies", () => {
-    const globals = parseLd(lexFile("globals.ld").source, "globals.ld");
-    const versions = [
-      Version.of("1", "main"),
-      Version.of("2", "main"),
-      Version.of("1", "contrib", "hard"),
-    ];
+  // The explicit timeout is not slack. This compiles every level in the corpus - 474
+  // level sections, each for three versions and both player halves, each with a full
+  // parse, kind table, settings, `startdist` decode and start-layout build. That is
+  // about 8 s of work, against vitest's 5 s default, so the test passed locally and on a
+  // warm machine and failed intermittently under load. A gate that fails for reasons
+  // unrelated to what it checks is the same failure mode as the `openspec` dependency
+  // this project just fixed, in the opposite direction: there, a check that could not
+  // run; here, one that cannot be trusted to.
+  it(
+    "materialises every real level's startdist, with few accidental adjacencies",
+    { timeout: 60_000 },
+    () => {
+      const globals = parseLd(lexFile("globals.ld").source, "globals.ld");
+      const versions = [
+        Version.of("1", "main"),
+        Version.of("2", "main"),
+        Version.of("1", "contrib", "hard"),
+      ];
 
-    const failures: string[] = [];
-    /** Levels whose heuristicised layout still has avoidable adjacency. */
-    const adjacencies: string[] = [];
-    let laid = 0;
-    let levelsWithRows = 0;
-    let worst = 0;
-    let worstWhere = "";
+      const failures: string[] = [];
+      /** Levels whose heuristicised layout still has avoidable adjacency. */
+      const adjacencies: string[] = [];
+      let laid = 0;
+      let levelsWithRows = 0;
+      let worst = 0;
+      let worstWhere = "";
 
-    for (const name of ALL_LD_FILES) {
-      if (
-        name === "summary.ld" ||
-        name === "globals.ld" ||
-        name === "example.ld"
-      ) {
-        continue;
-      }
-      const file = parseLd(lexFile(name).source, name);
-      const levelSections = file.definitions.filter(
-        (d) => d.value.type === "section",
-      );
-      if (levelSections.length === 0) continue;
+      for (const name of ALL_LD_FILES) {
+        if (
+          name === "summary.ld" ||
+          name === "globals.ld" ||
+          name === "example.ld"
+        ) {
+          continue;
+        }
+        const file = parseLd(lexFile(name).source, name);
+        const levelSections = file.definitions.filter(
+          (d) => d.value.type === "section",
+        );
+        if (levelSections.length === 0) continue;
 
-      for (const version of versions) {
-        const root = rootScope(name, version);
-        root.defineAll(globals.definitions);
-        root.defineAll(file.definitions);
-        for (const def of levelSections) {
-          if (def.value.type !== "section") continue;
-          const level = new DefinitionScope(def.name, root, version, name);
-          level.defineAll(def.value.definitions);
-          if (!level.hasOwn("startdist")) continue;
-          for (const two of [false, true]) {
-            const where = `${name} ${def.name}[${version.toString()}]${two ? " 2P" : ""}`;
-            try {
-              const settings = readLevelSettings(level);
-              const table = buildKinds(level, kindDefaultsFrom(settings));
-              const dist = readStartDist(level, table, two);
-              const hex = hexGeometry(settings.neighbours, settings.hexFlip);
-              const layout = buildStartLayout(dist, {
-                table,
-                random: corpusPrng(where),
-                neighbours: settings.neighbours,
-                hex,
-              });
-              laid++;
-              if (dist.rows.length > 0) levelsWithRows++;
+        for (const version of versions) {
+          const root = rootScope(name, version);
+          root.defineAll(globals.definitions);
+          root.defineAll(file.definitions);
+          for (const def of levelSections) {
+            if (def.value.type !== "section") continue;
+            const level = new DefinitionScope(def.name, root, version, name);
+            level.defineAll(def.value.definitions);
+            if (!level.hasOwn("startdist")) continue;
+            for (const two of [false, true]) {
+              const where = `${name} ${def.name}[${version.toString()}]${two ? " 2P" : ""}`;
+              try {
+                const settings = readLevelSettings(level);
+                const table = buildKinds(level, kindDefaultsFrom(settings));
+                const dist = readStartDist(level, table, two);
+                const hex = hexGeometry(settings.neighbours, settings.hexFlip);
+                const layout = buildStartLayout(dist, {
+                  table,
+                  random: corpusPrng(where),
+                  neighbours: settings.neighbours,
+                  hex,
+                });
+                laid++;
+                if (dist.rows.length > 0) levelsWithRows++;
 
-              // Only pairs with a drawn end count: a hand-authored layout is full of
-              // deliberate same-kind neighbours, and calling those accidental would
-              // be reporting the level author's work as a failure.
-              const pairs = accidentalPairs(
-                layout,
-                table,
-                settings.neighbours,
-                hex,
-              );
-              // One accidental pair is the worst the corpus produces, in four
-              // level/version combinations - all hex or knight geometry, where a
-              // cell's neighbours are not the four around it and the greedy descent
-              // can paint itself into a corner. So the threshold is one, not zero:
-              // the heuristic is very nearly perfect on real data and this is what
-              // "very nearly" measures at.
-              if (pairs > MAX_ACCIDENTAL_PAIRS) {
-                adjacencies.push(
-                  `${where}: ${pairs} pairs over ${dist.rows.length * GRX} cells`,
+                // Only pairs with a drawn end count: a hand-authored layout is full of
+                // deliberate same-kind neighbours, and calling those accidental would
+                // be reporting the level author's work as a failure.
+                const pairs = accidentalPairs(
+                  layout,
+                  table,
+                  settings.neighbours,
+                  hex,
                 );
+                // One accidental pair is the worst the corpus produces, in four
+                // level/version combinations - all hex or knight geometry, where a
+                // cell's neighbours are not the four around it and the greedy descent
+                // can paint itself into a corner. So the threshold is one, not zero:
+                // the heuristic is very nearly perfect on real data and this is what
+                // "very nearly" measures at.
+                if (pairs > MAX_ACCIDENTAL_PAIRS) {
+                  adjacencies.push(
+                    `${where}: ${pairs} pairs over ${dist.rows.length * GRX} cells`,
+                  );
+                }
+                if (pairs > worst) {
+                  worst = pairs;
+                  worstWhere = where;
+                }
+              } catch (error) {
+                failures.push(`${where}: ${(error as Error).message}`);
               }
-              if (pairs > worst) {
-                worst = pairs;
-                worstWhere = where;
-              }
-            } catch (error) {
-              failures.push(`${where}: ${(error as Error).message}`);
             }
           }
         }
       }
-    }
 
-    expect(failures, `\n${failures.join("\n")}`).toEqual([]);
-    expect(laid, "start layouts built").toBeGreaterThan(200);
-    expect(levelsWithRows).toBeGreaterThan(150);
+      expect(failures, `\n${failures.join("\n")}`).toEqual([]);
+      expect(laid, "start layouts built").toBeGreaterThan(200);
+      expect(levelsWithRows).toBeGreaterThan(150);
 
-    // Reported rather than hidden: the worst level is worth knowing about, and a
-    // future corpus that grows a genuinely bad layout should be visible in review.
-    expect(
-      adjacencies,
-      `levels with more than ${MAX_ACCIDENTAL_PAIRS} accidental same-kind pair ` +
-        `(worst single: ${worst} at ${worstWhere})\n` +
-        adjacencies.slice(0, 10).join("\n"),
-    ).toEqual([]);
-  });
+      // Reported rather than hidden: the worst level is worth knowing about, and a
+      // future corpus that grows a genuinely bad layout should be visible in review.
+      expect(
+        adjacencies,
+        `levels with more than ${MAX_ACCIDENTAL_PAIRS} accidental same-kind pair ` +
+          `(worst single: ${worst} at ${worstWhere})\n` +
+          adjacencies.slice(0, 10).join("\n"),
+      ).toEqual([]);
+    },
+  );
 });
 
 /**
