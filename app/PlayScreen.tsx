@@ -5,8 +5,14 @@ import type { Phase } from "../engine/game-core/simulation.ts";
 import type { LevelDef } from "../engine/level-format/level-data.ts";
 import { GRX, GRY } from "../engine/game-core/constants.ts";
 import { render } from "../render/board.ts";
-import { boardHeight, boardSizing, boardWidth } from "../render/geometry.ts";
+import {
+  boardHeight,
+  boardSizing,
+  boardWidth,
+  colourFor,
+} from "../render/geometry.ts";
 import { applyGesture, readGesture } from "./gestures.ts";
+import { goalSummary, goalSummaryLines } from "./goals.ts";
 import type { PointerSample } from "./gestures.ts";
 
 /** Held-direction repeat timings, in ms. */
@@ -282,6 +288,10 @@ export function PlayScreen({ level, seed, onExit }: Props) {
   }, [sim, onExit]);
 
   const finished = hud.phase === "won" || hud.phase === "lost";
+  const goals = goalSummary(level, {
+    targetRemaining: hud.goals,
+    greys: hud.greys,
+  });
 
   return (
     <div className="play">
@@ -293,6 +303,43 @@ export function PlayScreen({ level, seed, onExit }: Props) {
           <strong>{level.name}</strong>
           <span>{level.author}</span>
         </div>
+        {/*
+          The rules, one tap away. They were previously a bare `10` with a tooltip,
+          which answers "how many are left" and none of "of what", "how many make a
+          group", or - the one that made `Hormones` look unwinnable - "do diagonals
+          count". A `<details>` element rather than a panel, because the answer is
+          wanted once and then in the way; and `<details>` rather than a button with
+          state, because it stays keyboard- and screen-reader-correct for free.
+        */}
+        <details className="play__rules">
+          <summary className="chip">How to play</summary>
+          <div className="play__rulesBody">
+            {/*
+              A swatch rather than the kind's name. Upstream calls the goal kind
+              `inGras` or `inBunt`, which is artwork naming; a colour is something
+              the player can look for on the board.
+            */}
+            {goals.targetArtKey !== null && (
+              <p className="play__rulesSwatch">
+                <span
+                  className="play__swatch"
+                  style={{ background: colourFor(goals.targetArtKey, 0) }}
+                  aria-hidden="true"
+                />
+                <span title={goals.targetName ?? undefined}>
+                  {goals.targetNeedsChain
+                    ? "These are cleared by an explosion landing next to them."
+                    : "These are the blobs to clear."}
+                </span>
+              </p>
+            )}
+            <ul>
+              {goalSummaryLines(goals).map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        </details>
         <div className="play__stats">
           <span title="Score">{hud.score}</span>
           <span title="Goal blobs remaining">{hud.goals}</span>

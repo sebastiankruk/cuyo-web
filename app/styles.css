@@ -429,3 +429,82 @@ button {
     font-size: 0.95rem;
   }
 }
+
+/*
+ * The rules panel.
+ *
+ * A `<details>` styled to match the HUD chips, so it reads as part of the bar rather
+ * than as an overlay that appeared. The body is absolutely positioned so that
+ * opening it does not push the board down and resize the canvas - which would be a
+ * poor time to re-measure, and on a phone would move the board under the player's
+ * thumb.
+ */
+.play__rules {
+  position: relative;
+  margin-left: auto;
+}
+
+.play__rules > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.play__rules > summary::-webkit-details-marker {
+  display: none;
+}
+
+.play__rules[open] > summary {
+  border-color: var(--accent);
+}
+
+.play__rulesBody {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 5;
+  width: min(20rem, 78vw);
+  padding: 0.7rem 0.85rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.play__rulesBody ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.play__rulesBody li + li {
+  margin-top: 0.3rem;
+}
+
+.play__rulesSwatch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+}
+
+.play__swatch {
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+}
+
+/* Portrait phones have no room for it beside the stats. */
+@media (max-width: 30rem) {
+  .play__rules {
+    margin-left: 0.4rem;
+  }
+
+  .play__title {
+    display: none;
+  }
+}
