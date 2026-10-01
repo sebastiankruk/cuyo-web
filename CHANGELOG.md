@@ -54,6 +54,13 @@ something a player can tell.
 
 ### Fixed
 
+- **The "How to play" rules opened off the left edge of the screen**, so every line of
+  them lost its first few characters and the first word of the panel was cut in half. It
+  was positioned relative to the button that opens it, which sits a couple of hundred
+  pixels from the left of a phone screen, while the panel is up to 20rem wide — so it
+  began about 30px off-screen and the play area's own clipping finished the job. It is
+  now positioned against the screen, centred, inset from both edges, and scrolls if it is
+  taller than the space under the bar. Narrower phones were worse, not better.
 - **The level's name was missing from the play screen on a phone.** It had been hidden to
   make room for the score, which is exactly the screen where you want to know which level
   you are in. It now truncates with an ellipsis, the author drops first, and the "How to
