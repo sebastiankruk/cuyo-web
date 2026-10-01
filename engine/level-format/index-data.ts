@@ -49,6 +49,18 @@ export interface DifficultyEntry {
    */
   readonly version: string;
   /**
+   * The track this difficulty was compiled at.
+   *
+   * Recorded because a level can offer a difficulty on one track and not another, and
+   * because a level in several tracks is compiled at whichever offers the difficulty
+   * first. So the version alone is not enough to reproduce it: a level on `weird` and
+   * `main` that offers `hard` only on `weird` resolves to `[1,hard,weird]`, and asking
+   * the loader for `main,hard` would be a different level - one the index never
+   * described. Without this the catalogue would advertise a version it could not ask
+   * for.
+   */
+  readonly track: Track;
+  /**
    * The `numexplode` the level's ordinary colour kinds detonate at, or null when the
    * level sets none and its kinds never detonate on size.
    *

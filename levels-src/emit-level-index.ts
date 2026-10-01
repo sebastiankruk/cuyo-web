@@ -249,6 +249,7 @@ function compile(
     entry: {
       difficulty,
       version: version.toString(),
+      track,
       numExplode,
       chainGrass: settings.chainGrass,
       topTime: settings.topTime,

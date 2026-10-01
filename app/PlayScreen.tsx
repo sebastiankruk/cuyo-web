@@ -36,6 +36,15 @@ interface Props {
   level: LevelDef;
   seed: number;
   onExit: () => void;
+  /**
+   * Restarts the same level from the catalogue.
+   *
+   * Separate from `onExit` because restarting and leaving are different: leaving goes
+   * back to the list, restarting re-loads this level. Reloading matters for a real
+   * level - its start layout is randomised at load time, so a restart is a new board,
+   * not the one the player just failed.
+   */
+  onRestart?: () => void;
 }
 
 interface Hud {
@@ -56,7 +65,7 @@ const INITIAL_HUD: Hud = {
   steps: 0,
 };
 
-export function PlayScreen({ level, seed, onExit }: Props) {
+export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const loopRef = useRef<GameLoop | null>(null);
   const heldTimers = useRef<number[]>([]);
@@ -273,7 +282,8 @@ export function PlayScreen({ level, seed, onExit }: Props) {
           break;
         case "r":
         case "R":
-          setRunId((n) => n + 1);
+          if (onRestart !== undefined) onRestart();
+          else setRunId((n) => n + 1);
           break;
         case "Escape":
           onExit();
@@ -285,7 +295,7 @@ export function PlayScreen({ level, seed, onExit }: Props) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [sim, onExit]);
+  }, [sim, onExit, onRestart]);
 
   const finished = hud.phase === "won" || hud.phase === "lost";
   const goals = goalSummary(level, {
@@ -372,7 +382,10 @@ export function PlayScreen({ level, seed, onExit }: Props) {
               <button
                 type="button"
                 className="btn btn--primary"
-                onClick={() => setRunId((n) => n + 1)}
+                onClick={() => {
+                  if (onRestart !== undefined) onRestart();
+                  else setRunId((n) => n + 1);
+                }}
               >
                 Play again
               </button>

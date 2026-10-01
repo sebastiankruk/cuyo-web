@@ -23,3 +23,7 @@ dist/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Generated: the upstream .ld files the browser fetches at runtime, copied by
+# scripts/copy-level-data.sh from the local-only upstream tree.
+public/levels/

@@ -126,7 +126,9 @@ init:
 # a silent jump to 5174. A tunnel pointed at 5173 that is suddenly serving nothing
 # is a confusing way to spend an afternoon, and that is exactly what happened once
 # already during development.
-dev:
+# The browser fetches `.ld` files from public/levels/, so they have to be there
+# before the dev server starts or every level load 404s.
+dev: level-data
 	@$(NPM) $(NPM_RUN) run dev -- --port $(PORT) --strictPort
 
 # Exposed on all interfaces, so a phone on the same network can load it. This is
@@ -169,6 +171,11 @@ NODE_TS_FLAGS := --experimental-transform-types --disable-warning=ExperimentalWa
 art-manifest:
 	$(AI_ECHO) "Emitting the art-key manifest..."
 	@node $(NODE_TS_FLAGS) levels-src/emit-art-manifest.ts
+
+# Copies the level files into public/levels/ so the browser can fetch them. Generated
+# and gitignored: it is upstream data, and its provenance is already recorded.
+level-data:
+	@bash scripts/copy-level-data.sh
 
 # Parses and compiles every level in summary.ld, and fails on the first error. This
 # is the gate that makes "the real levels work" a fact rather than an assumption.
@@ -222,7 +229,7 @@ test:
 test-engine:
 	@$(NPM) $(NPM_RUN) test -- --reporter=verbose
 
-build:
+build: level-data
 	$(AI_ECHO) "Building..."
 	@$(NPM) $(NPM_RUN) run $(BUILD_TARGET)
 

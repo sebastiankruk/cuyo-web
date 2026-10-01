@@ -36,11 +36,15 @@ been wrong twice.
 
 ## What is actually playable
 
-The app runs **two hand-written fixture levels** (`engine/level-format/fixtures.ts`),
-not the 81 real ones. Real levels are task group 2 (parsing) followed by group 6
-(catalogue). Menus, touch-control polish, and offline install are groups 9, 10 and
-11. A reviewer looking at the app sees the board geometry, rendering and falling
-mechanics - not the game.
+All 79 upstream levels, loaded at runtime. The catalogue comes from
+`levels-src/generated/level-index.ts` and each level's `.ld` file is fetched on demand
+from `public/levels/`, which `make level-data` copies from the local-only upstream tree.
+
+Artwork is still **generated from the art key**, not upstream's sprites: see
+`scripts/check-no-upstream-art.sh`. Menus, pause, settings, offline install and audio
+are groups 9 and 11, none complete.
+
+So a reviewer sees real levels playing, with placeholder colours.
 
 ## Testing that catches things
 
