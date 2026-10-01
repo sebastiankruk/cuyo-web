@@ -1,0 +1,38 @@
+{
+  // Which files the documentation linter reads.
+  //
+  // The exclusions fall into three groups, and the second and third are the
+  // interesting ones:
+  //
+  //  - Build output and dependencies, which nobody wrote prose into.
+  //  - `.context/`, which holds the AI's own session memory and the upstream
+  //    GPL source. Neither is this project's documentation, and the upstream tree
+  //    is not even in git. `.caim` is listed as well because it is a *symlink* to
+  //    `.context/ai-memory`: markdownlint matches on the path it walks, which is
+  //    `.caim/...`, so excluding `.context` alone would pull 2 MB of session
+  //    transcript into the lint and report every "Assistant" heading in it.
+  //  - `.agents/`, `.gemini/`, `.opencode/`, `.agent/` and `.github/copilot.md`.
+  //    These are symlinks into `.agents/`, so linting them would lint the same
+  //    file once per link and report each finding five times.
+  //
+  // `openspec/changes/` is excluded on purpose too, and it is the one exclusion
+  // worth an argument: those are work-in-progress plans whose shape is owned by
+  // the OpenSpec tooling, and `tasks.md` in particular is a checklist that reads
+  // badly with a linter's spacing rules applied. `openspec/specs/` - the settled
+  // specifications, which are a deliverable - is linted.
+  "config": ".markdownlint.json",
+  "ignores": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/coverage/**",
+    "**/.git/**",
+    "**/.context/**",
+    "**/.caim/**",
+    "**/.agents/**",
+    "**/.agent/**",
+    "**/.gemini/**",
+    "**/.opencode/**",
+    "**/.github/**",
+    "**/openspec/changes/**"
+  ]
+}

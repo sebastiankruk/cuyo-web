@@ -80,18 +80,63 @@ today.
 
 ## Commands
 
+`make` wraps the npm scripts and adds nothing but the AI mode, so `npm run …` is
+always equivalent and neither has to be learned twice.
+
 ```sh
-npm run dev        # dev server
-npm test           # engine + level-format tests
-npm run lint       # ESLint, including the engine boundary rule
-npm run typecheck  # tsc --noEmit
-npm run build      # typecheck + production bundle
+make check         # lint + test + build, exactly what CI runs
+make lint          # eslint, tsc, markdownlint, openspec validate --strict
+make test          # engine + level-format tests
+make build         # typecheck + production bundle
+make corpus        # fetch the upstream tree the corpus tests read
+make help          # everything else
 ```
+
+Equivalents without make: `npm run lint`, `npm run lint:docs`,
+`npm run lint:specs`, `npm run lint:shell`, `npm test`,
+`npm run typecheck`, `npm run build`, `npm run fetch:corpus`.
 
 Level corpus tests read `.context/upstream-cuyo/data`; override with
 `CUYO_DATA_DIR`. If the upstream tree is absent they fail loudly rather than
 skipping, because "the parser handles every real level" is the assertion and it
-cannot be evaluated without them.
+cannot be evaluated without them — so on a fresh clone run `make corpus` first.
+`scripts/fetch-cuyo.sh` fetches it from Debian's archive pool, the only
+long-lived, checksummed copy of upstream 2.1.0; see that script for why there is
+nothing to clone.
+
+### AiOps Environment Mode Directive
+
+- **Always set `CUYO_AI_MODE=1`** before running make or npm commands. This
+  project is worked on by an agent that pays for every line of tool output, and
+  the flag exists for exactly that: `CUYO_AI_MODE=1 make check`,
+  `CUYO_AI_MODE=1 make lint`, `CUYO_AI_MODE=1 make test`, `CUYO_AI_MODE=1 npm test`.
+- **What it does**: drops the `echo` banners, the npm `notice` preamble, make's echo
+  of its own command lines, and vite's build chatter. Measured: `make check` is 1868
+  bytes with banners and 614 without, 52 lines against 18. `make test` alone is 484
+  against 406.
+- **What it must never do**: change what a command does, or hide a failure. Every
+  target propagates its exit status unchanged, and `scripts/lint-docs.sh` reads
+  `PIPESTATUS` rather than `$?` precisely so that a filtered-clean run is not
+  reported as a broken one.
+- **It does not touch the vitest reporter, on purpose.** Forcing a terser
+  reporter is a regression: vitest's default already goes compact when stdout is
+  not a TTY — 467 bytes for this suite — and the smallest forced choice,
+  `--reporter=dot`, costs 1474 bytes because it prints a dot per test. The
+  numbers are recorded in `vite.config.ts` so nobody re-adds it.
+- Two CI jobs hold this honest: one asserts the terse output really is terse and
+  one asserts the human-facing banners are still there. An agent-only path that
+  nobody exercises rots silently.
+
+### What CI gates
+
+`.github/workflows/quality.yml` runs one job per gate so a failure names itself:
+`lint` (eslint + tsc), `docs` (markdownlint), `shell` (pinned shellcheck),
+`specs` (`openspec validate --strict --all`), `test`, `build` (including an
+assertion that no upstream artwork reached `dist/`), and the two agent-mode jobs
+above.
+
+**Add a check to CI and to `make lint` in the same commit.** A gate that exists in
+only one of the two is either dead weight or a surprise.
 
 ## OpenSpec
 

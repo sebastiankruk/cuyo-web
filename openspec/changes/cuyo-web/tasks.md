@@ -217,3 +217,34 @@ untested files; the per-table tests are what protect fidelity, so both are neede
 - [ ] 13.5 Add behaviour tests for input timing under a DOM environment: immediate move, delayed repeat, repeat rate, and cancellation on the opposite direction
 - [ ] 13.6 Set coverage thresholds in the test config at the levels in design.md decision 12 and verify the suite fails when a file is left untested
 - [ ] 13.7 Record the achieved coverage per tier in the README whenever it is measured, so regressions are visible in review rather than discovered later
+
+## 14. Linting and continuous integration
+
+Documentation is a deliverable here, not a by-product: the man pages and the C++
+sources are the specification this project is written against, and a transcribed
+constant with no citation is indistinguishable from a guess. So both the code and
+the prose are linted, and GitHub runs the same gates `make lint` does — a check
+that passes locally and fails on a push is a check nobody trusts.
+
+The agent-facing output mode is part of this group rather than a convenience:
+this project is worked on by an agent that pays for every line of tool output, so
+`CUYO_AI_MODE=1` has to keep the tokens down without ever hiding a failure.
+
+- [x] 14.1 Add a Makefile wrapping the npm scripts, with `help`, `lint`, `test`, `build` and `check`, and verify no target defines a check that `npm run` does not
+- [x] 14.2 Add markdownlint-cli2 with a checked-in rule set, and verify the hand-written docs lint clean
+- [x] 14.3 Choose and record the documentation exclusions, including the `.caim` and `.context` symlink case, and verify the session transcript is not pulled into the lint
+- [x] 14.4 Add shellcheck over `scripts/` with a pinned CI version, and verify both scripts are clean
+- [x] 14.5 Add `CUYO_AI_MODE=1` to suppress make banners, the npm notice preamble and echoed command lines, and verify a failing command still exits non-zero with its output intact
+- [x] 14.6 Measure the token saving rather than assuming it, and record the figure; verify that forcing a terser vitest reporter is not an improvement and say why
+- [x] 14.7 Add a GitHub Actions workflow with one job per gate - lint, docs, shell, specs, test, build - so a failure names itself
+- [x] 14.8 Add a fetch script for the upstream Cuyo tree with a pinned URL and SHA-256 from Debian's `.dsc`, and verify the tree it produces is byte-identical to the hand-placed one
+- [x] 14.9 Add a CI job asserting no upstream artwork reached `dist/`, and verify it fails when a sprite is deliberately copied in
+- [x] 14.10 Add a CI job that runs the gates through `CUYO_AI_MODE=1` and asserts the output really is terse, and verify it fails when a banner is reintroduced
+- [x] 14.11 Add a CI job asserting the human-facing banners are still present, and verify it fails when `AI_ECHO` is inverted
+- [x] 14.12 Document the AI mode in `.agents/rules/cuyo-standards.md` and the README, including the measured saving
+- [x] 14.13 Correct the README's upstream clone instruction, which names a repository that does not exist
+- [ ] 14.14 Add a formatter check, and record why no formatter was adopted earlier: the code is hand-formatted at 80 columns with aligned tables, and running one now would rewrite every file for no rule that catches a defect
+- [ ] 14.15 Add a licence-header check over source and scripts, and verify `ATTRIBUTION.md` and the GPL notices are named from it
+- [ ] 14.16 Add a CI job that runs `npm audit` and fails on a high or critical advisory, with a documented allow-list and an expiry date for each entry
+- [ ] 14.17 Add coverage reporting to CI once 13.6 sets the floors, so a drop below them fails the build rather than appearing in a diff
+- [ ] 14.18 Add a scheduled weekly job that re-fetches the corpus and re-runs the level-format suite, so an upstream release is noticed rather than discovered

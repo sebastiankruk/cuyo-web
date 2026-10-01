@@ -53,7 +53,7 @@ While establishing the above, `cloudflared` created the record below in the
 **wrong** zone. It is inert (the tunnel 404s that hostname) but should be
 removed — Cloudflare dashboard → `iqoqo.cc` → DNS → delete:
 
-```
+```text
 CNAME  dev.cuyo.kruk.me.iqoqo.cc
 ```
 

@@ -1,0 +1,272 @@
+# Copyright (C) 2026 Sebastian Ryszard Kruk (dev@kruk.me)
+#
+# This file is part of the cuyo-web project.
+#
+# cuyo-web is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# cujo-web is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with cuyo-web. If not, see <https://www.gnu.org/licenses/>.
+name: Code Quality
+
+# One job per gate, so a failure says which one. `lint` and `test` are the two
+# that can hide a real defect; `docs` and `specs` catch drift in the
+# deliverables; `build` catches what only a bundle can; `agent-mode` keeps the
+# terse agent output path from rotting, which nothing else would.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref. A push to a branch with an open PR
+# supersedes the PR's own run, which is the common case on a one-developer
+# project and would otherwise queue three identical 3-minute suites.
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  lint:
+    name: Lint code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      # eslint.config.js carries the engine/ boundary rule, so this is also the
+      # check that `engine/` stays runnable in plain Node with no host globals.
+      - name: ESLint
+        run: npx eslint .
+
+      - name: TypeScript
+        run: npx tsc --noEmit
+
+  docs:
+    name: Lint documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      # The exclusions live in .markdownlint-cli2.jsonc, not in this command, so
+      # that `make lint-docs` and CI lint exactly the same set of files.
+      - name: markdownlint
+        run: npx markdownlint-cli2 "**/*.md"
+
+  shell:
+    name: Lint shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Pinned rather than taken from the runner image. shellcheck is a system
+      # package, so it is absent after `npm ci` on any machine, and relying on the
+      # image means a runner-image change can silently add or remove findings.
+      - name: Install a pinned shellcheck
+        run: |
+          SHELLCHECK_VERSION=0.10.0
+          curl -sSL \
+            "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
+            -o /tmp/shellcheck.tar.xz
+          tar -xJf /tmp/shellcheck.tar.xz -C /tmp
+          sudo install -m 0755 \
+            "/tmp/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" \
+            /usr/local/bin/shellcheck
+          shellcheck --version
+
+      - name: shellcheck
+        run: make lint-shell
+
+  specs:
+    name: Validate OpenSpec
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: openspec validate --strict --all
+        run: npx openspec validate --strict --all
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      # Not optional. The corpus tests fail loudly when the upstream tree is
+      # absent, because "the parser handles every real level" is the assertion and
+      # cannot be evaluated without them - so without this step the suite fails
+      # for a reason that has nothing to do with the change under test. See
+      # scripts/fetch-cuyo.sh for why Debian's pool is the source.
+      - name: Fetch the upstream Cuyo tree
+        run: bash scripts/fetch-cuyo.sh
+
+      - name: Vitest
+        run: npm test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: npm run build
+        run: npm run build
+
+      # Upstream ships 912 original spritesheets under data/pics, GPL-2.0-or-later,
+      # and the artwork here is new: one reaching dist/ is a licence problem, not
+      # merely a size one. The script compares SHA-256 digests rather than names,
+      # because every upstream sprite is .xpm.gz and because pasting one in renamed
+      # would otherwise pass. It needs the corpus, so it is fetched here too.
+      - name: Fetch the upstream Cuyo tree
+        run: bash scripts/fetch-cuyo.sh
+
+      - name: Assert no upstream artwork reached the bundle
+        run: bash scripts/check-no-upstream-art.sh
+
+  # Nothing else exercises CUYO_AI_MODE=1, and an agent-facing path that only
+  # runs when an agent happens to be using it rots silently. This job runs the
+  # same gates through the Makefile with the flag set, which is what an agent
+  # actually types - so a Makefile target that breaks, or a flag that starts
+  # failing, is caught here rather than mid-session.
+  agent-mode:
+    name: Agent mode (CUYO_AI_MODE=1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Fetch the upstream Cuyo tree
+        run: bash scripts/fetch-cuyo.sh
+
+      - name: Check the terse output actually is terse
+        run: |
+          # The point of the flag is fewer tokens. Assert it rather than trust it:
+          # a banner reintroduced by a new target would otherwise pass unnoticed
+          # until an agent started paying for it on every command.
+          env CUYO_AI_MODE=1 make lint > /tmp/ai-lint.log 2>&1 || {
+            echo "FAIL: CUYO_AI_MODE=1 make lint exited non-zero" >&2
+            cat /tmp/ai-lint.log >&2
+            exit 1
+          }
+          for banner in "Linting code" "Type checking" "Linting documentation" "Validating OpenSpec"; do
+            if grep -q "$banner" /tmp/ai-lint.log; then
+              echo "FAIL: AI mode still printed the banner: $banner" >&2
+              cat /tmp/ai-lint.log >&2
+              exit 1
+            fi
+          done
+          env CUYO_AI_MODE=1 make test > /tmp/ai-test.log 2>&1 || {
+            echo "FAIL: CUYO_AI_MODE=1 make test exited non-zero" >&2
+            cat /tmp/ai-test.log >&2
+            exit 1
+          }
+          # Vitest's default reporter prints per-file "✓" lines and a summary
+          # block; the dot reporter prints dots and a one-line count.
+          if grep -qE '^ *(✓|×) ' /tmp/ai-test.log; then
+            echo "FAIL: AI mode still printed per-test result lines" >&2
+            cat /tmp/ai-test.log >&2
+            exit 1
+          fi
+          echo "agent-mode: terse output verified"
+
+  # The human-facing path, in the same job as the terse one above so a difference
+  # in exit status between them shows up as a diff in one place. Kept separate
+  # from `test` so that a failure here is unambiguous: it means the banners
+  # changed behaviour, not that a rule regressed.
+  human-mode:
+    name: Human output (default)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Fetch the upstream Cuyo tree
+        run: bash scripts/fetch-cuyo.sh
+
+      - name: Check the banners are still there
+        run: |
+          make lint > /tmp/human-lint.log 2>&1 || {
+            echo "FAIL: make lint exited non-zero" >&2
+            cat /tmp/human-lint.log >&2
+            exit 1
+          }
+          for banner in "Linting code" "Type checking" "Linting documentation" "Validating OpenSpec"; do
+            if ! grep -q "$banner" /tmp/human-lint.log; then
+              echo "FAIL: the banner is missing for humans: $banner" >&2
+              cat /tmp/human-lint.log >&2
+              exit 1
+            fi
+          done
+          echo "human-mode: banners verified"

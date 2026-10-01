@@ -1,0 +1,31 @@
+{
+  // Documentation is a deliverable, not an afterthought, so it is linted like
+  // code. These relaxations are the ones iqoqo also makes, and each is a
+  // deliberate choice rather than a shrug:
+  //
+  //  - MD013 (line length): the project's markdown is hard-wrapped at 80 columns
+  //    by hand and the tables in openspec specs are wider than that by nature.
+  //    Wrapping prose automatically would fight the hand-wrapping.
+  //  - MD041 (first line a heading): several files here open with an HTML
+  //    comment carrying the provenance of the file, which is worth more than a
+  //    heading.
+  //  - MD022/MD028 (heading and blank-line spacing): the ASCII tables in
+  //    design.md and the man-page transcriptions in the module headers need
+  //    exact spacing that is easy to get wrong by hand and tedious to defend.
+  //  - MD033 (inline HTML): `<summary>`, `<br>` and friends appear in the README
+  //    tables and in the spec files' formatting.
+  //  - MD024 (duplicate headings): sibling-only, so a heading may repeat under
+  //    different parents - which is how tasks.md is organised - but the same
+  //    heading twice in a row still fails.
+  //  - MD048 (code fence style): backticks throughout.
+  //  - MD007 (list indent): two spaces, matching the files as written.
+  "default": true,
+  "MD013": false,
+  "MD007": { "indent": 2 },
+  "MD041": false,
+  "MD033": false,
+  "MD022": false,
+  "MD028": false,
+  "MD048": false,
+  "MD024": { "siblings_only": true }
+}
