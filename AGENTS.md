@@ -5,23 +5,14 @@ that are expensive to rediscover, live here rather than in someone's memory.
 
 ## Screenshots of the running app
 
-Screenshots and screen recordings are a **regular** part of reviewing this project,
-because a browser canvas is the one part of it that tests cannot fully substitute
-for. They are written by the user to:
+Screenshots are a regular part of reviewing this project, because a browser canvas
+is the one part of it that tests cannot fully substitute for. The user drops them in
+`~/Downloads/cuyo/` and expects them to be read.
 
-```
-~/Downloads/cuyo/
-```
-
-Read that directory when the user mentions how something looks, or when a change is
-visual. It is outside the repository on purpose: it is a drop folder, not a source
-of truth, and nothing in `make check` should depend on it.
-
-If the folder is unreadable, say so and ask for the file to be moved into the
-repository instead - do not guess what an image shows. Every previous visual bug in
-this project was found from a screenshot that said something specific ("paper with
-lines and one sprite in the upper left corner"), and guessing at the description
-would have been wrong twice.
+Do not guess what an image shows. Every visual bug in this project so far was found
+from a screenshot that said something specific ("paper with lines and one sprite in
+the upper left corner"), and reasoning from a description without looking would have
+been wrong twice.
 
 ## The dev server and its tunnel
 
