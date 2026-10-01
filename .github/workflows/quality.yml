@@ -122,7 +122,7 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: openspec validate --strict --all
-        run: npx openspec validate --strict --all
+        run: npx --no-install openspec validate --strict --all
 
   test:
     name: Tests
