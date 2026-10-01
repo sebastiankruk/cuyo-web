@@ -99,11 +99,12 @@ help:
 	@echo "  make clean        - Remove build output"
 	@echo ""
 	@echo "Agent mode:"
-	@echo "  Set CUYO_AI_MODE=1 to drop the banners and switch vitest to the"
-	@echo "  dot reporter. CUYO_AI_MODE=1 make check is the terse equivalent."
+	@echo "  CUYO_AI_MODE=1 make check runs the same gates without the banners,"
+	@echo "  npm preamble or vite build chatter. It does not touch the vitest"
+	@echo "  reporter: forcing a terser one costs more output, not less."
 	@echo ""
 	@echo "The corpus tests read .context/upstream-cuyo and fail loudly if it is"
-	@echo "absent. See the README for how to get it."
+	@echo "absent. Run 'make corpus' on a fresh clone."
 
 init:
 	@if [ ! -d node_modules ]; then $(AI_ECHO) "Installing dependencies..."; fi
