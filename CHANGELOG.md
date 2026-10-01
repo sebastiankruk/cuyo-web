@@ -12,6 +12,14 @@ something a player can tell.
 
 Nothing yet.
 
+### Fixed
+
+- `make check` was red on `main` for a reason unrelated to any change: `openspec` was
+  not a dependency, so `npx openspec` resolved from a global install locally and from
+  nothing in CI. It is now pinned as a devDependency and invoked with `--no-install`, so
+  the spec check can never quietly validate against a different version than the
+  repository declares.
+
 ## [0.2.0] - 2026-10-01
 
 The first version that plays the real game.
