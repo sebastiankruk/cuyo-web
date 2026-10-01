@@ -100,6 +100,19 @@ function levelFiles(): string[] {
  * editing this file. The values are stored in the manifest so that a change to this
  * function does not silently repaint every level that was generated before it - the
  * manifest is the record of what was decided, not a cache of a computation.
+ *
+ * **These colours are not what the game draws.** They were, once: the renderer used to
+ * look a kind's colour up from its art key, and this is where that lookup came from.
+ * It is per-key and therefore wrong by construction - two picture names in one level
+ * will sometimes land a couple of degrees apart, and across the 79 real levels 17 pairs
+ * came out under 25° with a worst case of 2°, in `pfeile.ld`, whose kinds are arrows.
+ * A palette is a *set* of colours for a level's kinds and has to be chosen as one, so
+ * the renderer now uses `render/palette.ts`, which chooses by perceptual distance.
+ *
+ * The fields are kept because they are cheap, they document what a key would look like,
+ * and `resolveArtKey` still needs the manifest for the thing that matters - failing the
+ * build when a level names a picture nothing else does. But nothing should read these
+ * three numbers to pick a colour. That is how the bug comes back.
  */
 function generatedSource(key: string): ArtEntry["source"] {
   let h = 0;
