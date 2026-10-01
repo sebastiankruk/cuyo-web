@@ -74,6 +74,64 @@ export function cellSizeFor(availableWidth: number): number {
   return availableWidth / GRX;
 }
 
+/** How a canvas showing the whole board should be sized. */
+export interface BoardSizing {
+  /** Cell size in CSS pixels, for {@link render} to draw with. */
+  readonly size: number;
+  /** Backing-store width in device pixels. */
+  readonly pixelsX: number;
+  /** Backing-store height in device pixels. */
+  readonly pixelsY: number;
+}
+
+/**
+ * Size a canvas so that all twenty rows fit inside it.
+ *
+ * The renderer works in whole cells and derives the board's own height as
+ * `20 * size`, so a canvas that is not exactly ten cells wide and twenty tall
+ * gets a board drawn at the wrong scale. Sizing it from the *available box* rather
+ * than from the canvas's own width is what keeps the two in step.
+ *
+ * This was a real bug: the canvas was displayed at 600x300 by
+ * `aspect-ratio: 1 / 2` while the renderer drew a 600x1200 board into it, so only
+ * the top five of twenty rows were visible. Both shipped levels put every blob in
+ * the bottom row, so the board looked empty. `board.test.ts` now pins the ratio
+ * from both ends.
+ *
+ * `dpr` scales the backing store only. CSS then scales the canvas to whatever the
+ * layout gives it, and because the backing store is exactly 1:2 the `aspect-ratio`
+ * on the element cannot distort it.
+ */
+export function boardSizing(
+  availableWidth: number,
+  availableHeight: number,
+  dpr = 1,
+): BoardSizing {
+  // A flex or grid parent reports zero height on the first commit, before layout
+  // has run. `fitBoard` would take that as a hard constraint and return a
+  // zero-sized board - a second way to get a blank canvas, and one that only
+  // appears on the frame the effect runs. So an unusable height is ignored rather
+  // than obeyed, and the width governs.
+  const heightUsable = Number.isFinite(availableHeight) && availableHeight > 0;
+  // Same for the width, except that zero is a genuine constraint there and must
+  // not become a fallback size: no room means no board, not a default board.
+  const width = Number.isFinite(availableWidth) ? availableWidth : 0;
+  const fitted = heightUsable
+    ? fitBoard(width, availableHeight).width
+    : width;
+  const size = fitted / GRX;
+  // A zero or non-finite ratio would make the backing store 0x0, which renders as
+  // a blank canvas even though `size` is perfectly good - the same symptom one
+  // layer down. `PlayScreen` guards this already; guard it here as well so the
+  // helper is safe to call from anywhere.
+  const ratio = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+  return {
+    size,
+    pixelsX: Math.round(GRX * size * ratio),
+    pixelsY: Math.round(GRY * size * ratio),
+  };
+}
+
 /**
  * Top-left corner of a cell, in pixels.
  *

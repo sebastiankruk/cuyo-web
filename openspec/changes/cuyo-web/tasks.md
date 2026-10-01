@@ -224,6 +224,7 @@ untested files; the per-table tests are what protect fidelity, so both are neede
 - [ ] 13.5 Add behaviour tests for input timing under a DOM environment: immediate move, delayed repeat, repeat rate, and cancellation on the opposite direction
 - [ ] 13.6 Set coverage thresholds in the test config at the levels in design.md decision 12 and verify the suite fails when a file is left untested
 - [ ] 13.7 Record the achieved coverage per tier in the README whenever it is measured, so regressions are visible in review rather than discovered later
+- [ ] 13.8 Mount `PlayScreen` in a DOM environment and verify it sizes the canvas from the space its parent actually offers, so the component cannot re-introduce the four-times-too-tall board that `render/board.test.ts` cannot catch from outside
 
 ## 14. Linting and continuous integration
 

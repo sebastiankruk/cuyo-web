@@ -5,6 +5,7 @@ import type { Phase } from "../engine/game-core/simulation.ts";
 import type { LevelDef } from "../engine/level-format/level-data.ts";
 import { GRX, GRY } from "../engine/game-core/constants.ts";
 import { render } from "../render/board.ts";
+import { boardSizing } from "../render/geometry.ts";
 
 /** Held-direction repeat timings, in ms. */
 const DAS_DELAY = 170;
@@ -61,11 +62,19 @@ export function PlayScreen({ level, seed, onExit }: Props) {
     const ctx = canvas.getContext("2d");
     if (ctx === null) return;
 
+    // The canvas is sized from the space available, not from its own width. The
+    // renderer works in whole cells and derives the board's height as 20 * size,
+    // so sizing it by width alone produced a board four times taller than the
+    // canvas - only the top five of twenty rows were visible, and since both
+    // levels put every blob in the bottom row the board looked empty.
+    const parent = canvas.parentElement;
+    const availableWidth =
+      parent?.clientWidth ?? canvas.clientWidth ?? GRX * 32;
+    const availableHeight = parent?.clientHeight ?? canvas.clientHeight ?? GRY * 32;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const cssWidth = canvas.clientWidth;
-    const cssHeight = canvas.clientHeight;
-    canvas.width = Math.round(cssWidth * dpr);
-    canvas.height = Math.round(cssHeight * dpr);
+    const sizing = boardSizing(availableWidth, availableHeight, dpr);
+    canvas.width = sizing.pixelsX;
+    canvas.height = sizing.pixelsY;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const loop = new GameLoop(sim);
@@ -73,7 +82,7 @@ export function PlayScreen({ level, seed, onExit }: Props) {
 
     let lastHud = 0;
     loop.subscribe((s) => {
-      render(ctx, s, cssWidth / GRX);
+      render(ctx, s, sizing.size);
       const now = performance.now();
       if (now - lastHud >= HUD_INTERVAL_MS) {
         lastHud = now;
