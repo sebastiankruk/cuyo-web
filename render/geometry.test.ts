@@ -13,14 +13,12 @@ import {
   hexGeometry,
 } from "../engine/game-core/constants.ts";
 import {
-  ART_COLOURS,
   boardHeight,
   boardWidth,
   borderBand,
   cellAt,
   cellOrigin,
   cellSizeFor,
-  colourFor,
   dragCells,
   explosionProgress,
   explosionRadius,
@@ -186,7 +184,12 @@ describe("borderBand", () => {
   });
 
   it("grows upward from the bottom when mirrored", () => {
-    expect(borderBand(mirrored, 2)).toEqual({ x: 0, y: 640 - 64, w: 320, h: 64 });
+    expect(borderBand(mirrored, 2)).toEqual({
+      x: 0,
+      y: 640 - 64,
+      w: 320,
+      h: 64,
+    });
   });
 
   it("clamps to the board height", () => {
@@ -256,25 +259,23 @@ describe("stubRect", () => {
   });
 });
 
-describe("colourFor", () => {
-  it("returns the declared colour for a known art key", () => {
-    expect(colourFor("inGruen", 0)).toBe(ART_COLOURS["inGruen"]);
-  });
-
-  it("is stable for an unknown key", () => {
-    expect(colourFor("zzz-unknown", 0)).toBe(colourFor("zzz-unknown", 0));
-  });
-
-  it("varies by version for an unknown key", () => {
-    expect(colourFor("zzz-unknown", 0)).not.toBe(colourFor("zzz-unknown", 1));
-  });
-
+describe("stableHue", () => {
+  // Still exported, still tested, but no longer used for anything a player sees: it was
+  // the per-key hash whose collisions `palette.ts` exists to fix. Kept because it is a
+  // reasonable deterministic hash and `shade` and the art manifest do not need it
+  // removed to be correct - but nothing should reach for it to pick a colour again.
   it("keeps a stable hue in range", () => {
     for (const k of ["", "a", "abc", "inGruen", "x".repeat(200)]) {
       const h = stableHue(k);
       expect(h).toBeGreaterThanOrEqual(0);
       expect(h).toBeLessThan(360);
       expect(Number.isInteger(h)).toBe(true);
+    }
+  });
+
+  it("is stable for a given key", () => {
+    for (const k of ["", "inGruen", "zhlen"]) {
+      expect(stableHue(k)).toBe(stableHue(k));
     }
   });
 });

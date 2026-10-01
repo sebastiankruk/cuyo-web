@@ -198,27 +198,19 @@ export function stubRadius(f: BoardFrame): number {
   return f.size * 0.16;
 }
 
-/**
- * A marker drawn on a blob whose kind has a special role.
+/*
+ * Blob markers.
  *
- * Upstream tells goal and grey blobs apart by their artwork, which is per-kind and
- * authored. There is no artwork here yet, so without a marker the only clue that a
- * blob is the one to clear is the rule text in the HUD - which points at "marked"
- * blobs that the board does not in fact mark.
- *
- * The marker is deliberately not colour: goal blobs already have their own colour,
- * and tinting them further would work against the goal blobs being told apart *from
- * each other*. A shape says "this one is special" and survives both a black
+ * A goal blob gets a dot and a grey a square, so the two roles are distinguishable
+ * from each other and from an ordinary blob by *shape* rather than by colour. Shape
+ * because goal blobs already have their own colour and recolouring them would work
+ * against telling them apart from each other, and because a shape survives both a black
  * background and a colour that happens to match.
+ *
+ * Which marker a kind gets comes from `palette.ts`, which is what knows about roles.
+ * This file keeps the geometry of the mark - its size and the ink colour - because that
+ * is geometry.
  */
-export type BlobMarker = "goal" | "grey" | null;
-
-/** The marker a kind's role calls for, or null for an ordinary colour. */
-export function markerForRole(role: string): BlobMarker {
-  if (role === "grass") return "goal";
-  if (role === "grey") return "grey";
-  return null;
-}
 
 /** Radius of the marker's inner shape, as a fraction of the cell. */
 export const MARKER_RADIUS = 0.16;
@@ -228,48 +220,34 @@ export function markerInk(colour: string): string {
   return shade(colour, 0.55);
 }
 
-// ------------------------------------------------------------------- colour
+/*
+ * Per-key colour, gone.
+ *
+ * These hashed a picture name to a hue independently of every other name, which meant
+ * two kinds in one level could land a couple of degrees apart: across the 79 real
+ * levels, 17 pairs under 25° and a worst case of 2°, in `pfeile.ld`. No improvement to
+ * the hash fixes it, because two names can hash near each other however good the hash
+ * is - a palette is a set, and has to be chosen as one.
+ *
+ * `palette.ts` builds one per level instead. It is kept out of this file deliberately:
+ * geometry is about where things go, and a palette is about what they look like.
+ */
 
-/**
+/*
  * Base colours per art key.
  *
- * A stand-in for the authored art manifest (design.md decision 7). Keys not
- * listed get a stable hue derived from the key text, so an unstyled kind is
- * still visually distinct rather than an unidentifiable blank.
+ * Artwork is generated procedurally rather than authored, so there is nothing to
+ * look up here. Upstream's spritesheets are GPL-2.0 and deliberately not shipped;
+ * see scripts/check-no-upstream-art.sh.
  */
-export const ART_COLOURS: Readonly<Record<string, string>> = {
-  inGruen: "#3bb03b",
-  inGelb: "#e0c020",
-  inSchwarz: "#303030",
-  inRosaNasen: "#d05090",
-  inOrangeNasen: "#e08030",
-  inGras: "#7a9a4a",
-  inGrau: "#909090",
-  ihRot: "#c03030",
-  ihGruen: "#30a050",
-  ihBlau: "#3060c0",
-  ihLila: "#9050c0",
-  ihBunt: "#b07040",
-  ihGrau: "#808080",
-};
 
 /** A stable hue in [0, 360) derived from a key, so it never varies per run. */
 export function stableHue(key: string): number {
   let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
+  for (let i = 0; i < key.length; i++) {
+    h = (Math.imul(h, 31) + key.charCodeAt(i)) | 0;
+  }
   return Math.abs(h) % 360;
-}
-
-/**
- * Colour for an art key and version.
- *
- * `version` shifts the lightness so kinds sharing a fallback hue stay
- * distinguishable.
- */
-export function colourFor(key: string, version: number): string {
-  const known = ART_COLOURS[key];
-  if (known !== undefined) return known;
-  return `hsl(${stableHue(key)} 62% ${52 - (version % 3) * 6}%)`;
 }
 
 /**

@@ -5,12 +5,11 @@ import type { Phase } from "../engine/game-core/simulation.ts";
 import type { LevelDef } from "../engine/level-format/level-data.ts";
 import { GRX, GRY } from "../engine/game-core/constants.ts";
 import { render } from "../render/board.ts";
+import { boardHeight, boardSizing, boardWidth } from "../render/geometry.ts";
 import {
-  boardHeight,
-  boardSizing,
-  boardWidth,
-  colourFor,
-} from "../render/geometry.ts";
+  buildPalette,
+  colourFor as paletteColourFor,
+} from "../render/palette.ts";
 import { applyGesture, readGesture } from "./gestures.ts";
 import { goalSummary, goalSummaryLines } from "./goals.ts";
 import type { PointerSample } from "./gestures.ts";
@@ -18,6 +17,18 @@ import type { PointerSample } from "./gestures.ts";
 /** Held-direction repeat timings, in ms. */
 const DAS_DELAY = 170;
 const DAS_RATE = 55;
+
+/**
+ * The kind constant for a goal kind's name.
+ *
+ * The summary carries names and the board stores constants, so the swatch needs the
+ * translation. `-1` when the name is not in the table, which the palette answers with
+ * its fallback rather than throwing - a missing swatch is not worth failing a frame for.
+ */
+function goalKindIndex(level: LevelDef, name: string | null): number {
+  if (name === null) return -1;
+  return level.kinds.findIndex((k) => k.name === name);
+}
 
 /** How often the HUD is allowed to re-render. */
 const HUD_INTERVAL_MS = 100;
@@ -333,7 +344,18 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
               <p className="play__rulesSwatch">
                 <span
                   className="play__swatch"
-                  style={{ background: colourFor(goals.targetArtKey, 0) }}
+                  style={{
+                    background: paletteColourFor(
+                      // The same palette the board is drawn with, built from the
+                      // level's kinds rather than hashed from the art key - so the
+                      // swatch beside "these are the blobs to clear" is the colour of
+                      // those blobs and cannot drift from it.
+                      buildPalette(level.kinds, {
+                        background: level.colours.background,
+                      }),
+                      goalKindIndex(level, goals.targetName),
+                    ),
+                  }}
                   aria-hidden="true"
                 />
                 <span title={goals.targetName ?? undefined}>
