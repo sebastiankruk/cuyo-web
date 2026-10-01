@@ -38,7 +38,11 @@ and expensive to discover late.
 
 ## Next, in order
 
-### 1. Art that distinguishes kinds
+Each item names the version it lands in. Versions are cut when the app is worth using,
+not when a group of tasks closes - so an item can be finished and not yet released, and
+a release can contain work from several groups.
+
+### 1. Art that distinguishes kinds — _0.3.0_
 
 The largest remaining gap between "working" and "playable". Artwork is generated from
 each picture's name, so kinds are usually but not always distinguishable, and you
@@ -51,7 +55,7 @@ like the rest.
 
 Needs your eyes. This is the next thing to look at together.
 
-### 2. The rules dialog as a modal (9.8, 10.12)
+### 2. The rules dialog as a modal (9.8, 10.12) — _0.3.0_
 
 You asked for this: a centred dialog that pauses the game, in a smaller face than the
 HUD. The rules panel is currently a dropdown that does not pause, so opening it mid-fall
@@ -59,7 +63,7 @@ is a way to lose a piece you were watching.
 
 Small, well-specified, and I can build it without asking. Good first pull request.
 
-### 3. Progress and unlocking (6.5, 6.6)
+### 3. Progress and unlocking (6.5, 6.6) — _0.3.0_
 
 Which levels you have finished, best scores, and the next level in a track unlocking.
 Without it every visit starts from the catalogue with no memory, which is the main thing
@@ -67,7 +71,7 @@ that makes a game feel like a game rather than a demo.
 
 Straightforward, entirely testable, no visual decisions.
 
-### 4. Cual runtime (groups 3 and 4)
+### 4. Cual runtime (groups 3 and 4) — _0.4.0_
 
 The scripting language levels use for custom rules. `rollenspiel.ld` and about twenty
 others ignore their Cual block and are therefore subtly wrong. This is the largest
@@ -78,18 +82,18 @@ Sequenced late because it is the hardest to verify: the oracle is upstream's
 interpreter, which cannot be built here, so correctness rests on tests written against
 its source.
 
-### 5. Menus, pause, settings (group 9)
+### 5. Menus, pause, settings (group 9) — _0.5.0_
 
 Pause, settings for audio and reduced motion, the dev overlay. Depends on 6.5 for
 anything worth storing.
 
-### 6. Presentation (group 7)
+### 6. Presentation (group 7) — _0.5.0_
 
 The chase border's artwork, `toppic` and `topoverlap`; the next-piece preview; the
 informational indicators; the time-bonus breakdown; text rendering with a bundled font.
 Mostly visible polish, each item small.
 
-### 7. Offline play (group 11)
+### 7. Offline play (group 11) — _0.6.0_
 
 A service worker and a precache list. Lowest priority of anything here: a game you play
 on a phone with a tunnel already works, and installing it to play offline is a
@@ -97,14 +101,24 @@ convenience rather than a capability.
 
 ## Versions
 
-Cut when the app is worth using, not when a group closes. The remaining candidates:
+Cut when the app is worth using, not when a group closes. What each one is _for_,
+rather than what is in it:
 
-- **0.3.0** - authored art, the modal rules dialog, progress and unlocking. "Looks like
-  a game and remembers you played it."
-- **0.4.0** - the Cual runtime. "Every upstream level, correctly."
-- **0.5.0** - menus, settings, audio. "A finished game."
+| Version | For                                            | Contains                                       |
+| ------- | ---------------------------------------------- | ---------------------------------------------- |
+| 0.2.0   | _done_                                         | All 79 levels, real rules, playable on a phone |
+| 0.3.0   | Looks like a game, and remembers you played it | 1, 2, 3                                        |
+| 0.4.0   | Every upstream level, correctly                | 4                                              |
+| 0.5.0   | A finished game                                | 5, 6                                           |
+| 0.6.0   | Playable with no connection                    | 7                                              |
 
 Minor versions fix and adjust. A version is not cut for a bugfix.
+
+The versions are deliberately uneven. 0.3.0 is three small items, 0.4.0 is one large
+one, and that reflects what each costs rather than a wish to ship evenly. What they share
+is that each one leaves the app in a state worth playing: 0.4.0 is a big jump, but
+without it about twenty levels are subtly wrong, and everything before it is already
+worth having.
 
 ## Working practice
 
