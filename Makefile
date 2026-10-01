@@ -160,6 +160,23 @@ lint-shell:
 check-art:
 	@bash scripts/check-no-upstream-art.sh
 
+# Regenerates the art-key manifest from the bundled level data. Node 22 runs
+# TypeScript directly, so this needs no build step of its own and no dependency.
+# The flag is the full transform rather than strip-only, because the level parser
+# uses TypeScript parameter properties.
+NODE_TS_FLAGS := --experimental-transform-types --disable-warning=ExperimentalWarning
+
+art-manifest:
+	$(AI_ECHO) "Emitting the art-key manifest..."
+	@node $(NODE_TS_FLAGS) levels-src/emit-art-manifest.ts
+
+# Regenerating must leave the committed file unchanged. Without this a level added
+# without regenerating would be caught only by the corpus test, which reports a
+# missing key rather than the fix; and a manifest edited by hand would survive until
+# someone noticed the diff was not generated.
+check-art-manifest:
+	@bash scripts/check-art-manifest.sh
+
 lint: lint-code lint-types lint-docs lint-specs
 
 # ESLint. The engine/ boundary rule lives in eslint.config.js, so this is also the
@@ -196,7 +213,7 @@ build:
 # The single command CI runs, so that "green locally" and "green on GitHub" mean
 # the same thing. `make check` is not a separate set of checks: it is these four
 # targets in the order a person would run them.
-check: lint test build check-art
+check: lint test build check-art check-art-manifest
 	$(AI_ECHO) "All checks passed."
 
 # Serves the production bundle from dist/ rather than the source, which is what

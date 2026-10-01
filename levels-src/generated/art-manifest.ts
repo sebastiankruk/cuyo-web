@@ -1,0 +1,2277 @@
+// GENERATED FILE - do not edit.
+//
+// Emitted by levels-src/emit-art-manifest.ts from 79 level files
+// (237 level sections across three versions). Every picture name those
+// levels reference has an entry here; a level naming a key that is missing from this
+// table fails to resolve at load time, naming the key and the kind.
+//
+// The artwork is generated from each key rather than authored, and upstream's
+// spritesheets are deliberately not shipped - see scripts/check-no-upstream-art.sh.
+
+import { artManifest } from "../../engine/level-format/art.ts";
+import type { ArtEntry } from "../../engine/level-format/art.ts";
+
+const ENTRIES: ArtEntry[] = [
+  {
+    key: "Grau",
+    source: {
+      kind: "generated",
+      hue: 159,
+      saturation: 66,
+      lightness: 55,
+    },
+    firstKind: "Grau",
+  },
+  {
+    key: "Starr",
+    source: {
+      kind: "generated",
+      hue: 104,
+      saturation: 66,
+      lightness: 57,
+    },
+    firstKind: "Starr",
+  },
+  {
+    key: "Start",
+    source: {
+      kind: "generated",
+      hue: 106,
+      saturation: 66,
+      lightness: 57,
+    },
+    firstKind: "Start",
+  },
+  {
+    key: "aBoxFractal.xpm",
+    source: {
+      kind: "generated",
+      hue: 194,
+      saturation: 63,
+      lightness: 55,
+    },
+    firstKind: "symbol",
+  },
+  {
+    key: "aCantorSet.xpm",
+    source: {
+      kind: "generated",
+      hue: 55,
+      saturation: 70,
+      lightness: 53,
+    },
+    firstKind: "aCantorSet",
+  },
+  {
+    key: "aDragon.xpm",
+    source: {
+      kind: "generated",
+      hue: 229,
+      saturation: 63,
+      lightness: 49,
+    },
+    firstKind: "greyblob",
+  },
+  {
+    key: "baAliens.xpm",
+    source: {
+      kind: "generated",
+      hue: 250,
+      saturation: 67,
+      lightness: 48,
+    },
+    firstKind: "Alien",
+  },
+  {
+    key: "baBlue.xpm",
+    source: {
+      kind: "generated",
+      hue: 328,
+      saturation: 66,
+      lightness: 52,
+    },
+    firstKind: "Blue",
+  },
+  {
+    key: "baGreen.xpm",
+    source: {
+      kind: "generated",
+      hue: 69,
+      saturation: 61,
+      lightness: 46,
+    },
+    firstKind: "Green",
+  },
+  {
+    key: "baRed.xpm",
+    source: {
+      kind: "generated",
+      hue: 95,
+      saturation: 66,
+      lightness: 50,
+    },
+    firstKind: "Red",
+  },
+  {
+    key: "baYellow.xpm",
+    source: {
+      kind: "generated",
+      hue: 22,
+      saturation: 63,
+      lightness: 52,
+    },
+    firstKind: "Yellow",
+  },
+  {
+    key: "bbBonus.xpm",
+    source: {
+      kind: "generated",
+      hue: 254,
+      saturation: 59,
+      lightness: 54,
+    },
+    firstKind: "bbBonus",
+  },
+  {
+    key: "bcEmpty1.xpm",
+    source: {
+      kind: "generated",
+      hue: 356,
+      saturation: 67,
+      lightness: 55,
+    },
+    firstKind: "All",
+  },
+  {
+    key: "bddisco.xpm",
+    source: {
+      kind: "generated",
+      hue: 351,
+      saturation: 63,
+      lightness: 48,
+    },
+    firstKind: "All",
+  },
+  {
+    key: "blBuchstabe.xpm",
+    source: {
+      kind: "generated",
+      hue: 224,
+      saturation: 69,
+      lightness: 48,
+    },
+    firstKind: "Letter1",
+  },
+  {
+    key: "blFragezeichen.xpm",
+    source: {
+      kind: "generated",
+      hue: 130,
+      saturation: 64,
+      lightness: 46,
+    },
+    firstKind: "blFragezeichen",
+  },
+  {
+    key: "bmKarten.xpm",
+    source: {
+      kind: "generated",
+      hue: 195,
+      saturation: 68,
+      lightness: 52,
+    },
+    firstKind: "bm",
+  },
+  {
+    key: "bmTisch.xpm",
+    source: {
+      kind: "generated",
+      hue: 185,
+      saturation: 61,
+      lightness: 52,
+    },
+    firstKind: "bmTisch",
+  },
+  {
+    key: "bpEis.xpm",
+    source: {
+      kind: "generated",
+      hue: 208,
+      saturation: 62,
+      lightness: 54,
+    },
+    firstKind: "Eis",
+  },
+  {
+    key: "bpFreezePingu.xpm",
+    source: {
+      kind: "generated",
+      hue: 99,
+      saturation: 64,
+      lightness: 47,
+    },
+    firstKind: "Freezing",
+  },
+  {
+    key: "bpIglu.xpm",
+    source: {
+      kind: "generated",
+      hue: 124,
+      saturation: 61,
+      lightness: 46,
+    },
+    firstKind: "Iglu",
+  },
+  {
+    key: "bpPingu.xpm",
+    source: {
+      kind: "generated",
+      hue: 124,
+      saturation: 70,
+      lightness: 50,
+    },
+    firstKind: "Empty",
+  },
+  {
+    key: "bpSchnee.xpm",
+    source: {
+      kind: "generated",
+      hue: 315,
+      saturation: 71,
+      lightness: 47,
+    },
+    firstKind: "Schnee",
+  },
+  {
+    key: "bpStein.xpm",
+    source: {
+      kind: "generated",
+      hue: 46,
+      saturation: 62,
+      lightness: 49,
+    },
+    firstKind: "bpStein",
+  },
+  {
+    key: "btGrey.xpm",
+    source: {
+      kind: "generated",
+      hue: 80,
+      saturation: 71,
+      lightness: 56,
+    },
+    firstKind: "Grey",
+  },
+  {
+    key: "btScore.xpm",
+    source: {
+      kind: "generated",
+      hue: 41,
+      saturation: 58,
+      lightness: 52,
+    },
+    firstKind: "Score",
+  },
+  {
+    key: "btTetris.xpm",
+    source: {
+      kind: "generated",
+      hue: 82,
+      saturation: 71,
+      lightness: 48,
+    },
+    firstKind: "Tetris",
+  },
+  {
+    key: "bxBaer32.xpm",
+    source: {
+      kind: "generated",
+      hue: 216,
+      saturation: 67,
+      lightness: 53,
+    },
+    firstKind: "All",
+  },
+  {
+    key: "dnBlack.xpm",
+    source: {
+      kind: "generated",
+      hue: 268,
+      saturation: 60,
+      lightness: 56,
+    },
+    firstKind: "dnStart",
+  },
+  {
+    key: "dnBlack2.xpm",
+    source: {
+      kind: "generated",
+      hue: 220,
+      saturation: 64,
+      lightness: 46,
+    },
+    firstKind: "dnStart",
+  },
+  {
+    key: "dnBlue.xpm",
+    source: {
+      kind: "generated",
+      hue: 259,
+      saturation: 63,
+      lightness: 57,
+    },
+    firstKind: "dnBlue",
+  },
+  {
+    key: "dnGray.xpm",
+    source: {
+      kind: "generated",
+      hue: 12,
+      saturation: 67,
+      lightness: 57,
+    },
+    firstKind: "dnGray",
+  },
+  {
+    key: "dnGreen1.xpm",
+    source: {
+      kind: "generated",
+      hue: 87,
+      saturation: 68,
+      lightness: 53,
+    },
+    firstKind: "dnGreen",
+  },
+  {
+    key: "dnRed1.xpm",
+    source: {
+      kind: "generated",
+      hue: 127,
+      saturation: 71,
+      lightness: 55,
+    },
+    firstKind: "dnRed",
+  },
+  {
+    key: "elBlack.xpm",
+    source: {
+      kind: "generated",
+      hue: 217,
+      saturation: 59,
+      lightness: 46,
+    },
+    firstKind: "elBlack",
+  },
+  {
+    key: "elBlue.xpm",
+    source: {
+      kind: "generated",
+      hue: 56,
+      saturation: 70,
+      lightness: 54,
+    },
+    firstKind: "elBlue",
+  },
+  {
+    key: "elGray.xpm",
+    source: {
+      kind: "generated",
+      hue: 303,
+      saturation: 66,
+      lightness: 54,
+    },
+    firstKind: "elGray",
+  },
+  {
+    key: "elGreen.xpm",
+    source: {
+      kind: "generated",
+      hue: 269,
+      saturation: 60,
+      lightness: 56,
+    },
+    firstKind: "elGreen",
+  },
+  {
+    key: "elRed.xpm",
+    source: {
+      kind: "generated",
+      hue: 327,
+      saturation: 62,
+      lightness: 47,
+    },
+    firstKind: "elRed",
+  },
+  {
+    key: "elYellow.xpm",
+    source: {
+      kind: "generated",
+      hue: 266,
+      saturation: 58,
+      lightness: 49,
+    },
+    firstKind: "elYellow",
+  },
+  {
+    key: "i3Dreieck.xpm",
+    source: {
+      kind: "generated",
+      hue: 296,
+      saturation: 67,
+      lightness: 50,
+    },
+    firstKind: "Dreieck",
+  },
+  {
+    key: "i3Gitter.xpm",
+    source: {
+      kind: "generated",
+      hue: 128,
+      saturation: 65,
+      lightness: 56,
+    },
+    firstKind: "Gitter",
+  },
+  {
+    key: "i3Grau.xpm",
+    source: {
+      kind: "generated",
+      hue: 240,
+      saturation: 59,
+      lightness: 46,
+    },
+    firstKind: "Box",
+  },
+  {
+    key: "i3Kreis.xpm",
+    source: {
+      kind: "generated",
+      hue: 13,
+      saturation: 71,
+      lightness: 48,
+    },
+    firstKind: "Kreis",
+  },
+  {
+    key: "i3Plus.xpm",
+    source: {
+      kind: "generated",
+      hue: 355,
+      saturation: 71,
+      lightness: 56,
+    },
+    firstKind: "Plus",
+  },
+  {
+    key: "i3Quadrat.xpm",
+    source: {
+      kind: "generated",
+      hue: 259,
+      saturation: 64,
+      lightness: 54,
+    },
+    firstKind: "Quadrat",
+  },
+  {
+    key: "i3Stern.xpm",
+    source: {
+      kind: "generated",
+      hue: 195,
+      saturation: 59,
+      lightness: 53,
+    },
+    firstKind: "Stern",
+  },
+  {
+    key: "i6Blau.xpm",
+    source: {
+      kind: "generated",
+      hue: 90,
+      saturation: 62,
+      lightness: 48,
+    },
+    firstKind: "i6Blau",
+  },
+  {
+    key: "i6Gelb.xpm",
+    source: {
+      kind: "generated",
+      hue: 56,
+      saturation: 62,
+      lightness: 48,
+    },
+    firstKind: "i6Gelb",
+  },
+  {
+    key: "i6Grau.xpm",
+    source: {
+      kind: "generated",
+      hue: 173,
+      saturation: 68,
+      lightness: 52,
+    },
+    firstKind: "i6Grau",
+  },
+  {
+    key: "i6Hintergrund.xpm",
+    source: {
+      kind: "generated",
+      hue: 266,
+      saturation: 70,
+      lightness: 57,
+    },
+    firstKind: "i6Gross",
+  },
+  {
+    key: "i6Lila.xpm",
+    source: {
+      kind: "generated",
+      hue: 186,
+      saturation: 60,
+      lightness: 55,
+    },
+    firstKind: "i6Lila",
+  },
+  {
+    key: "i6Rot.xpm",
+    source: {
+      kind: "generated",
+      hue: 41,
+      saturation: 64,
+      lightness: 49,
+    },
+    firstKind: "i6Rot",
+  },
+  {
+    key: "i6Weiss.xpm",
+    source: {
+      kind: "generated",
+      hue: 21,
+      saturation: 68,
+      lightness: 48,
+    },
+    firstKind: "i6Weiss",
+  },
+  {
+    key: "iaAusdruck.xpm",
+    source: {
+      kind: "generated",
+      hue: 145,
+      saturation: 71,
+      lightness: 46,
+    },
+    firstKind: "iaAusdruck",
+  },
+  {
+    key: "iaBefehl.xpm",
+    source: {
+      kind: "generated",
+      hue: 269,
+      saturation: 62,
+      lightness: 55,
+    },
+    firstKind: "iaBefehl",
+  },
+  {
+    key: "iaError.xpm",
+    source: {
+      kind: "generated",
+      hue: 71,
+      saturation: 63,
+      lightness: 52,
+    },
+    firstKind: "iaError",
+  },
+  {
+    key: "iaGrau.xpm",
+    source: {
+      kind: "generated",
+      hue: 302,
+      saturation: 59,
+      lightness: 46,
+    },
+    firstKind: "iaGrau",
+  },
+  {
+    key: "iaString.xpm",
+    source: {
+      kind: "generated",
+      hue: 320,
+      saturation: 66,
+      lightness: 52,
+    },
+    firstKind: "iaString",
+  },
+  {
+    key: "iaZahl.xpm",
+    source: {
+      kind: "generated",
+      hue: 102,
+      saturation: 59,
+      lightness: 50,
+    },
+    firstKind: "iaZahl",
+  },
+  {
+    key: "ibBaelle.xpm",
+    source: {
+      kind: "generated",
+      hue: 239,
+      saturation: 69,
+      lightness: 49,
+    },
+    firstKind: "Baelle1",
+  },
+  {
+    key: "ibGrauball.xpm",
+    source: {
+      kind: "generated",
+      hue: 294,
+      saturation: 65,
+      lightness: 52,
+    },
+    firstKind: "ibGrauball",
+  },
+  {
+    key: "ibKegelPink.xpm",
+    source: {
+      kind: "generated",
+      hue: 288,
+      saturation: 71,
+      lightness: 51,
+    },
+    firstKind: "ibKegel",
+  },
+  {
+    key: "ibkBunt.xpm",
+    source: {
+      kind: "generated",
+      hue: 66,
+      saturation: 64,
+      lightness: 56,
+    },
+    firstKind: "motiv",
+  },
+  {
+    key: "ibkRahmen.xpm",
+    source: {
+      kind: "generated",
+      hue: 2,
+      saturation: 68,
+      lightness: 57,
+    },
+    firstKind: "frame",
+  },
+  {
+    key: "ibwBlaeschen.xpm",
+    source: {
+      kind: "generated",
+      hue: 236,
+      saturation: 67,
+      lightness: 48,
+    },
+    firstKind: "Tintenfisch",
+  },
+  {
+    key: "ibwSchuh.xpm",
+    source: {
+      kind: "generated",
+      hue: 92,
+      saturation: 71,
+      lightness: 46,
+    },
+    firstKind: "ibwSchuh",
+  },
+  {
+    key: "ieGelb.xpm",
+    source: {
+      kind: "generated",
+      hue: 183,
+      saturation: 69,
+      lightness: 53,
+    },
+    firstKind: "ieGelb",
+  },
+  {
+    key: "ieGras.xpm",
+    source: {
+      kind: "generated",
+      hue: 176,
+      saturation: 58,
+      lightness: 48,
+    },
+    firstKind: "ieGras",
+  },
+  {
+    key: "ieGrau.xpm",
+    source: {
+      kind: "generated",
+      hue: 294,
+      saturation: 67,
+      lightness: 56,
+    },
+    firstKind: "ieGrau",
+  },
+  {
+    key: "ieGruen.xpm",
+    source: {
+      kind: "generated",
+      hue: 146,
+      saturation: 71,
+      lightness: 55,
+    },
+    firstKind: "ieGruen",
+  },
+  {
+    key: "ieRosa.xpm",
+    source: {
+      kind: "generated",
+      hue: 298,
+      saturation: 66,
+      lightness: 56,
+    },
+    firstKind: "ieRosa",
+  },
+  {
+    key: "ieRot.xpm",
+    source: {
+      kind: "generated",
+      hue: 214,
+      saturation: 63,
+      lightness: 56,
+    },
+    firstKind: "ieRot",
+  },
+  {
+    key: "igGo.xpm",
+    source: {
+      kind: "generated",
+      hue: 293,
+      saturation: 67,
+      lightness: 50,
+    },
+    firstKind: "igGo",
+  },
+  {
+    key: "igSchwarz.xpm",
+    source: {
+      kind: "generated",
+      hue: 51,
+      saturation: 65,
+      lightness: 53,
+    },
+    firstKind: "Stein",
+  },
+  {
+    key: "ihBlau.xpm",
+    source: {
+      kind: "generated",
+      hue: 36,
+      saturation: 68,
+      lightness: 50,
+    },
+    firstKind: "ihBlau",
+  },
+  {
+    key: "ihBunt.xpm",
+    source: {
+      kind: "generated",
+      hue: 295,
+      saturation: 70,
+      lightness: 51,
+    },
+    firstKind: "ihBunt",
+  },
+  {
+    key: "ihGrau.xpm",
+    source: {
+      kind: "generated",
+      hue: 29,
+      saturation: 62,
+      lightness: 57,
+    },
+    firstKind: "ihGrau",
+  },
+  {
+    key: "ihGruen.xpm",
+    source: {
+      kind: "generated",
+      hue: 341,
+      saturation: 62,
+      lightness: 51,
+    },
+    firstKind: "ihGruen",
+  },
+  {
+    key: "ihLila.xpm",
+    source: {
+      kind: "generated",
+      hue: 240,
+      saturation: 68,
+      lightness: 53,
+    },
+    firstKind: "ihLila",
+  },
+  {
+    key: "ihRot.xpm",
+    source: {
+      kind: "generated",
+      hue: 305,
+      saturation: 63,
+      lightness: 56,
+    },
+    firstKind: "ihRot",
+  },
+  {
+    key: "ilBlase.xpm",
+    source: {
+      kind: "generated",
+      hue: 109,
+      saturation: 67,
+      lightness: 50,
+    },
+    firstKind: "blase",
+  },
+  {
+    key: "ilDing.xpm",
+    source: {
+      kind: "generated",
+      hue: 64,
+      saturation: 67,
+      lightness: 47,
+    },
+    firstKind: "ding",
+  },
+  {
+    key: "ilTuer.xpm",
+    source: {
+      kind: "generated",
+      hue: 184,
+      saturation: 71,
+      lightness: 46,
+    },
+    firstKind: "tuer",
+  },
+  {
+    key: "ilVogelL.xpm",
+    source: {
+      kind: "generated",
+      hue: 199,
+      saturation: 70,
+      lightness: 47,
+    },
+    firstKind: "vogel",
+  },
+  {
+    key: "inGelb.xpm",
+    source: {
+      kind: "generated",
+      hue: 280,
+      saturation: 64,
+      lightness: 49,
+    },
+    firstKind: "inGelb",
+  },
+  {
+    key: "inGras.xpm",
+    source: {
+      kind: "generated",
+      hue: 79,
+      saturation: 63,
+      lightness: 52,
+    },
+    firstKind: "inGras",
+  },
+  {
+    key: "inGrau.xpm",
+    source: {
+      kind: "generated",
+      hue: 197,
+      saturation: 58,
+      lightness: 48,
+    },
+    firstKind: "inGrau",
+  },
+  {
+    key: "inGruen.xpm",
+    source: {
+      kind: "generated",
+      hue: 245,
+      saturation: 67,
+      lightness: 54,
+    },
+    firstKind: "inGruen",
+  },
+  {
+    key: "inOrangeNasen.xpm",
+    source: {
+      kind: "generated",
+      hue: 165,
+      saturation: 64,
+      lightness: 51,
+    },
+    firstKind: "inOrangeNasen",
+  },
+  {
+    key: "inRosaNasen.xpm",
+    source: {
+      kind: "generated",
+      hue: 64,
+      saturation: 70,
+      lightness: 46,
+    },
+    firstKind: "inRosaNasen",
+  },
+  {
+    key: "inSchwarz.xpm",
+    source: {
+      kind: "generated",
+      hue: 324,
+      saturation: 60,
+      lightness: 53,
+    },
+    firstKind: "inSchwarz",
+  },
+  {
+    key: "ipGrau.xpm",
+    source: {
+      kind: "generated",
+      hue: 173,
+      saturation: 64,
+      lightness: 53,
+    },
+    firstKind: "ipGrau",
+  },
+  {
+    key: "ipHoch.xpm",
+    source: {
+      kind: "generated",
+      hue: 86,
+      saturation: 61,
+      lightness: 50,
+    },
+    firstKind: "ipHoch",
+  },
+  {
+    key: "ipHochRunter.xpm",
+    source: {
+      kind: "generated",
+      hue: 304,
+      saturation: 70,
+      lightness: 56,
+    },
+    firstKind: "ipHochRunter",
+  },
+  {
+    key: "ipLinks.xpm",
+    source: {
+      kind: "generated",
+      hue: 201,
+      saturation: 71,
+      lightness: 52,
+    },
+    firstKind: "ipLinks",
+  },
+  {
+    key: "ipLinksRechts.xpm",
+    source: {
+      kind: "generated",
+      hue: 176,
+      saturation: 60,
+      lightness: 49,
+    },
+    firstKind: "ipLinksRechts",
+  },
+  {
+    key: "ipRechts.xpm",
+    source: {
+      kind: "generated",
+      hue: 67,
+      saturation: 60,
+      lightness: 56,
+    },
+    firstKind: "ipRechts",
+  },
+  {
+    key: "ipRunter.xpm",
+    source: {
+      kind: "generated",
+      hue: 84,
+      saturation: 70,
+      lightness: 52,
+    },
+    firstKind: "ipRunter",
+  },
+  {
+    key: "ipStart.xpm",
+    source: {
+      kind: "generated",
+      hue: 134,
+      saturation: 67,
+      lightness: 57,
+    },
+    firstKind: "ipStart",
+  },
+  {
+    key: "isVerbindung.xpm",
+    source: {
+      kind: "generated",
+      hue: 89,
+      saturation: 68,
+      lightness: 53,
+    },
+    firstKind: "isLaeufer",
+  },
+  {
+    key: "ispRest.xpm",
+    source: {
+      kind: "generated",
+      hue: 351,
+      saturation: 60,
+      lightness: 54,
+    },
+    firstKind: "isKoenig",
+  },
+  {
+    key: "ispSchwarz.xpm",
+    source: {
+      kind: "generated",
+      hue: 315,
+      saturation: 68,
+      lightness: 46,
+    },
+    firstKind: "isSpringer",
+  },
+  {
+    key: "itBlau.xpm",
+    source: {
+      kind: "generated",
+      hue: 200,
+      saturation: 68,
+      lightness: 51,
+    },
+    firstKind: "tier",
+  },
+  {
+    key: "itGras.xpm",
+    source: {
+      kind: "generated",
+      hue: 311,
+      saturation: 71,
+      lightness: 54,
+    },
+    firstKind: "gras",
+  },
+  {
+    key: "itGrau.xpm",
+    source: {
+      kind: "generated",
+      hue: 193,
+      saturation: 62,
+      lightness: 47,
+    },
+    firstKind: "grau",
+  },
+  {
+    key: "ithSitz.xpm",
+    source: {
+      kind: "generated",
+      hue: 120,
+      saturation: 60,
+      lightness: 47,
+    },
+    firstKind: "gelb",
+  },
+  {
+    key: "itrBraun.xpm",
+    source: {
+      kind: "generated",
+      hue: 150,
+      saturation: 66,
+      lightness: 49,
+    },
+    firstKind: "wuerfel",
+  },
+  {
+    key: "ivFeuer1.xpm",
+    source: {
+      kind: "generated",
+      hue: 194,
+      saturation: 65,
+      lightness: 54,
+    },
+    firstKind: "ivDrachen",
+  },
+  {
+    key: "iwBaum.xpm",
+    source: {
+      kind: "generated",
+      hue: 60,
+      saturation: 64,
+      lightness: 52,
+    },
+    firstKind: "Baum",
+  },
+  {
+    key: "iwErde.xpm",
+    source: {
+      kind: "generated",
+      hue: 243,
+      saturation: 59,
+      lightness: 47,
+    },
+    firstKind: "Erde",
+  },
+  {
+    key: "iwKreis.xpm",
+    source: {
+      kind: "generated",
+      hue: 159,
+      saturation: 61,
+      lightness: 54,
+    },
+    firstKind: "iwKreis",
+  },
+  {
+    key: "iwQuadrat.xpm",
+    source: {
+      kind: "generated",
+      hue: 239,
+      saturation: 63,
+      lightness: 50,
+    },
+    firstKind: "iwQuadrat",
+  },
+  {
+    key: "iwRaute.xpm",
+    source: {
+      kind: "generated",
+      hue: 240,
+      saturation: 69,
+      lightness: 49,
+    },
+    firstKind: "iwRaute",
+  },
+  {
+    key: "iwaBad.xpm",
+    source: {
+      kind: "generated",
+      hue: 191,
+      saturation: 60,
+      lightness: 48,
+    },
+    firstKind: "bad",
+  },
+  {
+    key: "iwaBeton.xpm",
+    source: {
+      kind: "generated",
+      hue: 132,
+      saturation: 66,
+      lightness: 50,
+    },
+    firstKind: "gras",
+  },
+  {
+    key: "iwaParkett.xpm",
+    source: {
+      kind: "generated",
+      hue: 89,
+      saturation: 62,
+      lightness: 55,
+    },
+    firstKind: "parkett",
+  },
+  {
+    key: "iwaTeppich.xpm",
+    source: {
+      kind: "generated",
+      hue: 25,
+      saturation: 68,
+      lightness: 56,
+    },
+    firstKind: "teppich",
+  },
+  {
+    key: "jhBallons.xpm",
+    source: {
+      kind: "generated",
+      hue: 82,
+      saturation: 58,
+      lightness: 55,
+    },
+    firstKind: "jhBallons",
+  },
+  {
+    key: "jhBlitz.xpm",
+    source: {
+      kind: "generated",
+      hue: 334,
+      saturation: 71,
+      lightness: 55,
+    },
+    firstKind: "Blitz",
+  },
+  {
+    key: "jhDrachensteigen.xpm",
+    source: {
+      kind: "generated",
+      hue: 353,
+      saturation: 69,
+      lightness: 57,
+    },
+    firstKind: "jhDrachensteigen",
+  },
+  {
+    key: "jhGraueWolke.xpm",
+    source: {
+      kind: "generated",
+      hue: 331,
+      saturation: 69,
+      lightness: 57,
+    },
+    firstKind: "jhGraueWolke",
+  },
+  {
+    key: "jhHelleWolken.xpm",
+    source: {
+      kind: "generated",
+      hue: 183,
+      saturation: 64,
+      lightness: 55,
+    },
+    firstKind: "jhHelleWolken",
+  },
+  {
+    key: "jhSonne.xpm",
+    source: {
+      kind: "generated",
+      hue: 26,
+      saturation: 66,
+      lightness: 48,
+    },
+    firstKind: "jhSonne",
+  },
+  {
+    key: "jhVoegel.xpm",
+    source: {
+      kind: "generated",
+      hue: 273,
+      saturation: 61,
+      lightness: 57,
+    },
+    firstKind: "Voegel",
+  },
+  {
+    key: "jjExtra.xpm",
+    source: {
+      kind: "generated",
+      hue: 23,
+      saturation: 62,
+      lightness: 56,
+    },
+    firstKind: "jjBaum",
+  },
+  {
+    key: "jsGelbFlach.xpm",
+    source: {
+      kind: "generated",
+      hue: 74,
+      saturation: 68,
+      lightness: 57,
+    },
+    firstKind: "jsGelbFlach",
+  },
+  {
+    key: "jsGrauLoch.xpm",
+    source: {
+      kind: "generated",
+      hue: 297,
+      saturation: 62,
+      lightness: 53,
+    },
+    firstKind: "jsGrauLoch",
+  },
+  {
+    key: "jsGruenGras.xpm",
+    source: {
+      kind: "generated",
+      hue: 278,
+      saturation: 62,
+      lightness: 54,
+    },
+    firstKind: "jsGruenGras",
+  },
+  {
+    key: "jsOrangeKetten_5.xpm",
+    source: {
+      kind: "generated",
+      hue: 95,
+      saturation: 59,
+      lightness: 48,
+    },
+    firstKind: "jsOrangeKetten",
+  },
+  {
+    key: "jsOrangeKreuz_2.xpm",
+    source: {
+      kind: "generated",
+      hue: 6,
+      saturation: 71,
+      lightness: 47,
+    },
+    firstKind: "jsOrangeKreuz",
+  },
+  {
+    key: "jsRotHexen_2.xpm",
+    source: {
+      kind: "generated",
+      hue: 176,
+      saturation: 67,
+      lightness: 53,
+    },
+    firstKind: "jsRotHexen",
+  },
+  {
+    key: "kmBier.xpm",
+    source: {
+      kind: "generated",
+      hue: 357,
+      saturation: 66,
+      lightness: 54,
+    },
+    firstKind: "bier",
+  },
+  {
+    key: "kmMuell.xpm",
+    source: {
+      kind: "generated",
+      hue: 142,
+      saturation: 67,
+      lightness: 46,
+    },
+    firstKind: "muell",
+  },
+  {
+    key: "kmPizza.xpm",
+    source: {
+      kind: "generated",
+      hue: 325,
+      saturation: 70,
+      lightness: 49,
+    },
+    firstKind: "pizza",
+  },
+  {
+    key: "kmSofa.xpm",
+    source: {
+      kind: "generated",
+      hue: 272,
+      saturation: 63,
+      lightness: 48,
+    },
+    firstKind: "sofa",
+  },
+  {
+    key: "kmTasse.xpm",
+    source: {
+      kind: "generated",
+      hue: 131,
+      saturation: 70,
+      lightness: 52,
+    },
+    firstKind: "tasse",
+  },
+  {
+    key: "lbBlack.xpm",
+    source: {
+      kind: "generated",
+      hue: 48,
+      saturation: 69,
+      lightness: 49,
+    },
+    firstKind: "lbBlack",
+  },
+  {
+    key: "lbBomb.xpm",
+    source: {
+      kind: "generated",
+      hue: 47,
+      saturation: 70,
+      lightness: 53,
+    },
+    firstKind: "lbBomb",
+  },
+  {
+    key: "lbGray.xpm",
+    source: {
+      kind: "generated",
+      hue: 72,
+      saturation: 66,
+      lightness: 49,
+    },
+    firstKind: "lbGray",
+  },
+  {
+    key: "lpGreen.xpm",
+    source: {
+      kind: "generated",
+      hue: 314,
+      saturation: 61,
+      lightness: 57,
+    },
+    firstKind: "Colour3",
+  },
+  {
+    key: "lpRed.xpm",
+    source: {
+      kind: "generated",
+      hue: 292,
+      saturation: 63,
+      lightness: 52,
+    },
+    firstKind: "Colour1",
+  },
+  {
+    key: "lpStart.xpm",
+    source: {
+      kind: "generated",
+      hue: 115,
+      saturation: 67,
+      lightness: 51,
+    },
+    firstKind: "Start",
+  },
+  {
+    key: "lpWhite.xpm",
+    source: {
+      kind: "generated",
+      hue: 52,
+      saturation: 66,
+      lightness: 55,
+    },
+    firstKind: "Gray",
+  },
+  {
+    key: "lpYellow.xpm",
+    source: {
+      kind: "generated",
+      hue: 1,
+      saturation: 70,
+      lightness: 49,
+    },
+    firstKind: "Colour2",
+  },
+  {
+    key: "lrEis.xpm",
+    source: {
+      kind: "generated",
+      hue: 24,
+      saturation: 63,
+      lightness: 48,
+    },
+    firstKind: "lrEisFallend",
+  },
+  {
+    key: "lrKamin.xpm",
+    source: {
+      kind: "generated",
+      hue: 67,
+      saturation: 63,
+      lightness: 51,
+    },
+    firstKind: "lrKamin",
+  },
+  {
+    key: "lrOfen.xpm",
+    source: {
+      kind: "generated",
+      hue: 323,
+      saturation: 65,
+      lightness: 55,
+    },
+    firstKind: "lrOfen",
+  },
+  {
+    key: "lrWasser.xpm",
+    source: {
+      kind: "generated",
+      hue: 260,
+      saturation: 67,
+      lightness: 51,
+    },
+    firstKind: "lrWasser",
+  },
+  {
+    key: "lreAlle.xpm",
+    source: {
+      kind: "generated",
+      hue: 358,
+      saturation: 63,
+      lightness: 48,
+    },
+    firstKind: "_0",
+  },
+  {
+    key: "ltCannon.xpm",
+    source: {
+      kind: "generated",
+      hue: 4,
+      saturation: 67,
+      lightness: 52,
+    },
+    firstKind: "Cannon",
+  },
+  {
+    key: "ltGray.xpm",
+    source: {
+      kind: "generated",
+      hue: 122,
+      saturation: 68,
+      lightness: 47,
+    },
+    firstKind: "Gray",
+  },
+  {
+    key: "ltParatrooper.xpm",
+    source: {
+      kind: "generated",
+      hue: 126,
+      saturation: 70,
+      lightness: 55,
+    },
+    firstKind: "Paratrooper",
+  },
+  {
+    key: "lwBroken.xpm",
+    source: {
+      kind: "generated",
+      hue: 319,
+      saturation: 60,
+      lightness: 46,
+    },
+    firstKind: "lwBroken",
+  },
+  {
+    key: "lwGray.xpm",
+    source: {
+      kind: "generated",
+      hue: 189,
+      saturation: 59,
+      lightness: 53,
+    },
+    firstKind: "lwGray",
+  },
+  {
+    key: "lwGreen.xpm",
+    source: {
+      kind: "generated",
+      hue: 327,
+      saturation: 71,
+      lightness: 49,
+    },
+    firstKind: "lwGreen",
+  },
+  {
+    key: "lwRed.xpm",
+    source: {
+      kind: "generated",
+      hue: 181,
+      saturation: 71,
+      lightness: 53,
+    },
+    firstKind: "lwRed",
+  },
+  {
+    key: "lwRolladen.xpm",
+    source: {
+      kind: "generated",
+      hue: 341,
+      saturation: 70,
+      lightness: 55,
+    },
+    firstKind: "lwRolladen",
+  },
+  {
+    key: "m6Dick.xpm",
+    source: {
+      kind: "generated",
+      hue: 349,
+      saturation: 69,
+      lightness: 51,
+    },
+    firstKind: "Sorte",
+  },
+  {
+    key: "m6Gras.xpm",
+    source: {
+      kind: "generated",
+      hue: 61,
+      saturation: 63,
+      lightness: 57,
+    },
+    firstKind: "m6Gras",
+  },
+  {
+    key: "m6Grau.xpm",
+    source: {
+      kind: "generated",
+      hue: 303,
+      saturation: 68,
+      lightness: 49,
+    },
+    firstKind: "m6Grau",
+  },
+  {
+    key: "maLidA.xpm",
+    source: {
+      kind: "generated",
+      hue: 109,
+      saturation: 64,
+      lightness: 52,
+    },
+    firstKind: "Auge",
+  },
+  {
+    key: "maeSchema.xpm",
+    source: {
+      kind: "generated",
+      hue: 279,
+      saturation: 60,
+      lightness: 50,
+    },
+    firstKind: "Kugel",
+  },
+  {
+    key: "manGras.xpm",
+    source: {
+      kind: "generated",
+      hue: 250,
+      saturation: 70,
+      lightness: 48,
+    },
+    firstKind: "Gras",
+  },
+  {
+    key: "manGrau.xpm",
+    source: {
+      kind: "generated",
+      hue: 8,
+      saturation: 65,
+      lightness: 55,
+    },
+    firstKind: "Grau",
+  },
+  {
+    key: "manKoepfe1.xpm",
+    source: {
+      kind: "generated",
+      hue: 320,
+      saturation: 62,
+      lightness: 53,
+    },
+    firstKind: "Blob",
+  },
+  {
+    key: "mbBunt.xpm",
+    source: {
+      kind: "generated",
+      hue: 21,
+      saturation: 59,
+      lightness: 46,
+    },
+    firstKind: "bunt",
+  },
+  {
+    key: "mbSchmelz1.xpm",
+    source: {
+      kind: "generated",
+      hue: 159,
+      saturation: 62,
+      lightness: 48,
+    },
+    firstKind: "schmelz",
+  },
+  {
+    key: "mbUnbunt.xpm",
+    source: {
+      kind: "generated",
+      hue: 338,
+      saturation: 65,
+      lightness: 50,
+    },
+    firstKind: "unbunt",
+  },
+  {
+    key: "mbaBand1.xpm",
+    source: {
+      kind: "generated",
+      hue: 1,
+      saturation: 66,
+      lightness: 53,
+    },
+    firstKind: "Band",
+  },
+  {
+    key: "mbaGras.xpm",
+    source: {
+      kind: "generated",
+      hue: 304,
+      saturation: 64,
+      lightness: 48,
+    },
+    firstKind: "Gras",
+  },
+  {
+    key: "mbaGrau.xpm",
+    source: {
+      kind: "generated",
+      hue: 186,
+      saturation: 69,
+      lightness: 52,
+    },
+    firstKind: "Grau",
+  },
+  {
+    key: "mbmSchnell.xpm",
+    source: {
+      kind: "generated",
+      hue: 242,
+      saturation: 64,
+      lightness: 51,
+    },
+    firstKind: "Kurz",
+  },
+  {
+    key: "mdBoden.xpm",
+    source: {
+      kind: "generated",
+      hue: 176,
+      saturation: 58,
+      lightness: 50,
+    },
+    firstKind: "Wand",
+  },
+  {
+    key: "mdPlastik.xpm",
+    source: {
+      kind: "generated",
+      hue: 352,
+      saturation: 58,
+      lightness: 57,
+    },
+    firstKind: "Bildschirm",
+  },
+  {
+    key: "mfaCabbage.xpm",
+    source: {
+      kind: "generated",
+      hue: 80,
+      saturation: 59,
+      lightness: 49,
+    },
+    firstKind: "Cabbage",
+  },
+  {
+    key: "mfaFence.xpm",
+    source: {
+      kind: "generated",
+      hue: 64,
+      saturation: 62,
+      lightness: 48,
+    },
+    firstKind: "Cattle",
+  },
+  {
+    key: "mfaMaize.xpm",
+    source: {
+      kind: "generated",
+      hue: 289,
+      saturation: 59,
+      lightness: 57,
+    },
+    firstKind: "Maize",
+  },
+  {
+    key: "mfaRoad.xpm",
+    source: {
+      kind: "generated",
+      hue: 153,
+      saturation: 58,
+      lightness: 55,
+    },
+    firstKind: "Road",
+  },
+  {
+    key: "mfaWater.xpm",
+    source: {
+      kind: "generated",
+      hue: 74,
+      saturation: 66,
+      lightness: 55,
+    },
+    firstKind: "Water",
+  },
+  {
+    key: "mfaWheat.xpm",
+    source: {
+      kind: "generated",
+      hue: 70,
+      saturation: 71,
+      lightness: 49,
+    },
+    firstKind: "Wheat",
+  },
+  {
+    key: "mffisch1.xpm",
+    source: {
+      kind: "generated",
+      hue: 228,
+      saturation: 60,
+      lightness: 50,
+    },
+    firstKind: "fisch",
+  },
+  {
+    key: "mflAlles.xpm",
+    source: {
+      kind: "generated",
+      hue: 179,
+      saturation: 59,
+      lightness: 53,
+    },
+    firstKind: "Blob",
+  },
+  {
+    key: "mfmuschel.xpm",
+    source: {
+      kind: "generated",
+      hue: 155,
+      saturation: 62,
+      lightness: 56,
+    },
+    firstKind: "muschel",
+  },
+  {
+    key: "mfqualle.xpm",
+    source: {
+      kind: "generated",
+      hue: 288,
+      saturation: 60,
+      lightness: 50,
+    },
+    firstKind: "qualle",
+  },
+  {
+    key: "mgsGoldVerbind.xpm",
+    source: {
+      kind: "generated",
+      hue: 82,
+      saturation: 66,
+      lightness: 48,
+    },
+    firstKind: "gold",
+  },
+  {
+    key: "mgsSilber.xpm",
+    source: {
+      kind: "generated",
+      hue: 145,
+      saturation: 71,
+      lightness: 55,
+    },
+    firstKind: "silber",
+  },
+  {
+    key: "mgsWeiss.xpm",
+    source: {
+      kind: "generated",
+      hue: 47,
+      saturation: 58,
+      lightness: 50,
+    },
+    firstKind: "mgsWeiss",
+  },
+  {
+    key: "mihGarten.xpm",
+    source: {
+      kind: "generated",
+      hue: 200,
+      saturation: 58,
+      lightness: 52,
+    },
+    firstKind: "stein",
+  },
+  {
+    key: "mihLoch.xpm",
+    source: {
+      kind: "generated",
+      hue: 243,
+      saturation: 61,
+      lightness: 51,
+    },
+    firstKind: "mihLoch",
+  },
+  {
+    key: "mihStein.xpm",
+    source: {
+      kind: "generated",
+      hue: 212,
+      saturation: 60,
+      lightness: 48,
+    },
+    firstKind: "mihStein",
+  },
+  {
+    key: "mjZeug1.xpm",
+    source: {
+      kind: "generated",
+      hue: 178,
+      saturation: 67,
+      lightness: 54,
+    },
+    firstKind: "Avatar",
+  },
+  {
+    key: "mkKolben.xpm",
+    source: {
+      kind: "generated",
+      hue: 328,
+      saturation: 62,
+      lightness: 52,
+    },
+    firstKind: "kolben",
+  },
+  {
+    key: "mkaFuenfeckKacheln.xpm",
+    source: {
+      kind: "generated",
+      hue: 311,
+      saturation: 59,
+      lightness: 49,
+    },
+    firstKind: "Kachel",
+  },
+  {
+    key: "mkaRhombusLeer.xpm",
+    source: {
+      kind: "generated",
+      hue: 306,
+      saturation: 64,
+      lightness: 55,
+    },
+    firstKind: "Block",
+  },
+  {
+    key: "mkaSechseckKacheln.xpm",
+    source: {
+      kind: "generated",
+      hue: 97,
+      saturation: 58,
+      lightness: 50,
+    },
+    firstKind: "Kachel",
+  },
+  {
+    key: "mkaViereckKacheln.xpm",
+    source: {
+      kind: "generated",
+      hue: 97,
+      saturation: 70,
+      lightness: 57,
+    },
+    firstKind: "Kachel",
+  },
+  {
+    key: "mlGras.xpm",
+    source: {
+      kind: "generated",
+      hue: 229,
+      saturation: 70,
+      lightness: 55,
+    },
+    firstKind: "Gras",
+  },
+  {
+    key: "mlGrau.xpm",
+    source: {
+      kind: "generated",
+      hue: 347,
+      saturation: 65,
+      lightness: 51,
+    },
+    firstKind: "Grau",
+  },
+  {
+    key: "mlSorte2.xpm",
+    source: {
+      kind: "generated",
+      hue: 297,
+      saturation: 71,
+      lightness: 50,
+    },
+    firstKind: "Sorte",
+  },
+  {
+    key: "mmBlau.xpm",
+    source: {
+      kind: "generated",
+      hue: 27,
+      saturation: 66,
+      lightness: 46,
+    },
+    firstKind: "maennchen",
+  },
+  {
+    key: "mmGrasgrau.xpm",
+    source: {
+      kind: "generated",
+      hue: 203,
+      saturation: 69,
+      lightness: 53,
+    },
+    firstKind: "grau",
+  },
+  {
+    key: "mnv1.xpm",
+    source: {
+      kind: "generated",
+      hue: 309,
+      saturation: 61,
+      lightness: 56,
+    },
+    firstKind: "Blop",
+  },
+  {
+    key: "moAnemone.xpm",
+    source: {
+      kind: "generated",
+      hue: 318,
+      saturation: 66,
+      lightness: 49,
+    },
+    firstKind: "anemone",
+  },
+  {
+    key: "moFisch.xpm",
+    source: {
+      kind: "generated",
+      hue: 78,
+      saturation: 59,
+      lightness: 56,
+    },
+    firstKind: "moFisch",
+  },
+  {
+    key: "moOctopus1.xpm",
+    source: {
+      kind: "generated",
+      hue: 61,
+      saturation: 65,
+      lightness: 46,
+    },
+    firstKind: "octopus",
+  },
+  {
+    key: "mpAlle.xpm",
+    source: {
+      kind: "generated",
+      hue: 86,
+      saturation: 69,
+      lightness: 50,
+    },
+    firstKind: "Stein",
+  },
+  {
+    key: "mreGrasgrau.xpm",
+    source: {
+      kind: "generated",
+      hue: 109,
+      saturation: 59,
+      lightness: 50,
+    },
+    firstKind: "grau",
+  },
+  {
+    key: "mreZahl1.xpm",
+    source: {
+      kind: "generated",
+      hue: 107,
+      saturation: 62,
+      lightness: 48,
+    },
+    firstKind: "zahl",
+  },
+  {
+    key: "mrpAlle.xpm",
+    source: {
+      kind: "generated",
+      hue: 166,
+      saturation: 68,
+      lightness: 53,
+    },
+    firstKind: "Fee",
+  },
+  {
+    key: "msGreen.xpm",
+    source: {
+      kind: "generated",
+      hue: 268,
+      saturation: 66,
+      lightness: 56,
+    },
+    firstKind: "fastslime",
+  },
+  {
+    key: "msRed.xpm",
+    source: {
+      kind: "generated",
+      hue: 290,
+      saturation: 61,
+      lightness: 52,
+    },
+    firstKind: "slowslime",
+  },
+  {
+    key: "mscLeer.xpm",
+    source: {
+      kind: "generated",
+      hue: 150,
+      saturation: 59,
+      lightness: 52,
+    },
+    firstKind: "Fuehler",
+  },
+  {
+    key: "mseGG.xpm",
+    source: {
+      kind: "generated",
+      hue: 246,
+      saturation: 58,
+      lightness: 57,
+    },
+    firstKind: "Grey",
+  },
+  {
+    key: "mseKind.xpm",
+    source: {
+      kind: "generated",
+      hue: 302,
+      saturation: 59,
+      lightness: 57,
+    },
+    firstKind: "Two",
+  },
+  {
+    key: "mtRacket.xpm",
+    source: {
+      kind: "generated",
+      hue: 164,
+      saturation: 69,
+      lightness: 56,
+    },
+    firstKind: "Yellow",
+  },
+  {
+    key: "mtWall.xpm",
+    source: {
+      kind: "generated",
+      hue: 240,
+      saturation: 69,
+      lightness: 48,
+    },
+    firstKind: "mtWall",
+  },
+  {
+    key: "mtr1.xpm",
+    source: {
+      kind: "generated",
+      hue: 83,
+      saturation: 68,
+      lightness: 54,
+    },
+    firstKind: "Graph",
+  },
+  {
+    key: "mtrGras.xpm",
+    source: {
+      kind: "generated",
+      hue: 351,
+      saturation: 70,
+      lightness: 57,
+    },
+    firstKind: "mtrGras",
+  },
+  {
+    key: "mtrGrau.xpm",
+    source: {
+      kind: "generated",
+      hue: 233,
+      saturation: 61,
+      lightness: 50,
+    },
+    firstKind: "mtrGrau",
+  },
+  {
+    key: "mzZahn.xpm",
+    source: {
+      kind: "generated",
+      hue: 79,
+      saturation: 62,
+      lightness: 49,
+    },
+    firstKind: "Zahn",
+  },
+  {
+    key: "mziAlle.xpm",
+    source: {
+      kind: "generated",
+      hue: 159,
+      saturation: 62,
+      lightness: 54,
+    },
+    firstKind: "gruen",
+  },
+  {
+    key: "sbSunglas.xpm",
+    source: {
+      kind: "generated",
+      hue: 37,
+      saturation: 68,
+      lightness: 56,
+    },
+    firstKind: "sbKaese",
+  },
+  {
+    key: "spLabyrinth.xpm",
+    source: {
+      kind: "generated",
+      hue: 143,
+      saturation: 69,
+      lightness: 48,
+    },
+    firstKind: "spLabyrinth",
+  },
+  {
+    key: "spPfeil.xpm",
+    source: {
+      kind: "generated",
+      hue: 140,
+      saturation: 69,
+      lightness: 57,
+    },
+    firstKind: "spUp",
+  },
+  {
+    key: "start_dummy",
+    source: {
+      kind: "generated",
+      hue: 61,
+      saturation: 68,
+      lightness: 56,
+    },
+    firstKind: "start_dummy",
+  },
+];
+
+export const ART_MANIFEST = artManifest(ENTRIES);

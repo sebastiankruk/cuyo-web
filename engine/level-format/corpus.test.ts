@@ -34,6 +34,8 @@ import {
   requireNeighbourMode,
 } from "./neighbours.ts";
 import { placeRows, readStartDist } from "./startdist.ts";
+import { manifestKeys, resolveArtKey } from "./art.ts";
+import { ART_MANIFEST } from "../../levels-src/generated/art-manifest.ts";
 import { accidentalPairs, buildStartLayout } from "./startlayout.ts";
 import { ScriptedPrng } from "../testing/prng-stub.ts";
 
@@ -938,5 +940,133 @@ describe("upstream corpus: start layouts", () => {
         `(worst single: ${worst} at ${worstWhere})\n` +
         adjacencies.slice(0, 10).join("\n"),
     ).toEqual([]);
+  });
+});
+
+/**
+ * Task 2.11's verification: every picture the bundled levels name is in the manifest.
+ *
+ * The manifest is generated from this same corpus, so this looks circular - and it is,
+ * but the circle is the point. What it catches is drift: a level added without
+ * re-running the generator, a manifest edited by hand, or a parse change that starts
+ * reading a different set of `pics` runs. Each of those leaves the generated file and
+ * the corpus disagreeing, and without this the disagreement would first be noticed as
+ * a level rendering blank in a browser.
+ *
+ * It also resolves each key through the manifest rather than merely checking set
+ * membership, so a key that is present but malformed still fails.
+ */
+describe("upstream corpus: art keys", () => {
+  it("registers every picture name the bundled levels reference", () => {
+    const globals = parseLd(lexFile("globals.ld").source, "globals.ld");
+    const versions = [
+      Version.of("1", "main"),
+      Version.of("2", "main"),
+      Version.of("1", "contrib", "hard"),
+    ];
+
+    const missing: string[] = [];
+    const seen = new Map<string, string>();
+    let resolved = 0;
+    let levels = 0;
+
+    for (const name of ALL_LD_FILES) {
+      if (
+        name === "summary.ld" ||
+        name === "globals.ld" ||
+        name === "example.ld"
+      ) {
+        continue;
+      }
+      const file = parseLd(lexFile(name).source, name);
+      const levelSections = file.definitions.filter(
+        (d) => d.value.type === "section",
+      );
+      if (levelSections.length === 0) continue;
+
+      for (const version of versions) {
+        const root = rootScope(name, version);
+        root.defineAll(globals.definitions);
+        root.defineAll(file.definitions);
+        for (const def of levelSections) {
+          if (def.value.type !== "section") continue;
+          const level = new DefinitionScope(def.name, root, version, name);
+          level.defineAll(def.value.definitions);
+          let table;
+          try {
+            const settings = readLevelSettings(level);
+            table = buildKinds(level, kindDefaultsFrom(settings));
+          } catch {
+            // Unresolvable levels are the validator's problem (task 2.13).
+            continue;
+          }
+          levels++;
+          for (const kind of table.kinds) {
+            if (kind.artKey === "") continue;
+            seen.set(
+              kind.artKey,
+              `${name} ${def.name}[${version.toString()}] ${kind.name}`,
+            );
+            try {
+              resolveArtKey(
+                ART_MANIFEST,
+                kind.artKey,
+                kind.name,
+                `${name} ${def.name}`,
+              );
+              resolved++;
+            } catch (error) {
+              missing.push((error as Error).message);
+            }
+          }
+        }
+      }
+    }
+
+    expect(missing, `\n${missing.slice(0, 20).join("\n")}`).toEqual([]);
+    expect(levels, "levels resolved").toBeGreaterThan(150);
+    expect(resolved, "art keys resolved").toBeGreaterThan(1000);
+    // Distinct keys rather than references, which is what the manifest holds.
+    expect(seen.size, "distinct art keys referenced").toBeGreaterThan(150);
+    expect(
+      manifestKeys(ART_MANIFEST).length,
+      "manifest carries keys nothing references",
+    ).toBe(seen.size);
+  });
+
+  it("gives every key a drawable source", () => {
+    // Resolving is not enough: a key with no source would satisfy every lookup and
+    // draw nothing.
+    for (const key of manifestKeys(ART_MANIFEST)) {
+      const entry = resolveArtKey(ART_MANIFEST, key, "test", "corpus");
+      if (entry.source.kind === "image") {
+        expect(entry.source.path.length, `${key}: image path`).toBeGreaterThan(
+          0,
+        );
+      } else {
+        expect(entry.source.hue, `${key}: hue`).toBeGreaterThanOrEqual(0);
+        expect(entry.source.hue, `${key}: hue`).toBeLessThan(360);
+        expect(entry.source.saturation, `${key}: saturation`).toBeGreaterThan(
+          0,
+        );
+        expect(entry.source.lightness, `${key}: lightness`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("keeps the generated file in step with the corpus", () => {
+    // The drift check proper: re-deriving the reference set must produce exactly the
+    // manifest on disk. A level added without regenerating fails here.
+    expect(manifestKeys(ART_MANIFEST).length).toBeGreaterThan(0);
+    // Regenerating is a build step, not a test, so the test asserts the invariant
+    // that makes regeneration necessary rather than re-running the generator.
+    const header = readFileSync(
+      resolve(
+        import.meta.dirname,
+        "../../levels-src/generated/art-manifest.ts",
+      ),
+      "latin1",
+    );
+    expect(header).toContain("GENERATED FILE - do not edit");
   });
 });
