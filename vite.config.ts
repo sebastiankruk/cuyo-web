@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
@@ -46,8 +48,65 @@ const ALLOWED_HOSTS = (process.env["CUYO_ALLOWED_HOSTS"] ?? "dev-cuyo.kruk.me")
   .map((h) => h.trim())
   .filter((h) => h !== "");
 
+/**
+ * Which commit the running server was built from, and whether the tree had uncommitted
+ * changes when it started.
+ *
+ * Exists to settle one specific argument, which has now come up twice: "it looks the same
+ * as before". A screenshot of the dev overlay carries the phase, the step and the seed,
+ * but nothing that says which build produced it - so a stale page in a browser and a fix
+ * that did not work look identical from the outside, and telling them apart means asking
+ * the person looking whether they reloaded, which is the one question they cannot answer
+ * reliably.
+ *
+ * With the commit in the corner, any screenshot says which build it came from. `dirty`
+ * matters as much as the hash: a dev server started before a commit and never restarted
+ * keeps serving the old modules, and that is exactly the case this is here to catch.
+ */
+function buildStamp(): { commit: string; dirty: boolean } {
+  try {
+    // `execFileSync` rather than a shell string, so a path with a space in it cannot turn
+    // into something unexpected. And failure is not fatal: a source tree with no git in
+    // it should still build, it just cannot say which commit it is.
+    const here = fileURLToPath(new URL(".", import.meta.url));
+    const run = (args: string[]): string =>
+      execFileSync("git", args, {
+        cwd: here,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    return {
+      commit: run(["rev-parse", "--short", "HEAD"]) || "unknown",
+      dirty: run(["status", "--porcelain"]) !== "",
+    };
+  } catch {
+    return { commit: "unknown", dirty: false };
+  }
+}
+
+const STAMP = buildStamp();
+
+/**
+ * Serves the commit hash as a module, so the dev overlay can say which build it is.
+ *
+ * A virtual module rather than `define`, because `define` is substituted by `vite build`
+ * and *not* in the dev server - which is backwards for this, since the dev server is
+ * where the question gets asked. Found by grepping what the dev server actually served.
+ * A plugin works the same in dev, build and test, since all three use one pipeline.
+ */
+const buildStampPlugin = {
+  name: "build-stamp",
+  resolveId: (id: string): string | undefined =>
+    id === "virtual:build-stamp" ? "\0build-stamp" : undefined,
+  load: (id: string): string | undefined =>
+    id === "\0build-stamp"
+      ? `export const COMMIT = ${JSON.stringify(STAMP.commit)};\n` +
+        `export const DIRTY = ${STAMP.dirty};\n`
+      : undefined,
+};
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), buildStampPlugin],
   server: {
     allowedHosts: ALLOWED_HOSTS,
   },

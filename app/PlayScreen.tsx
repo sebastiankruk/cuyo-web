@@ -10,6 +10,7 @@ import {
   buildPalette,
   colourFor as paletteColourFor,
 } from "../render/palette.ts";
+import { COMMIT as BUILD_COMMIT, DIRTY as BUILD_DIRTY } from "virtual:build-stamp";
 import {
   NO_TOUCH,
   applyGesture,
@@ -466,7 +467,16 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
           {hud.phase} · step {hud.steps} · {hud.frameMs.toFixed(0)} ms/frame
         </span>
         <span>
-          {GRX}×{GRY} · seed {seed + runId}
+          {GRX}×{GRY} · seed {seed + runId} ·{" "}
+          {/*
+            Which build this is, so a screenshot settles it. Twice now a report of "it
+            looks the same" has turned out to be indistinguishable between a stale page
+            and a fix that did not work, and the only way to tell them apart was to ask
+            whether the page had been reloaded. A `dirty` marker matters as much as the
+            hash: a dev server started before a commit keeps serving the old modules.
+          */}
+          {BUILD_COMMIT}
+          {BUILD_DIRTY ? "*" : ""}
         </span>
       </footer>
     </div>
