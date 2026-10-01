@@ -56,6 +56,34 @@ button {
   font: inherit;
   color: inherit;
   cursor: pointer;
+  /*
+   * Reset the user-agent background, not just per-component.
+   *
+   * Firefox wraps a button's content in `::-moz-focus-inner`, which carries its own
+   * default background. So a rule setting `background: transparent` on the button is
+   * applied correctly and then painted over by the pseudo-element inside it - the
+   * button comes out as a filled light box with the text colour fighting it. Chrome
+   * has no such element and renders correctly, which is what made it look like a
+   * styling mistake rather than a missing reset.
+   *
+   * Resetting here rather than in each button class means a new button cannot inherit
+   * this, and the same rule serves Firefox's `appearance` and Chrome's and Safari's.
+   */
+  appearance: none;
+  background: none;
+  border: 1px solid transparent;
+}
+
+button::-moz-focus-inner {
+  border: 0;
+  padding: 0;
+  background: none;
+}
+
+/* Firefox draws its own dotted focus ring inside the button; ours is clearer. */
+button::-moz-focusring {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* ------------------------------------------------------------------ shell */
@@ -532,31 +560,156 @@ button {
 }
 
 /*
- * The card is a div rather than a button, because it now contains one button per
- * difficulty and a button inside a button is invalid - and would also mean clicking the
- * description started a game.
+ * The card is a `div` holding a stretched button rather than being one: it contains a
+ * difficulty control, and a button inside a button is invalid HTML. `position: relative`
+ * is what lets the button cover it.
  */
 .levelCard {
+  position: relative;
   display: grid;
   gap: 0.3rem;
   padding: 1rem 1.1rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
+  transition:
+    border-color 120ms,
+    transform 120ms;
+}
+
+.levelCard:has(.levelCard__hit:hover),
+.levelCard:has(.levelCard__hit:focus-visible) {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/*
+ * The hit target: covers the card, sits under the visible content.
+ *
+ * Transparent rather than `display: none` or a zero-size box, because it has to stay
+ * focusable and clickable across the whole card. Its text is hidden rather than absent,
+ * so it still has an accessible name.
+ */
+.levelCard__hit {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border: 0;
+  background: none;
+  border-radius: var(--radius);
+  font-size: 0;
+  color: transparent;
+  cursor: pointer;
+}
+
+.levelCard__hit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/*
+ * Above the hit target, so the visible text is not painted under it.
+ *
+ * `pointer-events: none` on the body is load-bearing. A positioned box with no
+ * background still swallows pointer events over its whole area, so without this the
+ * name, author and description - most of the card - would sit over the button and
+ * quietly do nothing. Which is the opposite of what a whole-tile target means, and
+ * would look like a dead zone rather than a bug.
+ *
+ * The cost is that the description is not selectable. For a catalogue of levels to
+ * start, pressing the card is worth more than copying its text.
+ */
+.levelCard__body {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0.3rem;
+  pointer-events: none;
+}
+
+/*
+ * The actions row holds the difficulty control, which is genuinely interactive and so
+ * sits above the button. The Play affordance inside it is not: it is a label, and a
+ * label that looks pressable but is not is worse than no label.
+ */
+.levelCard__actions {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.levelCard__difficulties {
+  pointer-events: auto;
+}
+
+.levelCard__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.15rem;
+}
+
+/*
+ * The difficulty choice, as a segmented control.
+ *
+ * `aria-pressed` rather than a radio group: it is a small set of toggles that change
+ * what the single Play button will load, and a segmented control reads that way where a
+ * radio group implies "this is the value" - which would be a lie, since Play is still
+ * needed to start anything.
+ *
+ * The pressed state is filled rather than outlined, so the current choice is visible
+ * without relying on colour alone being the only signal.
+ */
+.levelCard__difficulties {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.levelCard__difficulty {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  padding: 0.15rem 0.6rem;
+  font-size: 0.72rem;
+  text-transform: capitalize;
+  text-align: center;
+  flex: 1 1 auto;
+}
+
+.levelCard__difficulty + .levelCard__difficulty {
+  border-left: 1px solid var(--line);
+}
+
+.levelCard__difficulty[aria-pressed="true"] {
+  background: var(--panel-2);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.levelCard__difficulty:hover {
+  color: var(--text);
 }
 
 .levelCard__play {
   border: 1px solid var(--accent);
-  background: transparent;
+  background: none;
   color: var(--accent);
   border-radius: 999px;
-  padding: 0.15rem 0.7rem;
-  font-size: 0.75rem;
-  text-transform: capitalize;
+  padding: 0.2rem 0.9rem;
+  font-size: 0.78rem;
+  /* Inherits `pointer-events: none` from the actions row, so a tap here presses the
+     card rather than landing on a label. */
 }
 
-.levelCard__play:hover,
-.levelCard__play:focus-visible {
-  background: var(--accent);
-  color: #06131a;
+/*
+ * The suffix repeats the chosen difficulty on the button itself.
+ *
+ * The segmented control already shows it, but the button is what is pressed, and on a
+ * phone the two are the same tap target's neighbours. Naming it on the button means the
+ * action is unambiguous without looking away from it.
+ */
+.levelCard__playSuffix {
+  opacity: 0.75;
 }

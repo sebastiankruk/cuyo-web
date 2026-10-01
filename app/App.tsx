@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { PlayScreen } from "./PlayScreen.tsx";
 import { catalogue, loadLevel } from "./levels.ts";
-import { levelsInTrack } from "../engine/level-format/index-data.ts";
+import {
+  DIFFICULTIES,
+  levelsInTrack,
+} from "../engine/level-format/index-data.ts";
 import type { LevelDef } from "../engine/level-format/level-data.ts";
 import type {
   Difficulty,
@@ -117,6 +120,23 @@ function Catalogue({
   readonly onPick: (entry: LevelIndexEntry, difficulty: Difficulty) => void;
 }) {
   const index = catalogue();
+  /*
+   * The difficulty chosen for each level.
+   *
+   * One map rather than a button per difficulty. Rendering "Easy" and "Play" side by
+   * side reads as two unrelated actions - and it did, which is the question asked about
+   * it. A difficulty is a *choice* about the level, so it belongs in a control that
+   * shows which one is current, and then there is one thing to press.
+   *
+   * Held here rather than per card so the choice survives scrolling the list, and so
+   * one level's choice does not reset when another re-renders.
+   */
+  const [chosen, setChosen] = useState<ReadonlyMap<string, Difficulty>>(
+    () => new Map(),
+  );
+  const pick = useCallback((id: string, difficulty: Difficulty) => {
+    setChosen((prev) => new Map(prev).set(id, difficulty));
+  }, []);
   // The Standard track first, because it is what a new player wants, then whatever else
   // the summary declares. `all` is the author's playing order across every level, which
   // is a better default than alphabetical but a worse first impression than a track.
@@ -144,7 +164,12 @@ function Catalogue({
             <ul className="levels">
               {levels.map((entry) => (
                 <li key={`${track}-${entry.id}`}>
-                  <LevelCard entry={entry} track={track} onPick={onPick} />
+                  <LevelCard
+                    entry={entry}
+                    chosen={chosen.get(entry.id) ?? "normal"}
+                    onChoose={(difficulty) => pick(entry.id, difficulty)}
+                    onPick={onPick}
+                  />
                 </li>
               ))}
             </ul>
@@ -162,62 +187,113 @@ function Catalogue({
   );
 }
 
-/** One level, with a button per difficulty it actually offers. */
+/**
+ * One level. The whole card is the thing you press.
+ *
+ * A 79-entry list where you have to hit a small pill is a list you use one-handed and
+ * mis-tap, so the card is the target. It is done with an absolutely positioned
+ * `<button>` covering the card rather than by making the card itself a button, for two
+ * reasons:
+ *
+ * - A button inside a button is invalid HTML, and the card needs the difficulty control
+ *   inside it.
+ * - `role="button"` on a container that holds focusable children is worse: assistive
+ *   technology reports one control and then finds nested controls inside it.
+ *
+ * A single real button, stretched over the card, is both valid and correctly
+ * focusable, and its accessible name says what pressing it does. The difficulty control
+ * sits above it in the stacking order, so choosing a difficulty does not also start the
+ * level - which is what would happen with a naive `onClick` on the card.
+ */
 function LevelCard({
   entry,
-  track,
+  chosen,
+  onChoose,
   onPick,
 }: {
   readonly entry: LevelIndexEntry;
-  readonly track: Parameters<typeof levelsInTrack>[1];
+  readonly chosen: Difficulty;
+  readonly onChoose: (difficulty: Difficulty) => void;
   readonly onPick: (entry: LevelIndexEntry, difficulty: Difficulty) => void;
 }) {
-  const offered = [...entry.difficulties.keys()];
+  // Only difficulties the level actually has. `summary.ld` declares variant lists as
+  // subsets of a track, so most levels have one and some have all three.
+  const offered = DIFFICULTIES.filter((d) => entry.difficulties.has(d));
+  const shown =
+    entry.difficulties.get(chosen) ?? entry.difficulties.get("normal");
   return (
     <div className="levelCard">
-      <span className="levelCard__name">{entry.name}</span>
-      {entry.author !== "" && (
-        <span className="levelCard__author">{entry.author}</span>
-      )}
-      {entry.description !== "" && (
-        <span className="levelCard__desc">{entry.description}</span>
-      )}
-      <span className="levelCard__tags">
-        {coloursAt(entry, track) > 0 && (
-          <span>{coloursAt(entry, track)} colours</span>
+      {/*
+        First in the DOM, so tab order follows reading order and the difficulty control
+        is reached straight after. Its label names the action rather than the level, so
+        a screen reader says what pressing it does.
+      */}
+      <button
+        type="button"
+        className="levelCard__hit"
+        onClick={() => onPick(entry, chosen)}
+      >
+        Play {entry.name}
+      </button>
+      <span className="levelCard__body">
+        <span className="levelCard__name">{entry.name}</span>
+        {entry.author !== "" && (
+          <span className="levelCard__author">{entry.author}</span>
         )}
-        <span>{neighbourLabel(entry)}</span>
-        {entry.difficulties.get("normal")?.chainGrass === true && (
-          <span>chain grass</span>
+        {entry.description !== "" && (
+          <span className="levelCard__desc">{entry.description}</span>
         )}
-        {offered.map((difficulty) => (
-          <button
-            key={difficulty}
-            type="button"
-            className="levelCard__play"
-            onClick={() => onPick(entry, difficulty)}
+        <span className="levelCard__tags">
+          {coloursAt(entry) > 0 && <span>{coloursAt(entry)} colours</span>}
+          <span>{neighbourLabel(shown)}</span>
+          {shown?.chainGrass === true && <span>chain grass</span>}
+        </span>
+      </span>
+      <span className="levelCard__actions">
+        {offered.length > 1 && (
+          <span
+            className="levelCard__difficulties"
+            role="group"
+            aria-label={`${entry.name} difficulty`}
           >
-            {difficulty === "normal" ? "Play" : difficulty}
-          </button>
-        ))}
+            {offered.map((difficulty) => (
+              <button
+                key={difficulty}
+                type="button"
+                className="levelCard__difficulty"
+                aria-pressed={difficulty === chosen}
+                onClick={() => onChoose(difficulty)}
+              >
+                {difficulty}
+              </button>
+            ))}
+          </span>
+        )}
+        {/*
+          An affordance, not a control. The card's own button is the hit target, so
+          this only says what pressing the card does and repeats the chosen difficulty
+          where the finger is about to land.
+        */}
+        <span className="levelCard__play" aria-hidden="true">
+          Play
+          {chosen !== "normal" && (
+            <span className="levelCard__playSuffix"> {chosen}</span>
+          )}
+        </span>
       </span>
     </div>
   );
 }
 
 /**
- * How many colour kinds the level has at this track's normal difficulty.
+ * How many colour kinds the level has at its normal difficulty.
  *
  * The index records the total kind count rather than a breakdown, because a breakdown
  * per level would triple the size of a generated file for a number the catalogue shows
  * in one line. `0` when the level has no normal difficulty, which is a level the card
  * cannot usefully describe.
  */
-function coloursAt(
-  entry: LevelIndexEntry,
-  track: Parameters<typeof levelsInTrack>[1],
-): number {
-  void track;
+function coloursAt(entry: LevelIndexEntry): number {
   const total = entry.difficulties.get("normal")?.kinds ?? 0;
   const nonColours = entry.goalKinds.length + (entry.greyKinds > 0 ? 1 : 0);
   return Math.max(0, total - nonColours - 1);
@@ -244,8 +320,9 @@ function trackName(track: string): string {
 }
 
 /** How the board connects, in words a player can act on. */
-function neighbourLabel(entry: LevelIndexEntry): string {
-  const described = entry.difficulties.get("normal");
+function neighbourLabel(
+  described: ReturnType<LevelIndexEntry["difficulties"]["get"]>,
+): string {
   switch (described?.neighbours) {
     case 0:
       return "sides";
