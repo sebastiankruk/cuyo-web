@@ -218,9 +218,15 @@ lint-docs:
 	$(AI_ECHO) "Linting documentation..."
 	@$(NPM) $(NPM_RUN) run lint:docs
 
+# `--no-install`, so this can never quietly fetch a different version of the spec
+# validator than the one this repository pins. A check that resolves its own tool is a
+# check that can pass or fail for reasons unrelated to what it is checking - which is
+# exactly what happened: `openspec` was not a dependency, so this resolved from a global
+# install locally and from nothing in CI, and `make check` was red on main for that
+# reason alone.
 lint-specs:
 	$(AI_ECHO) "Validating OpenSpec..."
-	@$(NPX) $(NPX_FLAGS) openspec validate --strict --all
+	@$(NPX) $(NPX_FLAGS) --no-install openspec validate --strict --all
 
 test:
 	$(AI_ECHO) "Running tests..."
