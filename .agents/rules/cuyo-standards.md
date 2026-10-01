@@ -100,9 +100,13 @@ Level corpus tests read `.context/upstream-cuyo/data`; override with
 `CUYO_DATA_DIR`. If the upstream tree is absent they fail loudly rather than
 skipping, because "the parser handles every real level" is the assertion and it
 cannot be evaluated without them — so on a fresh clone run `make corpus` first.
-`scripts/fetch-cuyo.sh` fetches it from Debian's archive pool, the only
-long-lived, checksummed copy of upstream 2.1.0; see that script for why there is
-nothing to clone.
+`scripts/fetch-cuyo.sh` fetches it from Debian's archive pool. Upstream's
+canonical home is GNU Savannah (`savannah.gnu.org/projects/cuyo/`, group 857,
+registered 2001) and its official site is `karimmi.de/cuyo/` — but Savannah's
+download area redirects the tarball to a generic index and the project is in CVS
+with no public git mirror, so there is nothing to clone and nothing to download.
+Debian's pool is the only place the artifact is both fetchable by a machine and
+verifiable by a checksum. See ATTRIBUTION.md and the script's header.
 
 ### AiOps Environment Mode Directive
 

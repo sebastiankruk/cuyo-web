@@ -57,16 +57,23 @@ npm install
 make corpus          # fetches and checksum-verifies upstream 2.1.0
 ```
 
-`make corpus` is not a `git clone` because there is nothing to clone. Cuyo's own
-site — `cuyo.de` — is a parked domain, and no public upstream repository exists.
-Debian has packaged whose 2.1.0, and its original tarball sits in the archive
-pool at a URL Debian never moves: `scripts/fetch-cuyo.sh` fetches it, checks the
-size and the SHA-256 from Debian's own `cuyo_2.1.0-2.1.dsc`, and unpacks it.
+`make corpus` is not a `git clone` because there is no git to clone. Cuyo's
+canonical home is [GNU Savannah](https://savannah.gnu.org/projects/cuyo/) — group
+857, registered 2001 by Immanuel Halupczok — and its official site is
+[karimmi.de/cuyo](https://www.karimmi.de/cuyo/). But Savannah's download area
+redirects the tarball to a generic releases index rather than serving it, and the
+project is in CVS with no public git mirror.
 
-That this is the same tree as the one checked out here is not assumed. All 1233
-files of the Debian tarball were compared against it with `diff -rq` and are
-byte-identical — including `data/`, `src/` and `docs/`, which is the whole basis
-for calling the transcriptions faithful.
+Debian has packaged whose 2.1.0, and its *original* tarball sits in the archive
+pool at a URL Debian does not move: `scripts/fetch-cuyo.sh` fetches that, checks
+the size and the SHA-256 from Debian's own `cuyo_2.1.0-2.1.dsc`, and unpacks it.
+
+That this is upstream's own 2.1.0 is verified rather than assumed. All 1233 files
+of the Debian tarball were compared against the tree checked out here with
+`diff -rq` and are byte-identical — `data/`, `src/` and `docs/` included — and
+being an `.orig.tar.gz` the comparison is against upstream's output rather than
+Debian's patched build. That is the whole basis for calling the transcriptions
+faithful. See [ATTRIBUTION.md](ATTRIBUTION.md) for the full provenance.
 
 Set `CUYO_DATA_DIR` to point elsewhere. The corpus tests fail loudly when the
 upstream tree is absent rather than skipping, because "the parser handles every

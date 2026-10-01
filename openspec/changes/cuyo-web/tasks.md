@@ -238,6 +238,8 @@ this project is worked on by an agent that pays for every line of tool output, s
 - [x] 14.6 Measure the token saving rather than assuming it, and record the figure; verify that forcing a terser vitest reporter is not an improvement and say why
 - [x] 14.7 Add a GitHub Actions workflow with one job per gate - lint, docs, shell, specs, test, build - so a failure names itself
 - [x] 14.8 Add a fetch script for the upstream Cuyo tree with a pinned URL and SHA-256 from Debian's `.dsc`, and verify the tree it produces is byte-identical to the hand-placed one
+- [x] 14.19 Record the real upstream provenance in `ATTRIBUTION.md` — GNU Savannah group 857, `karimmi.de/cuyo/`, GPL v2+ — and correct the false claim that there is no upstream, and the stale `../cuyo-2.1.0` path and `cuyo.de` URL
+- [x] 14.20 Make the fetch script refuse an oversized body up front, so a URL that redirects somewhere unexpected fails in seconds rather than after downloading the wrong thing
 - [x] 14.9 Add a CI job asserting no upstream artwork reached `dist/`, and verify it fails when a sprite is deliberately copied in
 - [x] 14.10 Add a CI job that runs the gates through `CUYO_AI_MODE=1` and asserts the output really is terse, and verify it fails when a banner is reintroduced
 - [x] 14.11 Add a CI job asserting the human-facing banners are still present, and verify it fails when `AI_ECHO` is inverted

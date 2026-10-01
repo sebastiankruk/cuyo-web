@@ -24,18 +24,31 @@
 #
 # Where the tarball comes from, and why not a git clone:
 #
-# Cuyo's own home page is a parked domain and there is no public upstream
-# repository to clone. The tree in `.context/upstream-cuyo` was placed there by
-# hand. But Debian has packaged whose 2.1.0 since long enough that the original
-# tarball sits in the archive pool, which is a stable, checksummed, indefinitely
-# retained URL - exactly the properties a CI fetch needs and a project's own site
-# no longer has.
+# Cuyo's canonical home is GNU Savannah: https://savannah.gnu.org/projects/cuyo/
+# - group 857, registered 2001 by Immanuel Halupczok, non-GNU software and
+# documentation, GPL v2 or later. Its official site is
+# https://www.karimmi.de/cuyo/. That is where the credit belongs, and ATTRIBUTION.md
+# records it.
 #
-# That this is the same tree is not an assumption. The 1233 files of the Debian
-# tarball were compared against the checked-out tree with `diff -rq` and are
-# byte-identical, including data/, src/ and docs/. The SHA-256 below is from
-# Debian's own `cuyo_2.1.0-2.1.dsc`, not computed here, so the fetch is verified
-# against something Debian signed rather than against itself.
+# But the tarball is not retrievable from there. Savannah's download area
+# redirects `download/cuyo/cuyo-2.1.0.tar.bz2` to a generic releases index rather
+# than serving the file, and the project's version control is CVS with no public
+# git mirror - so `git clone` has nothing to fetch and a CVS checkout needs a
+# client this environment does not have. (`cuyo.de`, which older references
+# give, is a parked domain and never was the project address.)
+#
+# Debian has packaged whose 2.1.0 since long enough that the original tarball
+# sits in the archive pool, at a URL Debian does not move and has no reason to
+# remove. That is the one place the artifact is both fetchable by a machine and
+# verifiable by a checksum, which is what CI needs.
+#
+# That this is upstream's own 2.1.0 is not an assumption. The 1233 files of the
+# Debian tarball were compared against the checked-out tree with `diff -rq` and
+# are byte-identical, including data/, src/ and docs/. It is an `.orig.tar.gz`, so
+# the comparison is against upstream's output and not against Debian's patched
+# build. The SHA-256 below comes from Debian's own `cuyo_2.1.0-2.1.dsc` rather
+# than being computed here, so the fetch is checked against something Debian
+# published rather than against itself.
 #
 # Licence: the upstream tree is GPL-2.0-or-later, the same as this project. See
 # ATTRIBUTION.md. It is deliberately not committed - it is 11 MB of GPL content,
@@ -70,11 +83,19 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 echo "fetch-cuyo: downloading $CUYO_URL"
-curl -sSL --fail --max-time 300 -o "$tmp/cuyo.tar.gz" "$CUYO_URL" \
-  || die "download failed. Cuyo's own site (cuyo.de) is a parked domain and
-       there is no public upstream repository to clone; if this URL has moved,
-       fetch cuyo_2.1.0.orig.tar.gz from a Debian mirror by hand, verify it
-       against the SHA-256 in this script, and unpack it into $TARGET."
+# `--max-filesize` rather than only checking the length afterwards: if the URL ever
+# redirects somewhere unexpected - Savannah's download area redirects to a generic
+# releases index, which is how this was found - curl aborts instead of spending a
+# minute downloading the wrong thing before the size check rejects it.
+curl -sSL --fail --max-time 300 --max-filesize "$CUYO_BYTES" \
+  -o "$tmp/cuyo.tar.gz" "$CUYO_URL" \
+  || die "download failed. Upstream's canonical homes are
+       https://savannah.gnu.org/projects/cuyo/ and https://www.karimmi.de/cuyo/,
+       but neither serves the tarball: Savannah's download area redirects to a
+       generic index and the project's version control is CVS with no git mirror.
+       If this URL has moved, fetch cuyo_2.1.0.orig.tar.gz from any Debian
+       mirror by hand, verify it against the SHA-256 in this script, and unpack
+       it into $TARGET."
 
 actual_bytes="$(wc -c < "$tmp/cuyo.tar.gz" | tr -d ' ')"
 [ "$actual_bytes" = "$CUYO_BYTES" ] \
