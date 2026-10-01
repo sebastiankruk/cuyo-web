@@ -82,8 +82,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 6,
         chainGrass: false,
         topTime: 50,
@@ -122,8 +122,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 7,
         chainGrass: false,
         topTime: 50,
@@ -163,8 +163,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 5,
         chainGrass: true,
         topTime: 50,
@@ -192,8 +192,8 @@ const RAW: readonly RawLevel[] = [
     difficulties: [
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 9,
         chainGrass: true,
         topTime: 50,
@@ -218,8 +218,8 @@ const RAW: readonly RawLevel[] = [
     difficulties: [
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 4,
         chainGrass: true,
         topTime: 50,
@@ -244,8 +244,8 @@ const RAW: readonly RawLevel[] = [
     difficulties: [
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 9,
         chainGrass: true,
         topTime: 50,
@@ -285,8 +285,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 4,
         chainGrass: false,
         topTime: 50,
@@ -337,8 +337,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 6,
         chainGrass: true,
         topTime: 50,
@@ -378,8 +378,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 3,
         chainGrass: true,
         topTime: 80,
@@ -430,8 +430,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 5,
         chainGrass: true,
         topTime: 50,
@@ -472,8 +472,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 5,
         chainGrass: true,
         topTime: 50,
@@ -524,8 +524,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 5,
         chainGrass: true,
         topTime: 50,
@@ -561,8 +561,8 @@ const RAW: readonly RawLevel[] = [
     difficulties: [
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,contrib]",
+        track: "contrib",
         numExplode: 6,
         chainGrass: false,
         topTime: 50,
@@ -602,8 +602,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 6,
         chainGrass: true,
         topTime: 50,
@@ -642,8 +642,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 7,
         chainGrass: false,
         topTime: 50,
@@ -684,8 +684,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 9,
         chainGrass: false,
         topTime: 40,
@@ -736,8 +736,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 5,
         chainGrass: false,
         topTime: 50,
@@ -787,8 +787,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 7,
         chainGrass: false,
         topTime: 100,
@@ -828,8 +828,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 6,
         chainGrass: false,
         topTime: 50,
@@ -865,8 +865,8 @@ const RAW: readonly RawLevel[] = [
     difficulties: [
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 8,
         chainGrass: true,
         topTime: 50,
@@ -908,8 +908,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 1,
         chainGrass: false,
         topTime: 4,
@@ -949,8 +949,8 @@ const RAW: readonly RawLevel[] = [
     difficulties: [
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 4,
         chainGrass: false,
         topTime: 30,
@@ -990,8 +990,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 4,
         chainGrass: true,
         topTime: 50,
@@ -1044,8 +1044,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 2,
         chainGrass: false,
         topTime: 50,
@@ -1096,8 +1096,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 4,
         chainGrass: true,
         topTime: 80,
@@ -1148,8 +1148,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 6,
         chainGrass: false,
         topTime: 5,
@@ -1201,8 +1201,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 4,
         chainGrass: true,
         topTime: 50,
@@ -1238,8 +1238,8 @@ const RAW: readonly RawLevel[] = [
     difficulties: [
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,contrib]",
+        track: "contrib",
         numExplode: 4,
         chainGrass: true,
         topTime: 30,
@@ -1279,8 +1279,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 8,
         chainGrass: false,
         topTime: 100,
@@ -1331,8 +1331,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 7,
         chainGrass: false,
         topTime: 200,
@@ -1372,8 +1372,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 4,
         chainGrass: false,
         topTime: 80,
@@ -1414,8 +1414,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 6,
         chainGrass: false,
         topTime: 200,
@@ -1467,8 +1467,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 5,
         chainGrass: false,
         topTime: 80,
@@ -1518,8 +1518,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 4,
         chainGrass: false,
         topTime: 200,
@@ -1560,8 +1560,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: null,
         chainGrass: false,
         topTime: 200,
@@ -1613,8 +1613,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 6,
         chainGrass: false,
         topTime: 100,
@@ -1666,8 +1666,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 2,
         chainGrass: false,
         topTime: 200,
@@ -1706,8 +1706,8 @@ const RAW: readonly RawLevel[] = [
     difficulties: [
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 9,
         chainGrass: true,
         topTime: 50,
@@ -1758,8 +1758,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 5,
         chainGrass: false,
         topTime: 50,
@@ -1784,8 +1784,8 @@ const RAW: readonly RawLevel[] = [
     difficulties: [
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,contrib]",
+        track: "contrib",
         numExplode: 100,
         chainGrass: false,
         topTime: 30,
@@ -1824,8 +1824,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 10,
         chainGrass: false,
         topTime: 50,
@@ -1876,8 +1876,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 100,
         chainGrass: false,
         topTime: 50,
@@ -1930,8 +1930,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 0,
         chainGrass: true,
         topTime: 50,
@@ -1982,8 +1982,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 8,
         chainGrass: false,
         topTime: 50,
@@ -2023,8 +2023,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 7,
         chainGrass: false,
         topTime: 50,
@@ -2063,8 +2063,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 7,
         chainGrass: false,
         topTime: 50,
@@ -2104,8 +2104,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 4,
         chainGrass: false,
         topTime: 50,
@@ -2157,8 +2157,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 9,
         chainGrass: false,
         topTime: 50,
@@ -2210,8 +2210,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 5,
         chainGrass: false,
         topTime: 50,
@@ -2247,8 +2247,8 @@ const RAW: readonly RawLevel[] = [
     difficulties: [
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,weird]",
+        track: "weird",
         numExplode: 5,
         chainGrass: false,
         topTime: 50,
@@ -2300,8 +2300,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 6,
         chainGrass: true,
         topTime: 50,
@@ -2352,8 +2352,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 4,
         chainGrass: false,
         topTime: 50,
@@ -2405,8 +2405,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 8,
         chainGrass: false,
         topTime: 50,
@@ -2447,8 +2447,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 17,
         chainGrass: false,
         topTime: 50,
@@ -2484,8 +2484,8 @@ const RAW: readonly RawLevel[] = [
     difficulties: [
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 5,
         chainGrass: false,
         topTime: 50,
@@ -2526,8 +2526,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 0,
         chainGrass: false,
         topTime: 50,
@@ -2577,8 +2577,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 6,
         chainGrass: false,
         topTime: 50,
@@ -2631,8 +2631,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 4,
         chainGrass: false,
         topTime: 100,
@@ -2683,8 +2683,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 9,
         chainGrass: false,
         topTime: 50,
@@ -2735,8 +2735,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 6,
         chainGrass: false,
         topTime: 50,
@@ -2788,8 +2788,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 4,
         chainGrass: false,
         topTime: 50,
@@ -2839,8 +2839,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 3,
         chainGrass: true,
         topTime: 50,
@@ -2892,8 +2892,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 6,
         chainGrass: false,
         topTime: 50,
@@ -2933,8 +2933,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 6,
         chainGrass: true,
         topTime: 50,
@@ -2974,8 +2974,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 7,
         chainGrass: true,
         topTime: 50,
@@ -3015,8 +3015,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 8,
         chainGrass: false,
         topTime: 50,
@@ -3056,8 +3056,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 9,
         chainGrass: true,
         topTime: 90,
@@ -3097,8 +3097,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 5,
         chainGrass: true,
         topTime: 100,
@@ -3138,8 +3138,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 6,
         chainGrass: true,
         topTime: 90,
@@ -3190,8 +3190,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 20,
         chainGrass: true,
         topTime: 50,
@@ -3227,8 +3227,8 @@ const RAW: readonly RawLevel[] = [
     difficulties: [
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,contrib]",
+        track: "contrib",
         numExplode: 10,
         chainGrass: true,
         topTime: 50,
@@ -3269,8 +3269,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 8,
         chainGrass: true,
         topTime: 50,
@@ -3321,8 +3321,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 15,
         chainGrass: true,
         topTime: 400,
@@ -3358,8 +3358,8 @@ const RAW: readonly RawLevel[] = [
     difficulties: [
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,contrib]",
+        track: "contrib",
         numExplode: 11,
         chainGrass: false,
         topTime: 50,
@@ -3401,8 +3401,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 6,
         chainGrass: false,
         topTime: 100,
@@ -3453,8 +3453,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 6,
         chainGrass: true,
         topTime: 50,
@@ -3490,8 +3490,8 @@ const RAW: readonly RawLevel[] = [
     difficulties: [
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,contrib]",
+        track: "contrib",
         numExplode: 3,
         chainGrass: true,
         topTime: 50,
@@ -3516,8 +3516,8 @@ const RAW: readonly RawLevel[] = [
     difficulties: [
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,contrib]",
+        track: "contrib",
         numExplode: 7,
         chainGrass: false,
         topTime: 50,
@@ -3558,8 +3558,8 @@ const RAW: readonly RawLevel[] = [
       },
       {
         difficulty: "normal",
-        version: "[1,main]",
-        track: "main",
+        version: "[1,all]",
+        track: "all",
         numExplode: 3,
         chainGrass: false,
         topTime: 50,

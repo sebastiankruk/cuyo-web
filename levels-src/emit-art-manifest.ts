@@ -23,9 +23,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { parseLd } from "../engine/level-format/parser.ts";
-import { decodeLatin1 } from "../engine/level-format/lexer.ts";
 import { Version } from "../engine/level-format/version.ts";
 import { DefinitionScope, rootScope } from "../engine/level-format/scope.ts";
 import { buildKinds } from "../engine/level-format/kinds.ts";
@@ -35,6 +33,12 @@ import {
 } from "../engine/level-format/settings.ts";
 import { artManifest } from "../engine/level-format/art.ts";
 import type { ArtEntry, ArtManifest } from "../engine/level-format/art.ts";
+import {
+  availableLevelFiles,
+  haveUpstream,
+  readGlobals,
+  readLevelFile,
+} from "./level-sources.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR =
@@ -63,17 +67,30 @@ interface Reference {
  * definitions both are resolved against. `example.ld` is documentation: its picture
  * names are illustrative and would put keys in the manifest that no level uses.
  */
+/**
+ * Every level file, from both sources.
+ *
+ * `levels/` as well as the upstream checkout: a contributed level naming a picture the
+ * corpus does not use must still get an entry, or the build fails for the level that is
+ * supposed to be adding to the game. Failing on an unknown key is the point of the
+ * manifest, and a contributed level is exactly the case it exists to catch.
+ */
 function levelFiles(): string[] {
-  if (!existsSync(DATA_DIR)) {
+  if (!haveUpstream()) {
     throw new Error(
-      `No level data at ${DATA_DIR}. Run "make fetch:corpus" first, or set ` +
+      `No upstream level data. Run "make fetch:corpus" first, or set ` +
         `CUYO_DATA_DIR.`,
     );
   }
-  return readdirSync(DATA_DIR)
-    .filter((f) => f.endsWith(".ld"))
-    .filter((f) => f !== "summary.ld" && f !== "example.ld")
-    .sort();
+  const files = availableLevelFiles().filter((f) => f !== "globals.ld");
+  if (files.length === 0) {
+    throw new Error(
+      "No level files found in either levels/ or the upstream checkout. Either the " +
+        "corpus is missing or the directory layout has changed, and either way an " +
+        "empty manifest would silently blank every level.",
+    );
+  }
+  return files;
 }
 
 /**
@@ -102,19 +119,13 @@ function collectReferences(): {
   files: number;
   levels: number;
 } {
-  const globals = parseLd(
-    decodeLatin1(readFileSync(resolve(DATA_DIR, "globals.ld"))),
-    "globals.ld",
-  );
+  const globals = parseLd(readGlobals(), "globals.ld");
   const refs: Reference[] = [];
   let files = 0;
   let levels = 0;
 
   for (const file of levelFiles()) {
-    const parsed = parseLd(
-      decodeLatin1(readFileSync(resolve(DATA_DIR, file))),
-      file,
-    );
+    const parsed = parseLd(readLevelFile(file), file);
     const sections = parsed.definitions.filter(
       (d) => d.value.type === "section",
     );

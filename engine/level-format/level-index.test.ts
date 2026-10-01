@@ -23,6 +23,7 @@ import {
   primaryTrack,
 } from "./index-data.ts";
 import { UNDEFINED_EXPLODE } from "./kinds.ts";
+import { levelSource } from "../../levels-src/level-sources.ts";
 
 describe("the generated catalogue", () => {
   it("contains every level summary.ld indexes", () => {
@@ -66,13 +67,18 @@ describe("the generated catalogue", () => {
 
   it("reports the level that summary.ld puts in no track", () => {
     // `UnterWasser` appears in no `level[...]` list, so it is unreachable from the
-    // upstream menu. A property of the data, not a parsing slip - asserted so that a
-    // future change to the track parsing shows up as a *change* here rather than as a
-    // level quietly vanishing from the catalogue.
-    const untracked = LEVELS.filter((l) => l.tracks.size === 0).map(
-      (l) => l.id,
-    );
-    expect(untracked).toEqual(["UnterWasser"]);
+    // upstream menu. A property of the data, not a parsing slip.
+    //
+    // Asserted as "contains UnterWasser, and nothing contributed", not as an exact
+    // list. `levels/` is where contributed levels land, so an exact list would fail the
+    // moment someone added one - and a test that has to be edited when the thing it
+    // guards is used is a test that eventually gets deleted instead.
+    const untracked = LEVELS.filter((l) => l.tracks.size === 0);
+    expect(untracked.map((l) => l.id)).toContain("UnterWasser");
+    expect(
+      untracked.filter((l) => levelSource(l.filename) === "contrib"),
+      "a contributed level is on no track, so it cannot be played",
+    ).toEqual([]);
   });
 
   it("orders each track as summary.ld does", () => {
@@ -94,7 +100,7 @@ describe("the generated catalogue", () => {
     // this wrong makes seven levels appear in the wrong order, which is the kind of
     // thing nobody notices until a player does.
     const unordered = LEVELS.filter((l) => l.ordered.get("contrib") === false);
-    expect(unordered.length).toBe(7);
+    expect(unordered.length).toBeGreaterThanOrEqual(7);
     for (const entry of LEVELS) {
       for (const track of entry.tracks.keys()) {
         if (track === "contrib") continue;

@@ -17,10 +17,8 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { parseLd } from "../engine/level-format/parser.ts";
-import { decodeLatin1 } from "../engine/level-format/lexer.ts";
 import { Version } from "../engine/level-format/version.ts";
 import { DefinitionScope, rootScope } from "../engine/level-format/scope.ts";
 import { buildKinds, UNDEFINED_EXPLODE } from "../engine/level-format/kinds.ts";
@@ -45,11 +43,12 @@ import type {
   LevelDiagnostic,
 } from "../engine/level-format/diagnostics.ts";
 import { ScriptedPrng } from "../engine/testing/prng-stub.ts";
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR =
-  process.env["CUYO_DATA_DIR"] ??
-  resolve(HERE, "../.context/upstream-cuyo/data");
+import {
+  UPSTREAM_DIR,
+  contribSummary,
+  readGlobals,
+  readLevelFile,
+} from "./level-sources.ts";
 
 /** The versions the engine supports. Kept in step with the corpus oracle's list. */
 const VERSIONS = [
@@ -73,32 +72,44 @@ interface Compiled {
  * level absent from it is unreachable and a file present in it but broken is fatal.
  */
 function indexedLevels(): string[] {
-  const summaryPath = resolve(DATA_DIR, "summary.ld");
-  if (!existsSync(summaryPath)) {
+  const files: string[] = [];
+  // Both summaries, for the same reason the catalogue reads both: a contributed level
+  // not in either would never be validated, which is the quietest way for a gate to
+  // stop meaning anything.
+  const sources: { text: string; label: string }[] = [];
+  const upstreamSummary = resolve(UPSTREAM_DIR, "summary.ld");
+  if (!existsSync(upstreamSummary)) {
     throw new Error(
-      `No summary.ld at ${DATA_DIR}. Run "make fetch:corpus" first, or set ` +
+      `No summary.ld at ${UPSTREAM_DIR}. Run "make fetch:corpus" first, or set ` +
         `CUYO_DATA_DIR.`,
     );
   }
-  const summary = parseLd(
-    decodeLatin1(readFileSync(summaryPath)),
-    "summary.ld",
-  );
-  const files: string[] = [];
-  // Through a `DefinitionScope` rather than by reaching into the token stream: the
-  // summary is ordinary level-definition syntax, so reading it the way every other
-  // definition is read keeps one code path for "what does this name resolve to".
-  for (const def of summary.definitions) {
-    if (def.value.type !== "section") continue;
-    const section = new DefinitionScope(
-      def.name,
-      undefined,
-      Version.of("1", "main"),
-      "summary.ld",
-    );
-    section.defineAll(def.value.definitions);
-    const filename = section.ownWord("filename", "") ?? "";
-    if (filename !== "") files.push(filename);
+  sources.push({
+    text: readFileSync(upstreamSummary, "latin1"),
+    label: "summary.ld",
+  });
+  const contributed = contribSummary();
+  if (contributed !== null) {
+    sources.push({ text: contributed, label: "levels/summary.ld" });
+  }
+
+  for (const { text, label } of sources) {
+    const summary = parseLd(text, label);
+    // Through a `DefinitionScope` rather than by reaching into the token stream: the
+    // summary is ordinary level-definition syntax, so reading it the way every other
+    // definition is read keeps one code path for "what does this name resolve to".
+    for (const def of summary.definitions) {
+      if (def.value.type !== "section") continue;
+      const section = new DefinitionScope(
+        def.name,
+        undefined,
+        Version.of("1", "main"),
+        label,
+      );
+      section.defineAll(def.value.definitions);
+      const filename = section.ownWord("filename", "") ?? "";
+      if (filename !== "") files.push(filename);
+    }
   }
   return [...new Set(files)].sort();
 }
@@ -106,10 +117,7 @@ function indexedLevels(): string[] {
 function main(): void {
   const bag = new DiagnosticBag();
   const files = indexedLevels();
-  const globals = parseLd(
-    decodeLatin1(readFileSync(resolve(DATA_DIR, "globals.ld"))),
-    "globals.ld",
-  );
+  const globals = parseLd(readGlobals(), "globals.ld");
 
   let sections = 0;
   const compiled: Compiled[] = [];
@@ -119,7 +127,7 @@ function main(): void {
     const parsed = capture(
       { file, definition: file, version: "-", twoPlayers: false },
       "lex",
-      () => parseLd(decodeLatin1(readFileSync(resolve(DATA_DIR, file))), file),
+      () => parseLd(readLevelFile(file), file),
     );
     if (!parsed.ok) continue;
     const levelSections = parsed.value.definitions.filter(

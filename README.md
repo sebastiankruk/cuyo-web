@@ -1,5 +1,14 @@
 # Cuyo — web
 
+[![Latest Release](https://img.shields.io/github/v/release/sebastiankruk/cuyo-web?color=blue&label=version)](https://github.com/sebastiankruk/cuyo-web/releases)
+[![CI Quality](https://github.com/sebastiankruk/cuyo-web/actions/workflows/quality.yml/badge.svg)](https://github.com/sebastiankruk/cuyo-web/actions/workflows/quality.yml)
+[![License: GPL v2](https://img.shields.io/badge/License-GPL_v2-red.svg)](LICENSE-OR-LATER.md)
+[![Node Version](https://img.shields.io/badge/Node-22%2B-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![TypeScript Version](https://img.shields.io/badge/TypeScript-6-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite Version](https://img.shields.io/badge/Vite-8-646CFF.svg?logo=vite&logoColor=white)](https://vite.dev/)
+[![React Version](https://img.shields.io/badge/React-19-61DAFB.svg?logo=react&logoColor=black)](https://react.dev/)
+[![Vitest Version](https://img.shields.io/badge/Vitest-5-FCFF64.svg?logo=vitest&logoColor=black)](https://vitest.dev/)
+
 A browser reimplementation of [Cuyo](https://www.cuyo.de/), the abstract
 falling-blob puzzle game by Immanuel Halupczok, built to be played on phones and
 tablets.
@@ -18,6 +27,7 @@ level files, so the same licence applies. See
 engine/       headless simulation — game-core, level-format, cual-runtime
 app/          React shell: screens, navigation, input, game loop
 render/       canvas renderer, art atlas and compositor, effects
+levels/       contributed levels, tracked in git — see docs/adding-levels.md
 levels-src/   build-time only: validates the level set, emits index + art keys
 scripts/      shell tooling: corpus fetch, doc lint, artwork assertion
 openspec/     planning artifacts (proposal, specs, design, tasks)
@@ -32,7 +42,7 @@ always equivalent.
 tested without a browser. This is enforced by `eslint.config.js`, not merely by
 convention — see [`.agents/rules/cuyo-standards.md`](.agents/rules/cuyo-standards.md).
 
-Cuyo's picture names in `.ld` files are treated as *logical art keys*, not file
+Cuyo's picture names in `.ld` files are treated as _logical art keys_, not file
 paths, and are resolved through an art-key manifest. The artwork is entirely new;
 the original spritesheets are not shipped.
 
@@ -64,7 +74,7 @@ canonical home is [GNU Savannah](https://savannah.gnu.org/projects/cuyo/) — gr
 redirects the tarball to a generic releases index rather than serving it, and the
 project is in CVS with no public git mirror.
 
-Debian has packaged whose 2.1.0, and its *original* tarball sits in the archive
+Debian has packaged whose 2.1.0, and its _original_ tarball sits in the archive
 pool at a URL Debian does not move: `scripts/fetch-cuyo.sh` fetches that, checks
 the size and the SHA-256 from Debian's own `cuyo_2.1.0-2.1.dsc`, and unpacks it.
 
@@ -79,33 +89,54 @@ Set `CUYO_DATA_DIR` to point elsewhere. The corpus tests fail loudly when the
 upstream tree is absent rather than skipping, because "the parser handles every
 real level" is the assertion and cannot be evaluated without it.
 
-| Artifact | Contents |
-| --- | --- |
-| `proposal.md` | Motivation, scope, licensing |
-| `specs/game-core` | The headless simulation |
-| `specs/level-format` | The `.ld` level description format |
-| `specs/cual-runtime` | Cual, the per-blob scripting language |
-| `specs/level-catalog` | Level tracks, difficulty, progress |
-| `specs/presentation` | Canvas rendering and art |
-| `specs/mobile-experience` | Touch input, PWA, persistence |
-| `design.md` | Architecture decisions and rationale |
-| `tasks.md` | Implementation tasks |
+| Artifact                  | Contents                              |
+| ------------------------- | ------------------------------------- |
+| `proposal.md`             | Motivation, scope, licensing          |
+| `specs/game-core`         | The headless simulation               |
+| `specs/level-format`      | The `.ld` level description format    |
+| `specs/cual-runtime`      | Cual, the per-blob scripting language |
+| `specs/level-catalog`     | Level tracks, difficulty, progress    |
+| `specs/presentation`      | Canvas rendering and art              |
+| `specs/mobile-experience` | Touch input, PWA, persistence         |
+| `design.md`               | Architecture decisions and rationale  |
+| `tasks.md`                | Implementation tasks                  |
 
 ## Status
 
 Under construction. The plan lives in [`openspec/changes/cuyo-web`](openspec/changes/cuyo-web):
 
-| Artifact | Contents |
-| --- | --- |
-| `proposal.md` | Motivation, scope, licensing |
-| `specs/game-core` | The headless simulation |
-| `specs/level-format` | The `.ld` level description format |
-| `specs/cual-runtime` | Cual, the per-blob scripting language |
-| `specs/level-catalog` | Level tracks, difficulty, progress |
-| `specs/presentation` | Canvas rendering and art |
-| `specs/mobile-experience` | Touch input, PWA, persistence |
-| `design.md` | Architecture decisions and rationale |
-| `tasks.md` | Implementation tasks |
+| Artifact                  | Contents                              |
+| ------------------------- | ------------------------------------- |
+| `proposal.md`             | Motivation, scope, licensing          |
+| `specs/game-core`         | The headless simulation               |
+| `specs/level-format`      | The `.ld` level description format    |
+| `specs/cual-runtime`      | Cual, the per-blob scripting language |
+| `specs/level-catalog`     | Level tracks, difficulty, progress    |
+| `specs/presentation`      | Canvas rendering and art              |
+| `specs/mobile-experience` | Touch input, PWA, persistence         |
+| `design.md`               | Architecture decisions and rationale  |
+| `tasks.md`                | Implementation tasks                  |
+
+## Contributing a level
+
+Upstream Cuyo's own 79 levels are not committed here — they are GPL-2.0 content in a
+local-only checkout fetched by `make corpus`. **Levels written for this project go in
+[`levels/`](levels/), tracked in git**, in the same `.ld` format upstream uses.
+
+```text
+levels/MyLevel.ld      the level
+levels/summary.ld      indexes it: a section, and a level[track] entry
+```
+
+```sh
+make level-index && make check && make dev
+```
+
+[`docs/adding-levels.md`](docs/adding-levels.md) has the format, the settings worth
+setting deliberately, and what a good contribution looks like. In short: `neighbours`
+is the one players get wrong most, picture names are logical keys rather than file
+paths so you need no artwork, and **Cual blocks are not executed yet** — a level using
+one would load and then quietly play by the ordinary rules.
 
 ## Development
 
@@ -154,9 +185,9 @@ the cause would cost far more than the tokens it saves. Two CI jobs hold this
 honest, one asserting the terse output really is terse and one asserting the
 human-facing banners are still there.
 
-It deliberately does *not* force a vitest reporter. Vitest's default already goes
+It deliberately does _not_ force a vitest reporter. Vitest's default already goes
 compact when stdout is not a terminal — 467 bytes for this suite, against 55 kB
-for `--reporter=verbose` — and forcing `--reporter=dot` makes it *larger*, at
+for `--reporter=verbose` — and forcing `--reporter=dot` makes it _larger_, at
 1474 bytes, because it prints a dot per test. The measurements are recorded in
 `vite.config.ts`.
 
@@ -164,16 +195,16 @@ for `--reporter=verbose` — and forcing `--reporter=dot` makes it *larger*, at
 
 `.github/workflows/quality.yml` runs one job per gate, so a failure names itself:
 
-| Job | Gate |
-| --- | --- |
-| `lint` | ESLint (including the `engine/` boundary rule) and `tsc --noEmit` |
-| `docs` | markdownlint over the hand-written docs |
-| `shell` | shellcheck, pinned to 0.10.0 |
-| `specs` | `openspec validate --strict --all` |
-| `test` | vitest, with the upstream corpus fetched first |
-| `build` | production bundle, plus an assertion that no upstream artwork reached `dist/` |
-| `agent-mode` | runs the gates with `CUYO_AI_MODE=1` and asserts the output is terse |
-| `human-mode` | asserts the banners are still there |
+| Job          | Gate                                                                          |
+| ------------ | ----------------------------------------------------------------------------- |
+| `lint`       | ESLint (including the `engine/` boundary rule) and `tsc --noEmit`             |
+| `docs`       | markdownlint over the hand-written docs                                       |
+| `shell`      | shellcheck, pinned to 0.10.0                                                  |
+| `specs`      | `openspec validate --strict --all`                                            |
+| `test`       | vitest, with the upstream corpus fetched first                                |
+| `build`      | production bundle, plus an assertion that no upstream artwork reached `dist/` |
+| `agent-mode` | runs the gates with `CUYO_AI_MODE=1` and asserts the output is terse          |
+| `human-mode` | asserts the banners are still there                                           |
 
 A Cloudflare tunnel should point at `http://localhost:5173`. Vite's DNS-rebinding
 guard is on, so the tunnel's hostname is allowed by name in `vite.config.ts`
