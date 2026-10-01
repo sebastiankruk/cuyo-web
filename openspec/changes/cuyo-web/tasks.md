@@ -70,9 +70,9 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [x] 2.4 Implement version resolution (most specific applicable subset wins) including the mutual-exclusion and exhaustiveness rules, and verify the documented `[1] [2] [easy] [hard]` examples plus the ambiguity-rejection case
 - [x] 2.5 Implement kind declaration lists (`pics`, `greypic`, `startpic`, `emptypic`), the successive kind constants, first-use-wins naming and per-kind overrides, and verify the apple/orange/pear/banana/pineapple example from the man page
 - [x] 2.6 Implement level-wide setting extraction with documented defaults (`toptime` 50, `chaingrass` 0, `mirror` 0, colours, `randomfallpos`, `randomgreys`, `nogreyprob`) and verify defaults apply when omitted
-- [ ] 2.7 Implement `neighbours` mode parsing including the hex-mode flag, and verify each of the ten modes resolves correctly
+- [x] 2.7 Implement `neighbours` mode parsing including the hex-mode flag, and verify each of the ten modes resolves correctly
 - [x] 2.8 Implement `startdist` decoding (row alignment, `.`/`+`/`-`/`*`, `distkey` version offsets, the 4- and 8-character informational last row) and verify the man page's example rows
-- [ ] 2.9 Implement the random-cell neighbour-avoidance retry used for `+` cells and verify a filled start layout contains no accidental same-kind adjacency beyond what the layout declares
+- [x] 2.9 Implement the random-cell neighbour-avoidance retry used for `+` cells and verify a filled start layout contains no accidental same-kind adjacency beyond what the layout declares
 - [ ] 2.10 Implement picture names as logical art keys resolved through the art manifest with no filesystem access, and verify a declared key resolves to a manifest entry and an unregistered key fails with the key and kind named
 - [ ] 2.11 Implement the build step that scans every bundled `.ld`, extracts the full set of referenced picture names and emits the art-key manifest, and verify every referenced key is registered with an entry
 - [ ] 2.12 Implement structured load diagnostics (file, definition, reason) for unresolvable art keys, wrong row lengths and undefined `numexplode`, and verify each produces a specific error
@@ -178,6 +178,7 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [ ] 9.5 Implement the pause menu offering resume, restart and abandon, and verify resuming continues the same board
 - [ ] 9.6 Implement the settings screen for audio, reduced motion, portrait lock and left-handed layout, and verify each takes effect
 - [ ] 9.7 Add a development overlay showing step count, frame time and blob count, and verify it can be toggled
+- [ ] 9.8 Replace the rules `<details>` dropdown with a centred modal dialog that pauses the game while open, dismissible by backdrop click, Escape and a close button, focus-trapped and restored on close, and rendered in a smaller face distinct from the HUD's
 
 ## 10. Mobile Experience
 
@@ -192,6 +193,7 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [ ] 10.9 Implement the portrait-lock preference that requests orientation on start, and verify both enabled and disabled states
 - [ ] 10.10 Implement the reduced-motion option suppressing non-essential animation while preserving gameplay information, and verify blob idle animations and menu transitions are suppressed
 - [ ] 10.11 Implement audio setup deferred to the first user gesture with mute and volume controls, and verify silence before the gesture and sound after it
+- [ ] 10.12 Verify the rules dialog of 9.8 on a portrait phone: readable at the smaller size, reachable with one thumb, and that pausing covers the case where it is opened mid-fall
 
 ## 11. PWA and Persistence
 

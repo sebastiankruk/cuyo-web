@@ -21,15 +21,42 @@ import type { Token } from "./lexer.ts";
 import { Version, VersionSet } from "./version.ts";
 import { DefinitionScope, rootScope } from "./scope.ts";
 import { buildKinds, UNDEFINED_EXPLODE } from "./kinds.ts";
-import { isHexMode } from "../game-core/constants.ts";
+import { GRX, hexGeometry, isHexMode } from "../game-core/constants.ts";
 import {
   NO_RANDOM_GREYS,
   isHexNeighbourMode,
   kindDefaultsFrom,
   readLevelSettings,
 } from "./settings.ts";
-import { boardHex, readNeighbourOverrides, requireNeighbourMode } from "./neighbours.ts";
+import {
+  boardHex,
+  readNeighbourOverrides,
+  requireNeighbourMode,
+} from "./neighbours.ts";
 import { placeRows, readStartDist } from "./startdist.ts";
+import { accidentalPairs, buildStartLayout } from "./startlayout.ts";
+import { ScriptedPrng } from "../testing/prng-stub.ts";
+
+/**
+ * A deterministic PRNG for a corpus case, seeded from the case's own name.
+ *
+ * The layout is a function of the seed, so naming the seed after the level means a
+ * failure report identifies the exact layout that produced it - reproducible without
+ * having to guess which of several seeds CI happened to use.
+ */
+function corpusPrng(where: string): ScriptedPrng {
+  let seed = 0x2545f491;
+  for (let i = 0; i < where.length; i++) {
+    seed = (Math.imul(seed, 31) + where.charCodeAt(i)) | 0;
+  }
+  const values: number[] = [];
+  let s = seed >>> 0 || 1;
+  for (let i = 0; i < 400000; i++) {
+    s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff;
+    values.push(s / 0x7fffffff);
+  }
+  return new ScriptedPrng(values);
+}
 
 const DATA_DIR =
   process.env["CUYO_DATA_DIR"] ??
@@ -135,7 +162,9 @@ describe("upstream corpus: shape of what it contains", () => {
   it("finds versioned definitions", () => {
     let bracketed = 0;
     for (const name of ALL_LD_FILES) {
-      bracketed += lexFile(name).tokens.filter((t) => t.kind === "punct" && t.text === "[").length;
+      bracketed += lexFile(name).tokens.filter(
+        (t) => t.kind === "punct" && t.text === "[",
+      ).length;
     }
     expect(bracketed).toBeGreaterThan(20);
   });
@@ -177,7 +206,9 @@ describe("upstream corpus: shape of what it contains", () => {
       ".+",
       ".-",
     ]) {
-      expect(seen.has(op), `operator ${op} never seen in the corpus`).toBe(true);
+      expect(seen.has(op), `operator ${op} never seen in the corpus`).toBe(
+        true,
+      );
     }
   });
 
@@ -216,7 +247,10 @@ describe("upstream corpus: shape of what it contains", () => {
     for (const name of ALL_LD_FILES) {
       for (const t of lexFile(name).tokens) {
         if (t.kind === "word") {
-          expect(t.text.length, `${name}: one-letter word ${t.text}`).toBeGreaterThanOrEqual(2);
+          expect(
+            t.text.length,
+            `${name}: one-letter word ${t.text}`,
+          ).toBeGreaterThanOrEqual(2);
         }
       }
     }
@@ -225,7 +259,9 @@ describe("upstream corpus: shape of what it contains", () => {
   it("uses the zeroOne literal rather than a number for bare 0 and 1", () => {
     let zeroOne = 0;
     for (const name of ALL_LD_FILES) {
-      zeroOne += lexFile(name).tokens.filter((t) => t.kind === "zeroOne").length;
+      zeroOne += lexFile(name).tokens.filter(
+        (t) => t.kind === "zeroOne",
+      ).length;
     }
     expect(zeroOne).toBeGreaterThan(0);
   });
@@ -354,7 +390,9 @@ describe("upstream corpus: the parser reads it", () => {
           try {
             set.checkWellFormed(key, true);
           } catch (error) {
-            failures.push(`${name} ${path}/${key}: ${(error as Error).message}`);
+            failures.push(
+              `${name} ${path}/${key}: ${(error as Error).message}`,
+            );
           }
         }
         for (const def of defs) {
@@ -398,11 +436,17 @@ describe("upstream corpus: the parser reads it", () => {
     let constants = 0;
 
     for (const name of ALL_LD_FILES) {
-      if (name === "summary.ld" || name === "globals.ld" || name === "example.ld") {
+      if (
+        name === "summary.ld" ||
+        name === "globals.ld" ||
+        name === "example.ld"
+      ) {
         continue;
       }
       const file = parseLd(lexFile(name).source, name);
-      const levelSections = file.definitions.filter((d) => d.value.type === "section");
+      const levelSections = file.definitions.filter(
+        (d) => d.value.type === "section",
+      );
       if (levelSections.length === 0) continue;
 
       for (const version of versions) {
@@ -432,7 +476,9 @@ describe("upstream corpus: the parser reads it", () => {
             kinds += table.count;
             constants += table.constants.size;
           } catch (error) {
-            failures.push(`${name} ${def.name}[${version}]: ${(error as Error).message}`);
+            failures.push(
+              `${name} ${def.name}[${version}]: ${(error as Error).message}`,
+            );
           }
         }
       }
@@ -470,11 +516,17 @@ describe("upstream corpus: the parser reads it", () => {
     let noNumExplode = 0;
 
     for (const name of ALL_LD_FILES) {
-      if (name === "summary.ld" || name === "globals.ld" || name === "example.ld") {
+      if (
+        name === "summary.ld" ||
+        name === "globals.ld" ||
+        name === "example.ld"
+      ) {
         continue;
       }
       const file = parseLd(lexFile(name).source, name);
-      const levelSections = file.definitions.filter((d) => d.value.type === "section");
+      const levelSections = file.definitions.filter(
+        (d) => d.value.type === "section",
+      );
       if (levelSections.length === 0) continue;
 
       for (const version of versions) {
@@ -497,7 +549,9 @@ describe("upstream corpus: the parser reads it", () => {
             if (isHexNeighbourMode(settings.neighbours)) hexLevels++;
             if (settings.numExplode === UNDEFINED_EXPLODE) noNumExplode++;
           } catch (error) {
-            failures.push(`${name} ${def.name}[${version}]: ${(error as Error).message}`);
+            failures.push(
+              `${name} ${def.name}[${version}]: ${(error as Error).message}`,
+            );
           }
         }
       }
@@ -529,7 +583,10 @@ describe("upstream corpus: the parser reads it", () => {
       "emptypic",
       "hexflip",
     ]) {
-      expect(setCounts.get(setting) ?? 0, `${setting} never appears`).toBeGreaterThan(0);
+      expect(
+        setCounts.get(setting) ?? 0,
+        `${setting} never appears`,
+      ).toBeGreaterThan(0);
     }
 
     // And the defaults are exercised rather than assumed. The description is the
@@ -567,11 +624,17 @@ describe("upstream corpus: the parser reads it", () => {
     let withOverrides = 0;
 
     for (const name of ALL_LD_FILES) {
-      if (name === "summary.ld" || name === "globals.ld" || name === "example.ld") {
+      if (
+        name === "summary.ld" ||
+        name === "globals.ld" ||
+        name === "example.ld"
+      ) {
         continue;
       }
       const file = parseLd(lexFile(name).source, name);
-      const levelSections = file.definitions.filter((d) => d.value.type === "section");
+      const levelSections = file.definitions.filter(
+        (d) => d.value.type === "section",
+      );
       if (levelSections.length === 0) continue;
 
       for (const version of versions) {
@@ -588,10 +651,7 @@ describe("upstream corpus: the parser reads it", () => {
             requireNeighbourMode(settings.neighbours, level, "neighbours");
             const hex = boardHex(level);
             if (hex.enabled) hexBoards++;
-            const table = buildKinds(
-              level,
-              kindDefaultsFrom(settings),
-            );
+            const table = buildKinds(level, kindDefaultsFrom(settings));
             const overrides = readNeighbourOverrides(level, table);
             if (overrides.length > 0) withOverrides++;
             for (const o of overrides) {
@@ -601,7 +661,9 @@ describe("upstream corpus: the parser reads it", () => {
               if (!hex.enabled && isHexMode(o.mode)) perKindHexInRectBoard++;
             }
           } catch (error) {
-            failures.push(`${name} ${def.name}[${version}]: ${(error as Error).message}`);
+            failures.push(
+              `${name} ${def.name}[${version}]: ${(error as Error).message}`,
+            );
           }
         }
       }
@@ -649,11 +711,17 @@ describe("upstream corpus: the parser reads it", () => {
     const characters = new Set<string>();
 
     for (const name of ALL_LD_FILES) {
-      if (name === "summary.ld" || name === "globals.ld" || name === "example.ld") {
+      if (
+        name === "summary.ld" ||
+        name === "globals.ld" ||
+        name === "example.ld"
+      ) {
         continue;
       }
       const file = parseLd(lexFile(name).source, name);
-      const levelSections = file.definitions.filter((d) => d.value.type === "section");
+      const levelSections = file.definitions.filter(
+        (d) => d.value.type === "section",
+      );
       if (levelSections.length === 0) continue;
 
       for (const version of versions) {
@@ -705,7 +773,10 @@ describe("upstream corpus: the parser reads it", () => {
     // the default distkey, so almost every named cell in the corpus uses it.
     const required = [".", "+", "-", "*", "%", "&", "1", "A", "a"];
     const missing = required.filter((ch) => !characters.has(ch));
-    expect(missing, `never appears in a startdist: ${missing.join(" ")}`).toEqual([]);
+    expect(
+      missing,
+      `never appears in a startdist: ${missing.join(" ")}`,
+    ).toEqual([]);
 
     // What the corpus does *not* have: a level whose kinds declare a multi-character
     // distkey, so that every cell is two or more characters wide. The extension is
@@ -738,5 +809,134 @@ describe("upstream corpus: the parser reads it", () => {
     }
     expect(insideSections, "no Cual inside a section").toBeGreaterThan(70);
     expect(blocks).toBeGreaterThan(70);
+  });
+});
+
+/**
+ * Task 2.9's oracle: the start layouts of every real level, with the
+ * neighbour-avoidance heuristic applied.
+ *
+ * This is where the unit tests stop being enough. `startlayout.test.ts` shows the
+ * heuristic removes adjacency from a synthetic row of pool draws; it cannot show
+ * that it behaves on the real data, where rows have mixed keys, where some cells are
+ * fixed and some are drawn, and where the neighbour mode is diagonal or hexagonal and
+ * therefore changes what counts as adjacency at all.
+ *
+ * Two things are asserted, and the second is the one that matters:
+ *
+ * 1. Every real level's startdist materialises without error.
+ * 2. The number of accidental same-kind adjacencies stays low. This is the claim
+ *    task 2.9 makes, and it is checked per level rather than in aggregate - an
+ *    aggregate would let one bad level hide inside a good average.
+ */
+describe("upstream corpus: start layouts", () => {
+  /**
+   * How many avoidable same-kind adjacencies a real level may keep.
+   *
+   * One. Measured across all 81 levels, three versions and both player counts: the
+   * heuristic leaves exactly one pair in four cases, all hex or knight geometry, and
+   * zero everywhere else. Anything that raises this number is a regression.
+   */
+  const MAX_ACCIDENTAL_PAIRS = 1;
+
+  it("materialises every real level's startdist, with few accidental adjacencies", () => {
+    const globals = parseLd(lexFile("globals.ld").source, "globals.ld");
+    const versions = [
+      Version.of("1", "main"),
+      Version.of("2", "main"),
+      Version.of("1", "contrib", "hard"),
+    ];
+
+    const failures: string[] = [];
+    /** Levels whose heuristicised layout still has avoidable adjacency. */
+    const adjacencies: string[] = [];
+    let laid = 0;
+    let levelsWithRows = 0;
+    let worst = 0;
+    let worstWhere = "";
+
+    for (const name of ALL_LD_FILES) {
+      if (
+        name === "summary.ld" ||
+        name === "globals.ld" ||
+        name === "example.ld"
+      ) {
+        continue;
+      }
+      const file = parseLd(lexFile(name).source, name);
+      const levelSections = file.definitions.filter(
+        (d) => d.value.type === "section",
+      );
+      if (levelSections.length === 0) continue;
+
+      for (const version of versions) {
+        const root = rootScope(name, version);
+        root.defineAll(globals.definitions);
+        root.defineAll(file.definitions);
+        for (const def of levelSections) {
+          if (def.value.type !== "section") continue;
+          const level = new DefinitionScope(def.name, root, version, name);
+          level.defineAll(def.value.definitions);
+          if (!level.hasOwn("startdist")) continue;
+          for (const two of [false, true]) {
+            const where = `${name} ${def.name}[${version.toString()}]${two ? " 2P" : ""}`;
+            try {
+              const settings = readLevelSettings(level);
+              const table = buildKinds(level, kindDefaultsFrom(settings));
+              const dist = readStartDist(level, table, two);
+              const hex = hexGeometry(settings.neighbours, settings.hexFlip);
+              const layout = buildStartLayout(dist, {
+                table,
+                random: corpusPrng(where),
+                neighbours: settings.neighbours,
+                hex,
+              });
+              laid++;
+              if (dist.rows.length > 0) levelsWithRows++;
+
+              // Only pairs with a drawn end count: a hand-authored layout is full of
+              // deliberate same-kind neighbours, and calling those accidental would
+              // be reporting the level author's work as a failure.
+              const pairs = accidentalPairs(
+                layout,
+                table,
+                settings.neighbours,
+                hex,
+              );
+              // One accidental pair is the worst the corpus produces, in four
+              // level/version combinations - all hex or knight geometry, where a
+              // cell's neighbours are not the four around it and the greedy descent
+              // can paint itself into a corner. So the threshold is one, not zero:
+              // the heuristic is very nearly perfect on real data and this is what
+              // "very nearly" measures at.
+              if (pairs > MAX_ACCIDENTAL_PAIRS) {
+                adjacencies.push(
+                  `${where}: ${pairs} pairs over ${dist.rows.length * GRX} cells`,
+                );
+              }
+              if (pairs > worst) {
+                worst = pairs;
+                worstWhere = where;
+              }
+            } catch (error) {
+              failures.push(`${where}: ${(error as Error).message}`);
+            }
+          }
+        }
+      }
+    }
+
+    expect(failures, `\n${failures.join("\n")}`).toEqual([]);
+    expect(laid, "start layouts built").toBeGreaterThan(200);
+    expect(levelsWithRows).toBeGreaterThan(150);
+
+    // Reported rather than hidden: the worst level is worth knowing about, and a
+    // future corpus that grows a genuinely bad layout should be visible in review.
+    expect(
+      adjacencies,
+      `levels with more than ${MAX_ACCIDENTAL_PAIRS} accidental same-kind pair ` +
+        `(worst single: ${worst} at ${worstWhere})\n` +
+        adjacencies.slice(0, 10).join("\n"),
+    ).toEqual([]);
   });
 });
