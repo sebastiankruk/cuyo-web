@@ -642,6 +642,24 @@ button::-moz-focusring {
   pointer-events: auto;
 }
 
+/*
+ * A level this engine cannot play.
+ *
+ * Sits in the actions row rather than replacing the card, so the level still reads as a
+ * level - it exists, it has a name and an author - with the reason attached. The muted
+ * colour is deliberate: it should not compete for attention with the 78 that can be
+ * played.
+ */
+.levelCard__blocked {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.levelCard:has(.levelCard__blocked) {
+  border-style: dashed;
+}
+
 .levelCard__actions {
   display: flex;
   align-items: center;

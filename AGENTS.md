@@ -27,6 +27,20 @@ been wrong twice.
 - The tunnel's ingress config and the DNS record live in the user's Cloudflare
   account, not here.
 
+## Versions and branches
+
+- Work on a branch and open a pull request. `main` is always green and always something
+  the user could have handed to someone. `make check` is the gate and CI runs the same
+  eight jobs.
+- Versions follow semver with a `0.` major, and are cut when the app is worth _using_
+  rather than when a group of tasks closes. `CHANGELOG.md` says what a player can do in
+  each version, because "42 tasks done" is not something a player can tell.
+- `docs/roadmap.md` holds the sequence and the reasoning. Read it before choosing what
+  to work on; the ordering rule is "changes what a player sees or does" first, then
+  "can it be verified without a human".
+- A pull request that changes what the app looks like needs a screenshot from the user
+  before it lands. See the honesty rule above.
+
 ## Commands
 
 - `make check` is what CI runs, and what to run before claiming something works.

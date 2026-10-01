@@ -228,13 +228,25 @@ function LevelCard({
         is reached straight after. Its label names the action rather than the level, so
         a screen reader says what pressing it does.
       */}
-      <button
-        type="button"
-        className="levelCard__hit"
-        onClick={() => onPick(entry, chosen)}
-      >
-        Play {entry.name}
-      </button>
+      {entry.supported ? (
+        <button
+          type="button"
+          className="levelCard__hit"
+          onClick={() => onPick(entry, chosen)}
+        >
+          Play {entry.name}
+        </button>
+      ) : (
+        /*
+          No hit target at all rather than a disabled one. A disabled button is
+          unreachable by keyboard, so a screen-reader user could not find out *why* the
+          level is unavailable - and the reason is the only interesting thing about it.
+          The reason is in the card's text instead.
+        */
+        <span className="levelCard__blocked" role="note">
+          {entry.unsupportedReason}
+        </span>
+      )}
       <span className="levelCard__body">
         <span className="levelCard__name">{entry.name}</span>
         {entry.author !== "" && (
@@ -250,7 +262,7 @@ function LevelCard({
         </span>
       </span>
       <span className="levelCard__actions">
-        {offered.length > 1 && (
+        {entry.supported && offered.length > 1 && (
           <span
             className="levelCard__difficulties"
             role="group"
@@ -274,12 +286,14 @@ function LevelCard({
           this only says what pressing the card does and repeats the chosen difficulty
           where the finger is about to land.
         */}
-        <span className="levelCard__play" aria-hidden="true">
-          Play
-          {chosen !== "normal" && (
-            <span className="levelCard__playSuffix"> {chosen}</span>
-          )}
-        </span>
+        {entry.supported && (
+          <span className="levelCard__play" aria-hidden="true">
+            Play
+            {chosen !== "normal" && (
+              <span className="levelCard__playSuffix"> {chosen}</span>
+            )}
+          </span>
+        )}
       </span>
     </div>
   );

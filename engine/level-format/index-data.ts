@@ -114,6 +114,18 @@ export interface LevelIndexEntry {
   readonly goalKinds: readonly string[];
   /** The count of grey kinds, for the catalogue's marker. */
   readonly greyKinds: number;
+  /**
+   * Whether this engine can actually play the level, at every difficulty it offers.
+   *
+   * False only when a difficulty asks for a neighbour mode that is not implemented -
+   * `DreiD` and `ThreeD`. Such a level is still listed, because it exists and hiding
+   * it would be a silent omission, but it must not be offered as playable: the mode
+   * falls back to *no* neighbours, so nothing could ever connect and the level could
+   * not be won. Discovering that after a minute of play is worse than being told.
+   */
+  readonly supported: boolean;
+  /** Why it is unsupported, when it is. Empty when it is supported. */
+  readonly unsupportedReason: string;
 }
 
 /** The whole catalogue. */

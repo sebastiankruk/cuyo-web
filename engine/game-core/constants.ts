@@ -124,7 +124,11 @@ export function hexGeometry(mode: number, flip = 0): HexGeometry {
  * side the column is on - in a two-player game the two halves of the board can be
  * flipped independently, which is why `hexflip` has four values and not two.
  */
-export function columnShift(hex: HexGeometry, right: boolean, x: number): boolean {
+export function columnShift(
+  hex: HexGeometry,
+  right: boolean,
+  x: number,
+): boolean {
   if (!hex.enabled) return false;
   // `x & 1` is 0 or 1, and C++ promotes the bool `flip` to 0 or 1 the same way,
   // so the comparison is against a number rather than a boolean.
@@ -230,6 +234,33 @@ const HEX4_UNSHIFTED: readonly Offset[] = [
  * offsets laid out on a square grid - which is what upstream does, and is why
  * `3d.ld`'s per-kind hex modes work on a board that is not itself hex.
  *
+/**
+ * Whether this engine implements a neighbour mode.
+ *
+ * `neighbourOffsets` answers for every mode rather than refusing the unimplemented
+ * ones, because a level that asks for an unknown mode should still render a board - but
+ * `ThreeD` falls back to *no* neighbours, which means nothing can ever connect and the
+ * level cannot be won. That is different from a mode that merely draws oddly, so it has
+ * to be visible rather than merely handled.
+ *
+ * `DreiD` is the one level affected, and it is listed in the catalogue. Offering it as
+ * playable would be a lie the player only discovers after a minute of play, so the
+ * catalogue gates on this and says why.
+ */
+export function isImplementedNeighbourMode(mode: NeighbourMode): boolean {
+  return mode !== NeighbourMode.ThreeD;
+}
+
+/** Why a mode is unavailable, for a diagnostic rather than a bare "no". */
+export function unsupportedNeighbourReason(mode: NeighbourMode): string | null {
+  if (isImplementedNeighbourMode(mode)) return null;
+  return (
+    `neighbours=${mode} needs a third board dimension, which this engine does not ` +
+    `implement. The level is listed because it exists, but it cannot be played.`
+  );
+}
+
+/*
  * `ThreeD` is not implemented and falls back to no neighbours; only `3d.ld`
  * uses it, and that level is not yet ported.
  */
