@@ -182,14 +182,21 @@ const SEED_HUES = [200, 45, 160, 300, 265];
  * subsequent kind gets a colour chosen to be far from all the earlier ones. Which is
  * what makes it positional: two levels with four kinds look the same.
  */
-export function maximinColours(count: number, dark: boolean): string[] {
+export function maximinColours(
+  count: number,
+  dark: boolean,
+  anchors: readonly string[] = [],
+): string[] {
   if (count <= 0) return [];
   const grid = candidateGrid(dark);
+  // Colours the ordinary kinds must also stay clear of, as measured targets rather than
+  // as members of the returned set.
+  const fixed = anchors.map((css) => hslCandidate(...hslParts(css)));
   let best: Candidate[] = [];
   let bestMinimum = -1;
   for (const hue of SEED_HUES) {
-    const attempt = sample(grid, hue, dark, count);
-    const minimum = closestIn(attempt);
+    const attempt = sample(grid, hue, dark, count, fixed);
+    const minimum = closestIn([...fixed, ...attempt]);
     if (minimum > bestMinimum) {
       bestMinimum = minimum;
       best = attempt;
@@ -198,22 +205,29 @@ export function maximinColours(count: number, dark: boolean): string[] {
   return best.map((c) => c.css);
 }
 
-/** One greedy pass from a given seed. */
+/** One greedy pass from a given seed, staying clear of `fixed`. */
 function sample(
   grid: readonly Candidate[],
   hue: number,
   dark: boolean,
   count: number,
+  fixed: readonly Candidate[],
 ): Candidate[] {
-  const chosen: Candidate[] = [seed(hue, dark)];
+  const start = seed(hue, dark);
   // `far[i]` is the distance from candidate i to its nearest chosen colour, which is
   // what keeps the inner loop linear in the grid rather than quadratic. It has to be
-  // seeded from the first choice: left at infinity, the first pick is simply `grid[0]`
-  // and the seed is decoration.
+  // seeded from every colour already spoken for - the seed *and* the anchors - or the
+  // first pick ignores them.
   const far = new Array<number>(grid.length);
   for (let i = 0; i < grid.length; i++) {
-    far[i] = deltaE(grid[i]!.lab, chosen[0]!.lab);
+    let d = deltaE(grid[i]!.lab, start.lab);
+    for (const f of fixed) {
+      const fd = deltaE(grid[i]!.lab, f.lab);
+      if (fd < d) d = fd;
+    }
+    far[i] = d;
   }
+  const chosen: Candidate[] = [];
   while (chosen.length < count) {
     let bestIndex = 0;
     let bestDistance = -1;
@@ -236,6 +250,15 @@ function sample(
   return chosen;
 }
 
+/** Splits an `hsl(H S% L%)` string into the three numbers `hslCandidate` wants. */
+function hslParts(css: string): [number, number, number] {
+  const m = /^hsl\((\d+(?:\.\d+)?) (\d+(?:\.\d+)?)% (\d+(?:\.\d+)?)%\)$/.exec(
+    css,
+  );
+  if (m === null) return [200, 58, 52];
+  return [Number(m[1]), Number(m[2]), Number(m[3])];
+}
+
 /** The closest pair in a chosen set, by ΔE. */
 function closestIn(chosen: readonly Candidate[]): number {
   let worst = Number.POSITIVE_INFINITY;
@@ -246,6 +269,17 @@ function closestIn(chosen: readonly Candidate[]): number {
     }
   }
   return worst;
+}
+
+/** The goal blobs' colour. Fixed, so a goal blob is recognisable across levels. */
+function goalColour(dark: boolean): string {
+  return `hsl(${GOAL_HUE} ${dark ? 55 : 50}% ${dark ? 52 : 42}%)`;
+}
+
+/** The `index`th grey, in lightness steps so several greys in a level stay apart. */
+function greyColour(dark: boolean, index: number): string {
+  const l = GREY_LIGHTNESS[index % GREY_LIGHTNESS.length] ?? 58;
+  return `hsl(0 0% ${dark ? l - 12 : l}%)`;
 }
 
 /**
@@ -300,7 +334,22 @@ export function buildPalette(
   const ordinary = kinds
     .map((_, index) => index)
     .filter((index) => kinds[index]?.role === "colour");
-  const colours = maximinColours(ordinary.length, dark);
+  const has = (role: KindRole): boolean => kinds.some((k) => k.role === role);
+  // The role colours are fixed, and the ordinary kinds are chosen *around* them rather
+  // than independently of them.
+  //
+  // That ordering is the whole point, and getting it wrong was a real defect: the goal
+  // hue is a constant, so dropping it in after the palette had been chosen made
+  // "can a player tell a goal blob from an ordinary one" a matter of luck. Measured over
+  // the 76 levels that have a goal kind, three landed closer than the ΔE 20 the palette
+  // guarantees everywhere else — and the worst of them was `angst.ld` at ΔE 10, which
+  // is *Frightened balls*, a level with a grass kind sitting ΔE 10 from an ordinary one.
+  // Both carry a marker shape, so neither is invisible; but a goal blob you have to look
+  // twice at is a goal blob the marker was supposed to make unnecessary.
+  const anchors: string[] = [];
+  if (has("grass")) anchors.push(goalColour(dark));
+  if (has("grey")) anchors.push(greyColour(dark, 0));
+  const colours = maximinColours(ordinary.length, dark, anchors);
   const palette = new Map<number, KindColour>();
 
   let greyIndex = 0;
@@ -315,19 +364,13 @@ export function buildPalette(
       continue;
     }
     if (role === "grey") {
-      const l = GREY_LIGHTNESS[greyIndex % GREY_LIGHTNESS.length] ?? 58;
+      const colour = greyColour(dark, greyIndex);
       greyIndex++;
-      palette.set(i, {
-        colour: `hsl(0 0% ${dark ? l - 12 : l}%)`,
-        marker: "square",
-      });
+      palette.set(i, { colour, marker: "square" });
       continue;
     }
     if (role === "grass") {
-      palette.set(i, {
-        colour: `hsl(${GOAL_HUE} ${dark ? 55 : 50}% ${dark ? 52 : 42}%)`,
-        marker: "dot",
-      });
+      palette.set(i, { colour: goalColour(dark), marker: "dot" });
       continue;
     }
     palette.set(i, {

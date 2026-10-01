@@ -178,13 +178,87 @@ describe("buildPalette", () => {
   });
 
   it("does not depend on which kinds the level happens to have", () => {
-    // Two levels with five colours should look the same, since the assignment is
-    // positional. That is the point: the alternative was a hash of names the level
-    // author chose, which is exactly how two kinds came to share a colour.
-    const withGoal = [...kinds(5), { role: "grass" as const }];
-    const palette = buildPalette(withGoal);
-    for (let i = 0; i < 5; i++) {
-      expect(colourFor(palette, i)).toBe(colourFor(buildPalette(kinds(5)), i));
+    // Two levels with five colours get the same five colours, since the assignment is
+    // positional. That is the point: the alternative was a hash of the picture names the
+    // level author chose, which is exactly how two kinds came to share a colour.
+    //
+    // Two things this deliberately does *not* claim, both of which I got wrong first:
+    //
+    // - that adding a goal kind changes nothing. It does, on purpose: the goal hue is a
+    //   fixed constant, so the ordinary kinds are chosen to stay clear of it.
+    // - that reordering the kind table leaves each index's colour alone. It does not, and
+    //   it should not: a kind's colour comes from its position *among the ordinary
+    //   kinds*, so moving a goal kind earlier moves the ordinary ones up a place. What is
+    //   invariant is the set.
+    const shapeA: KindRole[] = [
+      "colour",
+      "colour",
+      "grass",
+      "colour",
+      "colour",
+      "colour",
+      "grey",
+    ];
+    const shapeB: KindRole[] = [
+      "colour",
+      "grey",
+      "colour",
+      "colour",
+      "colour",
+      "grass",
+      "colour",
+    ];
+    const a = buildPalette(shapeA.map((role) => ({ role })));
+    const b = buildPalette(shapeB.map((role) => ({ role })));
+    const ordinary = (p: typeof a, shape: readonly KindRole[]): string[] =>
+      shape
+        .map((role, i) => (role === "colour" ? colourFor(p, i) : null))
+        .filter((c): c is string => c !== null)
+        .sort();
+    expect(ordinary(a, shapeA)).toEqual(ordinary(b, shapeB));
+    // And the role colours travel with their role, not their index.
+    const at = (
+      p: typeof a,
+      shape: readonly KindRole[],
+      role: KindRole,
+    ): string => colourFor(p, shape.indexOf(role));
+    expect(at(a, shapeA, "grass")).toBe(at(b, shapeB, "grass"));
+    expect(at(a, shapeA, "grey")).toBe(at(b, shapeB, "grey"));
+  });
+
+  it("chooses the ordinary colours clear of the fixed goal and grey", () => {
+    // The defect this pins: the goal hue is a constant, so choosing the ordinary colours
+    // first and dropping the goal in afterwards made "can a player tell a goal blob from
+    // an ordinary one" a matter of luck. Over the 76 levels with a goal kind, three
+    // landed below the ΔE 20 the palette guarantees everywhere else, and the worst was
+    // this one at ΔE 10.
+    for (const n of [2, 4, 6, 14]) {
+      for (const dark of [false, true]) {
+        const table = [
+          ...kinds(n),
+          { role: "grass" as const },
+          { role: "grey" as const },
+        ];
+        const palette = buildPalette(table, {
+          background: dark ? "rgb(0,0,0)" : "#ffffff",
+        });
+        const goal = labOfHsl(colourFor(palette, n))!;
+        const grey = labOfHsl(colourFor(palette, n + 1))!;
+        for (let i = 0; i < n; i++) {
+          const d = deltaE(goal, labOfHsl(colourFor(palette, i))!);
+          expect(
+            d,
+            `${n} kinds, ${dark ? "dark" : "light"}: ordinary ${i} is ΔE ${d.toFixed(1)} ` +
+              `from the goal colour`,
+          ).toBeGreaterThanOrEqual(MINIMUM_DELTA_E);
+          // A grey is desaturated, so it is further from a saturated colour than almost
+          // anything else in the palette. Held separately because it is a different
+          // relationship, not a smaller version of the same one.
+          expect(
+            deltaE(grey, labOfHsl(colourFor(palette, i))!),
+          ).toBeGreaterThan(MINIMUM_DELTA_E);
+        }
+      }
     }
   });
 
@@ -353,6 +427,29 @@ describe("the real corpus", () => {
 
       const pair = closestPair(ordinary.map((k) => k.colour));
       measured.push([where, ordinary.length, pair.delta]);
+
+      // The goal colour is a constant, so the ordinary kinds have to be chosen clear of
+      // it. Checked here as well as synthetically, because the gap was only ever visible
+      // in the corpus: `angst.ld` sat at ΔE 10 from its goal colour while every ordinary
+      // pair in it was comfortably apart. Nothing in the level-to-level test would have
+      // seen it, since that test only looks at ordinary pairs.
+      const goalIndex = level.kinds.findIndex((k) => k.role === "grass");
+      if (goalIndex >= 0 && ordinary.length <= MAX_SEPARABLE_KINDS) {
+        const goal = labOfHsl(colourFor(palette, goalIndex))!;
+        let nearest = Number.POSITIVE_INFINITY;
+        for (let i = 0; i < level.kinds.length; i++) {
+          if (i === goalIndex || level.kinds[i]?.role !== "colour") continue;
+          nearest = Math.min(
+            nearest,
+            deltaE(goal, labOfHsl(colourFor(palette, i))!),
+          );
+        }
+        if (nearest < MINIMUM_DELTA_E) {
+          bad.push(
+            `${where}: goal colour is ΔE ${nearest.toFixed(1)} from an ordinary kind`,
+          );
+        }
+      }
 
       if (ordinary.length > MAX_SEPARABLE_KINDS) {
         beyondColour.push(

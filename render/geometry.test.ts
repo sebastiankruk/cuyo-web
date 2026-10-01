@@ -13,6 +13,7 @@ import {
   hexGeometry,
 } from "../engine/game-core/constants.ts";
 import {
+  MARKER_RADIUS,
   boardHeight,
   boardWidth,
   borderBand,
@@ -28,7 +29,7 @@ import {
   stubRect,
   stubRadius,
 } from "./geometry.ts";
-import type { BoardFrame } from "./geometry.ts";
+import type { BoardFrame, Contacts } from "./geometry.ts";
 
 const SIZE = 32;
 const rect: BoardFrame = {
@@ -277,6 +278,51 @@ describe("stableHue", () => {
     for (const k of ["", "inGruen", "zhlen"]) {
       expect(stableHue(k)).toBe(stableHue(k));
     }
+  });
+});
+
+describe("the blob marker", () => {
+  it("is a mark on the blob rather than the blob", () => {
+    // The relationship that matters. `stubRect` insets an isolated blob and then pulls
+    // its free edges inwards, so a blob is much narrower than its cell, and a marker
+    // sized as a fraction of the *cell* can easily end up nearly as wide as the thing it
+    // is marking. It did: 91%, which made a row of goal blobs read as a row of white
+    // circles in green pills.
+    //
+    // Both numbers are asserted together because either can be changed on its own, and
+    // a change to `stubRect` would quietly undo the marker's size.
+    const noContacts: Contacts = {
+      left: false,
+      right: false,
+      up: false,
+      down: false,
+    };
+    const blob = stubRect(rect, noContacts);
+    const marker = MARKER_RADIUS * 2 * SIZE;
+    const fraction = marker / blob.w;
+    expect(
+      fraction,
+      `marker is ${(fraction * 100).toFixed(0)}% of the blob's width`,
+    ).toBeGreaterThan(0.25);
+    expect(
+      fraction,
+      `marker is ${(fraction * 100).toFixed(0)}% of the blob's width`,
+    ).toBeLessThan(0.6);
+  });
+
+  it("stays inside the blob even when the blob is at its widest", () => {
+    // A blob in the middle of a group spans the full padded cell, so the marker is a
+    // larger fraction of it there. It must still fit, or the mark spills over the seam
+    // and onto the neighbour.
+    const allTouching: Contacts = {
+      left: true,
+      right: true,
+      up: true,
+      down: true,
+    };
+    const blob = stubRect(rect, allTouching);
+    expect(MARKER_RADIUS * 2 * SIZE).toBeLessThan(blob.w);
+    expect(MARKER_RADIUS * 2 * SIZE).toBeLessThan(blob.h);
   });
 });
 

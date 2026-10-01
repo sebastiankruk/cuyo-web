@@ -30,6 +30,17 @@ something a player can tell.
   Colour cannot separate 153 things — that needs distinct shapes, which is the next piece
   of work on the roadmap. Every other level is verified to keep its kinds at least 20 ΔE
   apart, which is a difference you can see at cell size.
+- **The blobs that say "clear me" and the ones that say "grey" are marked with a mark
+  again, rather than being mostly mark.** The mark was 91% as wide as the blob it sat
+  on, so a row of goal blobs read as a row of white circles in green pills. The shape
+  still distinguished goal from grey, so nothing looked broken — it just stopped looking
+  like a marked blob, which is the whole point of the mark. It is now 43% of the blob.
+- **The colours are now chosen to be clear of the goal and grey colours too, not only
+  clear of each other.** The goal colour is a fixed green, and the ordinary colours used
+  to be chosen without reference to it and then have it dropped in beside them. Whether
+  you could tell a goal blob from an ordinary one was therefore luck: in _Frightened
+  balls_ the goal green sat ΔE 10 from an ordinary kind — close to the same colour. The
+  ordinary colours now avoid it, and that level's is ΔE 40.
 
 ### Fixed
 

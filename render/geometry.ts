@@ -212,8 +212,27 @@ export function stubRadius(f: BoardFrame): number {
  * is geometry.
  */
 
-/** Radius of the marker's inner shape, as a fraction of the cell. */
-export const MARKER_RADIUS = 0.16;
+/**
+ * Radius of the marker's inner shape, as a fraction of the cell.
+ *
+ * A fraction of the cell, but the number that matters is its fraction of the *blob*,
+ * because that is what the eye compares. An isolated blob is 35% of the cell wide -
+ * `stubRect` insets it by 6% and then pulls the free edges in to 30% - so a mark
+ * wider than about a fifth of the cell stops reading as a mark on a blob and becomes
+ * the blob.
+ *
+ * It was 0.16, which is a diameter of 32% of the cell: **91% of the blob's width.** A
+ * screenshot of a dark level showed the consequence exactly - a row of goal blobs read
+ * as a row of white circles sitting in green pills, and the greys as grey squares with a
+ * white bar across them. The mark had become the object. The shape distinction still
+ * worked, so nothing looked *broken*; it just stopped looking like a marked blob, which
+ * is the thing the marker is for.
+ *
+ * 0.075 puts the diameter at 43% of the blob: unmistakably a mark, still solid enough
+ * to see on a phone. `geometry.test.ts` ties the two numbers together so they cannot
+ * drift apart, since a change to `stubRect` would silently undo this.
+ */
+export const MARKER_RADIUS = 0.075;
 
 /** A colour that reads against the blob's own, for the marker's inner shape. */
 export function markerInk(colour: string): string {
