@@ -213,6 +213,9 @@ button::-moz-focusring {
 .play__title {
   display: grid;
   line-height: 1.2;
+  /* Shrinks before anything else, and truncates rather than disappearing: this is the
+     only thing in the bar that says which level you are playing. */
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -223,6 +226,7 @@ button::-moz-focusring {
 
 .play__stats {
   margin-left: auto;
+  flex: none;
   display: flex;
   gap: 0.75rem;
   font-variant-numeric: tabular-nums;
@@ -526,14 +530,55 @@ button::-moz-focusring {
   border: 1px solid var(--line);
 }
 
-/* Portrait phones have no room for it beside the stats. */
+/*
+ * Narrow phones.
+ *
+ * The level's name is the one thing in the bar that says which level you are playing,
+ * so it is never hidden - an earlier version dropped it to make room for the stats,
+ * which left a game with no way to say what it was. Instead the name truncates, and the
+ * parts that can shrink do: the rules button becomes an icon, and the stats keep only
+ * the two numbers a player reads mid-game.
+ */
 @media (max-width: 30rem) {
   .play__rules {
     margin-left: 0.4rem;
   }
 
+  .play__rulesBody {
+    width: min(20rem, 88vw);
+  }
+
+  .play__rules > summary {
+    /* The words do not fit; the meaning does. */
+    font-size: 0;
+    padding: 0.35rem 0.6rem;
+  }
+
+  .play__rules > summary::after {
+    content: "?";
+    font-size: 0.95rem;
+  }
+
   .play__title {
+    /* Truncate rather than disappear, and take the slack before the stats do. */
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .play__title strong,
+  .play__title span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The author is the first thing that can go; the name is what matters. */
+  .play__title span {
     display: none;
+  }
+
+  .play__stats {
+    flex: none;
   }
 }
 
