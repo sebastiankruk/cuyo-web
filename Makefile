@@ -24,6 +24,17 @@
 
 SHELL := /bin/bash
 
+# The port the dev server listens on, and the port a Cloudflare tunnel points at.
+#
+# One variable, so `make dev` and the tunnel configuration cannot drift apart. It
+# lives here rather than only in package.json because the tunnel config is outside
+# this repository and needs a value to copy - and 5173 is Vite's default, so
+# nothing currently states it. Override with `make dev PORT=8080`.
+#
+# `vite preview`, which serves the production bundle from dist/, uses PREVIEW_PORT.
+PORT         ?= 5173
+PREVIEW_PORT ?= 4173
+
 # Detect node/npm/npx, working from shells that have not sourced nvm - IDE
 # terminals, cron, CI. Prepending the binary's own directory to PATH keeps
 # `#!/usr/bin/env node` shebangs in npm/npx wrappers resolvable.
@@ -78,8 +89,9 @@ help:
 	@echo "  make init         - Install dependencies"
 	@echo ""
 	@echo "Development:"
-	@echo "  make dev          - Dev server (all interfaces)"
-	@echo "  make dev-lan      - Dev server reachable from a phone on the LAN"
+	@echo "  make dev          - Dev server on $(PORT), this machine only"
+	@echo "  make dev-lan      - Dev server on $(PORT), reachable from a phone"
+	@echo "  make preview      - Serve dist/ on $(PREVIEW_PORT), as deployed"
 	@echo ""
 	@echo "Code quality:"
 	@echo "  make lint         - Everything CI runs: code, types, docs, specs"
@@ -110,15 +122,19 @@ init:
 	@if [ ! -d node_modules ]; then $(AI_ECHO) "Installing dependencies..."; fi
 	@$(NPM) install $(NPM_INSTALL)
 
+# `--strictPort` so a stale server holding the port is a loud failure rather than
+# a silent jump to 5174. A tunnel pointed at 5173 that is suddenly serving nothing
+# is a confusing way to spend an afternoon, and that is exactly what happened once
+# already during development.
 dev:
-	@$(NPM) $(NPM_RUN) run dev
+	@$(NPM) $(NPM_RUN) run dev -- --port $(PORT) --strictPort
 
 # Exposed on all interfaces, so a phone on the same network can load it. This is
 # the whole point of a project that targets phones, and the reason `dev` alone is
 # not enough: it binds loopback only, so nothing but this machine can reach it.
 # On an untrusted network, so be aware.
 dev-lan:
-	@$(NPM) $(NPM_RUN) run dev:lan
+	@$(NPM) $(NPM_RUN) run dev:lan -- --port $(PORT) --strictPort
 
 # The corpus tests read .context/upstream-cuyo and fail loudly without it, so
 # `make corpus` is something a fresh clone needs rather than something to
@@ -183,11 +199,13 @@ build:
 check: lint test build check-art
 	$(AI_ECHO) "All checks passed."
 
+# Serves the production bundle from dist/ rather than the source, which is what
+# you want when checking what would actually be deployed. `make build` first.
 preview:
-	@$(NPM) $(NPM_RUN) run preview
+	@$(NPM) $(NPM_RUN) run preview -- --port $(PREVIEW_PORT) --strictPort
 
 preview-host:
-	@$(NPM) $(NPM_RUN) run preview -- --host 127.0.0.1 --port 4173
+	@$(NPM) $(NPM_RUN) run preview -- --host 127.0.0.1 --port $(PREVIEW_PORT) --strictPort
 
 clean:
 	rm -rf dist

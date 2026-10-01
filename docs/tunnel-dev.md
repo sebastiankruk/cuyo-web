@@ -1,70 +1,96 @@
-# Exposing the dev server at dev.cuyo.kruk.me
+# Dev server and tunnel
 
-The dev server runs on `http://127.0.0.1:5173`.
+How the game is served locally, and what a Cloudflare tunnel should point at.
 
-Cloudflare Tunnel `iqoqo-devel` already serves `preview.iqoqo.cc` and
-`devel.iqoqo.cc`. `dev.cuyo.kruk.me` is added as a third ingress rule on the
-same tunnel, so no new tunnel or credential is needed.
+## Ports
 
-## 1. Add the ingress rule (needs sudo)
+| What | Port | Command |
+| --- | --- | --- |
+| Dev server, source, hot reload | **5173** | `make dev` |
+| Dev server, reachable from a phone on the LAN | **5173** | `make dev-lan` |
+| Production bundle from `dist/` | **4173** | `make build && make preview` |
 
-The live tunnel is the **system** service `/etc/cloudflared/config.yml`, so:
+Both come from variables at the top of the `Makefile` — `PORT` and
+`PREVIEW_PORT` — so there is one place to change them and one value to copy into
+the tunnel configuration. Override either per invocation:
 
 ```sh
-sudo tee -a /etc/cloudflared/config.yml >/dev/null <<'YAML'
-YAML
+make dev PORT=8080
 ```
 
-That append is wrong on its own — `ingress` is a YAML list and the final
-catch-all must stay last. Edit the file so the rules read, in this order:
+`--strictPort` is on for both. A dev server that silently moves to 5174 when 5173
+is busy looks like a tunnel that is pointing at nothing, which is a confusing way
+to lose an afternoon; with it, the port conflict is a loud failure. That is not
+hypothetical — it is what happened here once, and it is why `make dev` is the
+command to use rather than a bare `vite`.
+
+## Vite's host check
+
+Vite refuses a request whose `Host` header it does not recognise, so the first
+time the tunnel is pointed at the dev server the page says:
+
+```text
+Blocked request. This host ("dev.cuyo.kruk.me") is not allowed.
+```
+
+That is a DNS-rebinding guard, and it is working as intended: without it, a page
+anywhere on the internet could point a hostname at your loopback interface and
+have the dev server serve it to whoever loaded that page.
+
+`dev.cuyo.kruk.me` is allowed **by name** in `vite.config.ts`, for both the dev
+server and `vite preview`. The alternative — `host: true`, which allows any
+header — would have worked and would have removed the guard, which is the thing
+to avoid. A hostname added later fails loudly instead of quietly working.
+
+For a different tunnel hostname:
+
+```sh
+CUYO_ALLOWED_HOSTS=dev.example.com,other.example.com make dev
+```
+
+Checked in both directions: the tunnel's hostname is answered, `localhost` still
+is, and `Host: evil.example.com` is still refused.
+
+## Cloudflare
+
+The tunnel should point at loopback. The dev server binds `127.0.0.1`, which is
+deliberate: nothing on the network can reach it, and the tunnel is the intended
+way in.
+
+For a quick tunnel:
+
+```sh
+cloudflared tunnel --url http://localhost:5173
+```
+
+For a named tunnel, add to `/etc/cloudflared/config.yml`:
 
 ```yaml
 ingress:
-  - hostname: preview.iqoqo.cc
-    service: http://localhost:8000
-  - hostname: devel.iqoqo.cc
-    service: http://localhost:3000
   - hostname: dev.cuyo.kruk.me
     service: http://localhost:5173
   - service: http_status:404
 ```
 
-Then apply without dropping connections:
+Then `cloudflared tunnel run <name>`.
 
-```sh
-sudo systemctl reload cloudflared
-```
+Keep this project's port out of the iqoqo set. `3000` and `8000` are taken by the
+iqoqo development tunnels; 5173 is Vite's default and is not one of them, and
+4173 is Vite's preview port.
 
-## 2. DNS for the kruk.me zone
+## What you will be looking at
 
-**This step is not done and needs your action.** The `cert.pem` in
-`~/.cloudflared` is scoped to the `iqoqo.cc` zone only, so `cloudflared` cannot
-provision `kruk.me`. You need a Cloudflare API token with `Zone:DNS:Edit` for
-`kruk.me`, then:
+The app currently runs the two hand-written fixture levels in
+`engine/level-format/fixtures.ts`, transcribed from `nasenkugeln.ld` and
+`hormone.ld`. The real level corpus is not wired up yet — that is task group 2 and
+the level catalogue in group 6, and `engine/level-format` is where the `.ld`
+parsing has been landing.
 
-```sh
-export CLOUDFLARE_API_TOKEN=<token>
-cloudflared tunnel route dns iqoqo-devel dev.cuyo.kruk.me
-```
+So the rendering, the board geometry and the falling-piece mechanics can be
+judged from it. The 81 levels, the menus, the touch controls and the offline
+install cannot: those are groups 6, 9, 10 and 11, none of which has a task
+complete against its own bar.
 
-### Stray record to delete
-
-While establishing the above, `cloudflared` created the record below in the
-**wrong** zone. It is inert (the tunnel 404s that hostname) but should be
-removed — Cloudflare dashboard → `iqoqo.cc` → DNS → delete:
-
-```text
-CNAME  dev.cuyo.kruk.me.iqoqo.cc
-```
-
-`cloudflared tunnel route dns` has no delete flag, so the dashboard is the
-cleanest route.
-
-## 3. Run the dev server
-
-```sh
-npm run dev:lan      # --host, pinned to 5173; reachable from a phone
-```
-
-`--strictPort` is deliberate: without it Vite silently moves to another port and
-the tunnel 404s.
+`make preview` is worth a look too, since it serves `dist/` rather than the
+source — it is what would actually be deployed, and it catches anything that only
+breaks in a production bundle.

@@ -112,8 +112,9 @@ Under construction. The plan lives in [`openspec/changes/cuyo-web`](openspec/cha
 ```sh
 make init          # npm install
 make corpus        # fetch the upstream tree (once; see above)
-make dev           # dev server, this machine only
-make dev-lan       # dev server a phone on the same network can reach
+make dev           # dev server on 5173, this machine only
+make dev-lan       # dev server on 5173, reachable from a phone
+make preview       # serve dist/ on 4173, as it would be deployed
 make check         # lint + test + build — exactly what CI runs
 ```
 
@@ -173,6 +174,14 @@ for `--reporter=verbose` — and forcing `--reporter=dot` makes it *larger*, at
 | `build` | production bundle, plus an assertion that no upstream artwork reached `dist/` |
 | `agent-mode` | runs the gates with `CUYO_AI_MODE=1` and asserts the output is terse |
 | `human-mode` | asserts the banners are still there |
+
+A Cloudflare tunnel should point at `http://localhost:5173`. Vite's DNS-rebinding
+guard is on, so the tunnel's hostname is allowed by name in `vite.config.ts`
+rather than by disabling the check — see
+[`docs/tunnel-dev.md`](docs/tunnel-dev.md). The port comes from
+`PORT` at the top of the `Makefile`, so there is one value to copy and one place to
+change it — see [`docs/tunnel-dev.md`](docs/tunnel-dev.md), which also says what
+you will and will not see.
 
 The corpus fetch is a real step rather than an assumption: the tests fail loudly
 without it, so a `test` job that skipped it would fail for a reason unrelated to

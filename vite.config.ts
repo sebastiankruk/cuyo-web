@@ -17,8 +17,40 @@ import react from "@vitejs/plugin-react";
  * command lines. Measured on the full suite, that is the difference between 1458
  * and 467 bytes.
  */
+/**
+ * The hostnames the dev server will answer to.
+ *
+ * Vite refuses any request whose `Host` header it does not recognise, which is a
+ * DNS-rebinding guard: without it, a page on the open internet could point a
+ * hostname at your loopback interface and have the dev server serve it to
+ * whoever loaded that page. Coming through the Cloudflare tunnel the header is
+ * `dev.cuyo.kruk.me` rather than `localhost`, so the guard fires and the tunnel
+ * sees "Blocked request".
+ *
+ * The hostname is allowed by name rather than by turning the check off with
+ * `host: true`. A dev server that answers to any Host header is exactly what the
+ * guard exists to prevent, and naming it means anything added later fails loudly
+ * instead of quietly working.
+ *
+ * `CUYO_ALLOWED_HOSTS` overrides the list, comma-separated, for another tunnel
+ * hostname or a second one. localhost, 127.0.0.1 and the machine's own address are
+ * allowed by Vite already and are not repeated here.
+ */
+const ALLOWED_HOSTS = (process.env["CUYO_ALLOWED_HOSTS"] ?? "dev.cuyo.kruk.me")
+  .split(",")
+  .map((h) => h.trim())
+  .filter((h) => h !== "");
+
 export default defineConfig({
   plugins: [react()],
+  server: {
+    allowedHosts: ALLOWED_HOSTS,
+  },
+  preview: {
+    // The same guard applies to `vite preview`, which serves dist/ - and that one
+    // is the more interesting target, since dist/ is the deployed artefact.
+    allowedHosts: ALLOWED_HOSTS,
+  },
   test: {
     // The engine package must be testable in plain Node with no browser
     // harness, so the default node environment is used deliberately.
