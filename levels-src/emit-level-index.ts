@@ -31,7 +31,10 @@ import {
   readLevelSettings,
 } from "../engine/level-format/settings.ts";
 import { UNDEFINED_EXPLODE } from "../engine/level-format/kinds.ts";
-import { EXPLODES_ON_SIZE } from "../engine/game-core/constants.ts";
+import {
+  EXPLODES_ON_SIZE,
+  unsupportedNeighbourReason,
+} from "../engine/game-core/constants.ts";
 import { readStartDist } from "../engine/level-format/startdist.ts";
 import type {
   Difficulty,
@@ -286,6 +289,7 @@ function main(): void {
 
   const levels: LevelIndexEntry[] = [];
   const missing: string[] = [];
+  const unsupported: string[] = [];
 
   for (const section of sections) {
     if (section.filename === "") {
@@ -340,6 +344,12 @@ function main(): void {
       if (greyKinds === 0) greyKinds = compiled.greyKinds;
     }
 
+    // Availability across every difficulty, since a level is offered as a whole.
+    const reasons = [...byDifficulty.values()]
+      .map((d) => unsupportedNeighbourReason(d.neighbours))
+      .filter((r): r is string => r !== null);
+    const supported = reasons.length === 0;
+
     levels.push({
       id: section.id,
       filename: section.filename,
@@ -351,7 +361,10 @@ function main(): void {
       difficulties: byDifficulty,
       goalKinds,
       greyKinds,
+      supported,
+      unsupportedReason: reasons[0] ?? "",
     });
+    if (!supported) unsupported.push(section.id);
   }
 
   if (missing.length > 0) {
@@ -399,6 +412,12 @@ function main(): void {
       `Standard track lists ${index.authoredCounts.get("main")} and reaches ` +
       `${standard}\n`,
   );
+  if (unsupported.length > 0) {
+    process.stdout.write(
+      `level-index: ${unsupported.length} level(s) listed but not playable, because ` +
+        `they need an unimplemented neighbour mode: ${unsupported.join(", ")}\n`,
+    );
+  }
   process.stdout.write(`level-index: written to ${OUT}\n`);
 }
 
@@ -424,6 +443,8 @@ function emit(index: LevelIndex): string {
     difficulties: ${JSON.stringify([...entry.difficulties.values()])},
     goalKinds: ${JSON.stringify(entry.goalKinds)},
     greyKinds: ${entry.greyKinds},
+    supported: ${entry.supported},
+    unsupportedReason: ${JSON.stringify(entry.unsupportedReason)},
   },`;
   });
   return `// GENERATED FILE - do not edit.
@@ -458,6 +479,8 @@ interface RawLevel {
   readonly difficulties: readonly DifficultyEntry[];
   readonly goalKinds: readonly string[];
   readonly greyKinds: number;
+  readonly supported: boolean;
+  readonly unsupportedReason: string;
 }
 
 function toEntry(raw: RawLevel): LevelIndexEntry {
@@ -477,6 +500,8 @@ function toEntry(raw: RawLevel): LevelIndexEntry {
     difficulties,
     goalKinds: raw.goalKinds,
     greyKinds: raw.greyKinds,
+    supported: raw.supported,
+    unsupportedReason: raw.unsupportedReason,
   };
 }
 

@@ -30,6 +30,8 @@ interface RawLevel {
   readonly difficulties: readonly DifficultyEntry[];
   readonly goalKinds: readonly string[];
   readonly greyKinds: number;
+  readonly supported: boolean;
+  readonly unsupportedReason: string;
 }
 
 function toEntry(raw: RawLevel): LevelIndexEntry {
@@ -47,6 +49,8 @@ function toEntry(raw: RawLevel): LevelIndexEntry {
     difficulties,
     goalKinds: raw.goalKinds,
     greyKinds: raw.greyKinds,
+    supported: raw.supported,
+    unsupportedReason: raw.unsupportedReason,
   };
 }
 
@@ -90,6 +94,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["inGras"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Pfeile",
@@ -128,6 +134,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["ipStart"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "HexKugeln",
@@ -167,6 +175,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["i6Gross"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Viecher",
@@ -194,6 +204,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["ivVulkan"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "UnterWasser",
@@ -218,6 +230,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Algen"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Kunst",
@@ -242,6 +256,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["frame"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Baelle",
@@ -292,6 +308,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["ibKegel"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Hormone",
@@ -331,6 +349,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["ihBunt"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Go",
@@ -381,6 +401,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["mihStein"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Ebene",
@@ -420,6 +442,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["ieGras"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Schach",
@@ -471,6 +495,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["isGras"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Wachsen",
@@ -521,6 +547,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Erde"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "ASCII",
@@ -545,6 +573,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["iaError"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Tiere",
@@ -584,6 +614,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["gras"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "DreiD",
@@ -622,6 +654,9 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Gitter"],
     greyKinds: 1,
+    supported: false,
+    unsupportedReason:
+      "neighbours=6 needs a third board dimension, which this engine does not implement. The level is listed because it exists, but it cannot be played.",
   },
   {
     id: "Doors",
@@ -672,6 +707,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["tuer"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Walls",
@@ -722,6 +759,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["gras"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Wuerfel",
@@ -760,6 +799,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["start_dummy"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Theater",
@@ -810,6 +851,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Sitz"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Antarctic",
@@ -834,6 +877,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Eis"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Bonus",
@@ -886,6 +931,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["bbGeld"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Letters",
@@ -914,6 +961,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["blFragezeichen"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Tetris",
@@ -964,6 +1013,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Score"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Memory",
@@ -1016,6 +1067,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["bmTisch"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "ColorShape",
@@ -1066,6 +1119,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Start"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Disco",
@@ -1116,6 +1171,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Start"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Aliens",
@@ -1167,6 +1224,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Alien"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Xtradick",
@@ -1191,6 +1250,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["blFragezeichen"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Kolben",
@@ -1241,6 +1302,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["start"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Unmoeglich",
@@ -1280,6 +1343,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["m6Gras"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Labyrinth",
@@ -1319,6 +1384,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Gras"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Tennis",
@@ -1370,6 +1437,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Start"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Slime",
@@ -1421,6 +1490,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["slowslime"],
     greyKinds: 0,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "SilberGold",
@@ -1459,6 +1530,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["mgsWeiss"],
     greyKinds: 0,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Gold",
@@ -1510,6 +1583,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["gold"],
     greyKinds: 0,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Zahn",
@@ -1561,6 +1636,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Start"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Bunt",
@@ -1612,6 +1689,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["mbUnbunt"],
     greyKinds: 0,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Labskaus2",
@@ -1650,6 +1729,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["inGras"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Baender",
@@ -1689,6 +1770,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Gras"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Ziehlen",
@@ -1713,6 +1796,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["gras"],
     greyKinds: 0,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Maennchen",
@@ -1762,6 +1847,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["mmGrasgrau"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Rechnen",
@@ -1812,6 +1899,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["gras"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "GoII",
@@ -1864,6 +1953,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["igGo"],
     greyKinds: 0,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Kacheln_Sechseck",
@@ -1903,6 +1994,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Kachel"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Kacheln_Viereck",
@@ -1942,6 +2035,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Kachel"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Kacheln_Fuenfeck",
@@ -1980,6 +2075,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Kachel"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Kacheln_azyklisch",
@@ -2030,6 +2127,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Kachel"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Puzzle",
@@ -2081,6 +2180,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: [],
     greyKinds: 0,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Dungeon",
@@ -2132,6 +2233,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Bildschirm"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Secret",
@@ -2167,6 +2270,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Start"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Rollenspiel",
@@ -2218,6 +2323,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["mrpAlle"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Jump",
@@ -2268,6 +2375,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Naegel"],
     greyKinds: 0,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Octopi",
@@ -2308,6 +2417,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["anemone"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Aehnlich",
@@ -2359,6 +2470,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Rest"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Augen",
@@ -2383,6 +2496,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Starr", "Starr", "Starr", "Starr", "Starr"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Trees2",
@@ -2434,6 +2549,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["mtrGras"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Schemen",
@@ -2483,6 +2600,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Gras"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "BoniMali2",
@@ -2535,6 +2654,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Gras"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Fische",
@@ -2585,6 +2706,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["muschel"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "NoVIPs",
@@ -2635,6 +2758,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: [],
     greyKinds: 0,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Angst",
@@ -2686,6 +2811,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Gras"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Flechtwerk",
@@ -2735,6 +2862,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Gras"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Farming",
@@ -2775,6 +2904,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Road"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Himmel",
@@ -2814,6 +2945,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["jhSonne"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Jahreszeiten",
@@ -2853,6 +2986,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["jjErde"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Embroidery",
@@ -2892,6 +3027,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["jsGruenGras"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Elemente",
@@ -2931,6 +3068,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["elBlack"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Wohnungen",
@@ -2970,6 +3109,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["lwBroken"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Darken",
@@ -3020,6 +3161,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["dnStart"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Rohre",
@@ -3070,6 +3213,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["lrOfen"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Pressure",
@@ -3094,6 +3239,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Start"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Explosive",
@@ -3145,6 +3292,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["lbBlack"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "ReversiBRL",
@@ -3195,6 +3344,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["lreAlle"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "ParatroopersInvers",
@@ -3219,6 +3370,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["Cannon"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Springer",
@@ -3271,6 +3424,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["isKoenig"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Baggis",
@@ -3321,6 +3476,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["sbOfen"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Pacman",
@@ -3345,6 +3502,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["spLabyrinth"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "mfs",
@@ -3369,6 +3528,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["muell"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
   {
     id: "Fractals",
@@ -3420,6 +3581,8 @@ const RAW: readonly RawLevel[] = [
     ],
     goalKinds: ["aCantorSet"],
     greyKinds: 1,
+    supported: true,
+    unsupportedReason: "",
   },
 ];
 

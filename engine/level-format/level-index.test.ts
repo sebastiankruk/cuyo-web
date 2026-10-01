@@ -222,6 +222,19 @@ describe("the generated catalogue", () => {
     expect(DIFFICULTIES).toEqual(["easy", "normal", "hard"]);
   });
 
+  it("gates the level that needs an unimplemented neighbour mode", () => {
+    // `DreiD` uses `neighbours = ThreeD`, which upstream reserves and this engine does
+    // not implement. `neighbourOffsets` answers for it anyway, falling back to *no*
+    // neighbours - so nothing could ever connect and the level could not be won. It
+    // was listed as playable, and a player would have found that out a minute into a
+    // game rather than from the catalogue.
+    const unsupported = LEVELS.filter((l) => !l.supported);
+    expect(unsupported.map((l) => l.id)).toEqual(["DreiD"]);
+    expect(unsupported[0]?.unsupportedReason).toContain("third board dimension");
+    // Everything else is playable, so a regression that gates everything is caught.
+    expect(LEVELS.filter((l) => l.supported).length).toBe(78);
+  });
+
   it("was emitted with the generator's header", () => {
     const source = readFileSync(
       resolve(import.meta.dirname, "../../levels-src/generated/level-index.ts"),
