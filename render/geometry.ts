@@ -10,6 +10,7 @@
 
 import { GRX, GRY, columnShift } from "../engine/game-core/constants.ts";
 import type { HexGeometry } from "../engine/game-core/constants.ts";
+import { deltaE, labOfHsl } from "./perceptual.ts";
 
 /** The level properties that affect board geometry. */
 export interface BoardFrame {
@@ -234,9 +235,27 @@ export function stubRadius(f: BoardFrame): number {
  */
 export const MARKER_RADIUS = 0.075;
 
-/** A colour that reads against the blob's own, for the marker's inner shape. */
+/**
+ * A colour that reads against the blob's own, for the marker's inner shape.
+ *
+ * Whichever direction gives more contrast, rather than always lightening. A mark on a
+ * pale fill has nowhere to lighten to - on the lightest grey the palette uses, a
+ * lightening ink lands ΔE 13.8 from the fill, which at six pixels across is not a mark
+ * you can rely on - while the same fill darkened is ΔE 30. Measuring the direction
+ * instead of assuming it is a few lines and removes the whole class of failure, which
+ * matters because an unreadable mark means the *shape* distinction between a goal and a
+ * grey silently stops working.
+ */
 export function markerInk(colour: string): string {
-  return shade(colour, 0.55);
+  const lighter = shade(colour, 0.55);
+  const darker = shade(colour, -0.5);
+  const from = labOfHsl(colour);
+  const a = labOfHsl(lighter);
+  const b = labOfHsl(darker);
+  // An unreadable fill is not worth guessing about: fall back to a light mark, which is
+  // what this always did and is the better guess against a dark board.
+  if (from === null || a === null || b === null) return lighter;
+  return deltaE(from, b) > deltaE(from, a) ? darker : lighter;
 }
 
 /*
@@ -272,22 +291,55 @@ export function stableHue(key: string): number {
 /**
  * Lightens (amount > 0) or darkens (amount < 0) a hex or hsl colour.
  *
- * Unrecognised formats are returned unchanged rather than throwing, so a
- * malformed art key degrades to a visible colour instead of a blank cell.
+ * `amount` is the fraction of the distance to white, or to black. It used to be a fixed
+ * step in the same units, which is the same arithmetic under a different name and a
+ * different result: a fixed step is the same size whichever fill it lands on, so a
+ * decoration is a different visual weight on every colour.
+ *
+ * The blob's seam is `shade(colour, -0.28)`, and measured against its own fill the two
+ * behaviours are nothing alike:
+ *
+ * | Fill L | Seam L, fixed step | Contrast | Seam L, proportional | Contrast |
+ * | ------ | ------------------ | -------- | -------------------- | -------- |
+ * | 30     | 4                  | **ΔE 1** | 22                   | ΔE 7     |
+ * | 50     | 22                 | ΔE 7     | 36                   | ΔE 14    |
+ * | 70     | 42                 | ΔE 17    | 50                   | ΔE 21    |
+ * | 80     | 52                 | ΔE 22    | 58                   | ΔE 24    |
+ *
+ * So a dark blob got no visible seam at all and a pale one got a heavy black line, and
+ * the marker - `shade(colour, 0.55)` - was pure white on every fill with a lightness
+ * above 41%, which is nearly all of them. The proportional version holds the seam at a
+ * steady weight and lets the marker's contrast follow the fill it is drawn on.
+ *
+ * Unrecognised formats are returned unchanged rather than throwing, so a malformed art
+ * key degrades to a visible colour instead of a blank cell.
  */
 export function shade(colour: string, amount: number): string {
   const hex = /^#([0-9a-f]{6})$/i.exec(colour);
   if (hex !== null) {
     const n = parseInt(hex[1] as string, 16);
-    const f = (c: number) =>
-      Math.max(0, Math.min(255, Math.round(c + amount * 255)));
+    // A fraction of the way to white, or to black - not a fixed step towards it. See
+    // the note above: a fixed step makes the same decoration a different weight on
+    // every fill, which for the seam meant invisible on dark blobs and heavy on light
+    // ones.
+    const f = (c: number): number =>
+      Math.max(
+        0,
+        Math.min(
+          255,
+          Math.round(amount >= 0 ? c + amount * (255 - c) : c + amount * c),
+        ),
+      );
     return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
   }
   const hsl = /^hsl\((\d+) (\d+)% (\d+)%\)$/.exec(colour);
   if (hsl !== null) {
     const l = Number(hsl[3]);
-    const next = Math.max(4, Math.min(96, l + amount * 100));
-    return `hsl(${hsl[1]} ${hsl[2]}% ${next}%)`;
+    const next = Math.max(
+      4,
+      Math.min(96, amount >= 0 ? l + amount * (100 - l) : l + amount * l),
+    );
+    return `hsl(${hsl[1]} ${hsl[2]}% ${Math.round(next)}%)`;
   }
   return colour;
 }

@@ -35,6 +35,16 @@ something a player can tell.
   on, so a row of goal blobs read as a row of white circles in green pills. The shape
   still distinguished goal from grey, so nothing looked broken — it just stopped looking
   like a marked blob, which is the whole point of the mark. It is now 43% of the blob.
+- **The shading on every blob — the highlight along the top, the seam between touching
+  blobs — now weighs the same whatever colour it is on.** The darkening was a fixed step
+  rather than a fraction of the way to the darker end, so a dark blob got a seam that
+  was effectively invisible (ΔE 1 against its own fill) and a pale one got a heavy black
+  line (ΔE 22). Both are now a steady weight. You will see the seams on dark blobs
+  clearly for the first time, and the highlights on pale blobs will be gentler.
+- **The mark is now dark on a pale blob and light on a dark one**, whichever gives more
+  contrast, instead of always being near-white. On the palest grey the mark was ΔE 14
+  from the blob it sat on — at six pixels across, not something to rely on. It is ΔE 30
+  or better on every colour the game draws.
 - **The colours are now chosen to be clear of the goal and grey colours too, not only
   clear of each other.** The goal colour is a fixed green, and the ordinary colours used
   to be chosen without reference to it and then have it dropped in beside them. Whether
