@@ -48,6 +48,9 @@ cp "$COMMITTED" "$TMP"
 node --experimental-transform-types --disable-warning=ExperimentalWarning \
   levels-src/emit-art-manifest.ts >/dev/null
 
+# Both sides go through Prettier first, for the reason given in check-level-index.sh.
+npx --no-install prettier --write "$TMP" "$COMMITTED" >/dev/null 2>&1 || true
+
 if ! diff -u "$TMP" "$COMMITTED" > /dev/null; then
   cp "$TMP" "$COMMITTED"
   echo "check-art-manifest: the committed manifest is stale." >&2

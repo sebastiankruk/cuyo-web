@@ -176,6 +176,16 @@ validate-levels:
 	$(AI_ECHO) "Validating every level..."
 	@node $(NODE_TS_FLAGS) levels-src/validate-levels.ts
 
+# Regenerates the catalogue from summary.ld and every level file it indexes.
+level-index:
+	$(AI_ECHO) "Emitting the level catalogue..."
+	@node $(NODE_TS_FLAGS) levels-src/emit-level-index.ts
+
+# Same staleness argument as the art manifest, and for the same reason: the catalogue
+# holds resolved numbers that no other check reads.
+check-level-index:
+	@bash scripts/check-level-index.sh
+
 # Regenerating must leave the committed file unchanged. Without this a level added
 # without regenerating would be caught only by the corpus test, which reports a
 # missing key rather than the fix; and a manifest edited by hand would survive until
@@ -219,7 +229,7 @@ build:
 # The single command CI runs, so that "green locally" and "green on GitHub" mean
 # the same thing. `make check` is not a separate set of checks: it is these four
 # targets in the order a person would run them.
-check: lint test build check-art check-art-manifest validate-levels
+check: lint test build check-art check-art-manifest check-level-index validate-levels
 	$(AI_ECHO) "All checks passed."
 
 # Serves the production bundle from dist/ rather than the source, which is what
