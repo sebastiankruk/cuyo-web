@@ -170,6 +170,12 @@ art-manifest:
 	$(AI_ECHO) "Emitting the art-key manifest..."
 	@node $(NODE_TS_FLAGS) levels-src/emit-art-manifest.ts
 
+# Parses and compiles every level in summary.ld, and fails on the first error. This
+# is the gate that makes "the real levels work" a fact rather than an assumption.
+validate-levels:
+	$(AI_ECHO) "Validating every level..."
+	@node $(NODE_TS_FLAGS) levels-src/validate-levels.ts
+
 # Regenerating must leave the committed file unchanged. Without this a level added
 # without regenerating would be caught only by the corpus test, which reports a
 # missing key rather than the fix; and a manifest edited by hand would survive until
@@ -213,7 +219,7 @@ build:
 # The single command CI runs, so that "green locally" and "green on GitHub" mean
 # the same thing. `make check` is not a separate set of checks: it is these four
 # targets in the order a person would run them.
-check: lint test build check-art check-art-manifest
+check: lint test build check-art check-art-manifest validate-levels
 	$(AI_ECHO) "All checks passed."
 
 # Serves the production bundle from dist/ rather than the source, which is what

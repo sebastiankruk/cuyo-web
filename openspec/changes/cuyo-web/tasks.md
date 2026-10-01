@@ -75,8 +75,8 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [x] 2.9 Implement the random-cell neighbour-avoidance retry used for `+` cells and verify a filled start layout contains no accidental same-kind adjacency beyond what the layout declares
 - [x] 2.10 Implement picture names as logical art keys resolved through the art manifest with no filesystem access, and verify a declared key resolves to a manifest entry and an unregistered key fails with the key and kind named
 - [x] 2.11 Implement the build step that scans every bundled `.ld`, extracts the full set of referenced picture names and emits the art-key manifest, and verify every referenced key is registered with an entry
-- [ ] 2.12 Implement structured load diagnostics (file, definition, reason) for unresolvable art keys, wrong row lengths and undefined `numexplode`, and verify each produces a specific error
-- [ ] 2.13 Implement the build-time validator that parses and compiles all levels in `summary.ld` plus its includes and **fails the build** on the first error, and verify it passes on the unmodified upstream data
+- [x] 2.12 Implement structured load diagnostics (file, definition, reason) for unresolvable art keys, wrong row lengths and undefined `numexplode`, and verify each produces a specific error
+- [x] 2.13 Implement the build-time validator that parses and compiles all levels in `summary.ld` plus its includes and **fails the build** on the first error, and verify it passes on the unmodified upstream data
 - [ ] 2.14 Implement the level index generator (id, tracks, name, author, description, per-difficulty `numexplode`) and verify it is emitted and contains the 48 Standard-track levels
 - [ ] 2.15 Implement runtime level loading that fetches a `.ld` on demand, parses it and caches it, and verify a second request for the same level hits the cache
 
