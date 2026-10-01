@@ -29,7 +29,7 @@ import {
   stubRadius,
   stubRect,
 } from "./geometry.ts";
-import type { BoardFrame, Contacts, Rect } from "./geometry.ts";
+import type { BoardFrame, Contacts, Point, Rect } from "./geometry.ts";
 
 function roundRect(
   ctx: CanvasRenderingContext2D,
@@ -58,7 +58,11 @@ function drawCell(
 ): void {
   const origin = cellOrigin(f, x, y);
   const colour = colourFor(level.kinds[kind]?.artKey ?? "", version);
-  const rect = stubRect(f, contacts);
+  // `stubRect` gives the shape *within* a cell, so it has to be moved to the
+  // cell's origin before it is filled. This was missing: every blob was filled at
+  // the same near-origin rectangle, so the whole board piled up in the top-left
+  // corner and read as one sprite on a blank grid.
+  const rect = atOrigin(stubRect(f, contacts), origin);
 
   ctx.fillStyle = colour;
   roundRect(ctx, rect, stubRadius(f));
@@ -72,8 +76,11 @@ function drawCell(
   ctx.moveTo(rect.x + f.size * 0.16, rect.y + band);
   ctx.lineTo(rect.x + rect.w - f.size * 0.16, rect.y + band);
   ctx.stroke();
+}
 
-  void origin;
+/** A rect moved by an offset. */
+function atOrigin(r: Rect, origin: Point): Rect {
+  return { x: r.x + origin.x, y: r.y + origin.y, w: r.w, h: r.h };
 }
 
 /** Fades and blooms an exploding blob over its animation. */

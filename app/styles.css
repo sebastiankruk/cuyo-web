@@ -177,12 +177,23 @@ button {
 }
 
 .play__canvas {
-  width: 100%;
+  /*
+   * The canvas is sized from the space available, not stretched to fill.
+   *
+   * `width: 100%` with `max-height: 100%` looks right but is not: when the height
+   * clamp bites, the element's width stays at 100% while its height is capped, so
+   * the 1:2 proportion the backing store relies on is violated and the board is
+   * squashed. Letting the element take the canvas's own pixel dimensions and
+   * bounding it with max-width/max-height keeps the two in step, and the element
+   * then scales down to fit whatever the layout gives it.
+   */
+  max-width: 100%;
+  max-height: 100%;
   /* The board is 10x20, so exactly half as tall as it is wide. */
   aspect-ratio: 1 / 2;
-  max-height: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
+  /* Hand the gesture to the game rather than scrolling or zooming the page. */
   touch-action: none;
 }
 
@@ -246,6 +257,43 @@ button {
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * The controls must never be the thing that gets squeezed.
+ *
+ * The board row is `1fr` and the controls row is `auto`, so an oversized board
+ * pushed the buttons off the bottom of a phone screen - they were in the
+ * document but you could not reach them, which looks identical to them not
+ * existing. These two rules are the difference between "the controls are there"
+ * and "the controls are visible": the board may not claim more than its row, and
+ * the controls may not shrink below a usable target.
+ */
+.play__board {
+  /* Never let the board demand space the viewport does not have. */
+  min-height: 0;
+  overflow: hidden;
+}
+
+.play__controls {
+  /* Below this the buttons stop being pressable targets for a thumb. */
+  min-height: 3.25rem;
+}
+
+/* A short viewport: the board gives up height before the controls give up size. */
+@media (max-height: 34rem) {
+  .play__hud {
+    padding: 0.35rem 0.9rem;
+  }
+
+  .play__dev {
+    display: none;
+  }
+
+  .pad {
+    min-height: 2.75rem;
+    padding: 0.6rem 0.4rem;
+  }
 }
 
 .pad:active {

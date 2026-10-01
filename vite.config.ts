@@ -55,6 +55,11 @@ export default defineConfig({
     // The engine package must be testable in plain Node with no browser
     // harness, so the default node environment is used deliberately.
     environment: "node",
-    include: ["{engine,levels-src,render}/**/*.test.ts"],
+    // `app/` is included for its canvas-free logic. design.md decision 12 puts the
+    // game-feel numbers - gesture thresholds, key repeat - in pure functions
+    // precisely so they can be tested without a browser; excluding `app/` would
+    // leave those numbers untestable, which is the thing the split was for.
+    // Component tests that need a DOM are a separate environment, not this one.
+    include: ["{app,engine,levels-src,render}/**/*.test.ts"],
   },
 });

@@ -21,8 +21,14 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { GRX, GRY } from "../engine/game-core/constants.ts";
-import { boardSizing, boardHeight, boardWidth } from "./geometry.ts";
+import { GRX, GRY, hexGeometry } from "../engine/game-core/constants.ts";
+import {
+  boardSizing,
+  boardHeight,
+  boardWidth,
+  cellOrigin,
+} from "./geometry.ts";
+import type { BoardFrame } from "./geometry.ts";
 import { render } from "./board.ts";
 import { Simulation } from "../engine/game-core/simulation.ts";
 import { FIXTURES } from "../engine/level-format/fixtures.ts";
@@ -247,6 +253,53 @@ describe("render fills the whole board", () => {
         expect(fill.y + fill.h).toBeLessThanOrEqual(sizing.pixelsY + 1);
         expect(fill.x + fill.w).toBeLessThanOrEqual(sizing.pixelsX + 1);
       }
+    });
+
+    it(`puts each blob in its own cell`, () => {
+      // The regression: `stubRect` gives a shape *within* a cell, and it has to be
+      // moved to that cell's origin before filling. Without the move every blob
+      // was filled at the same near-origin rectangle, so the board piled up in the
+      // top-left corner and looked like a single sprite on an empty grid.
+      //
+      // Counting fills could not catch this - the count was right and every fill
+      // was inside the canvas. What distinguishes it is that two blobs in
+      // different columns get *different* x, and two in different rows different y.
+      const { ctx, log } = recordingContext();
+      const sizing = boardSizing(600, 900, 1);
+      const sim = simulate(fixture.make);
+      render(ctx, sim, sizing.size);
+
+      const frame: BoardFrame = {
+        size: sizing.size,
+        hex: hexGeometry(level.neighbours),
+        mirror: level.mirror,
+      };
+      // The fills after the background, one per blob then one per piece cell.
+      const drawn = log.fills.slice(1);
+      const boardBlobs = [...sim.board.occupied()].map(({ x, y }) => ({
+        x,
+        y,
+        origin: cellOrigin(frame, x, y),
+      }));
+      // Every board blob's origin must be matched by a fill near it. The fallback
+      // art is drawn with a small inset, so the fill starts a little right of and
+      // below the cell origin - within a cell is the requirement.
+      for (const { x, y, origin } of boardBlobs) {
+        const near = drawn.some(
+          (f) =>
+            Math.abs(f.x - origin.x) < sizing.size &&
+            Math.abs(f.y - origin.y) < sizing.size,
+        );
+        expect(near, `no fill near cell (${x},${y}) at ${origin.x},${origin.y}`).toBe(
+          true,
+        );
+      }
+      // And the drawn fills must not all be in the same place, which is the
+      // shape of the bug: many cells, one position.
+      const distinctXs = new Set(drawn.map((f) => f.x));
+      const distinctYs = new Set(drawn.map((f) => f.y));
+      expect(distinctXs.size).toBeGreaterThan(1);
+      expect(distinctYs.size).toBeGreaterThan(1);
     });
 
     it(`gives each kind a colour that is not the background`, () => {
