@@ -31,10 +31,13 @@ describe("the generated catalogue", () => {
     expect(LEVEL_INDEX.byId.size).toBe(79);
   });
 
-  it("contains the 48 Standard-track levels", () => {
-    // The number the task names, and the one to check first: it is read from
-    // `level[main]`, so a parsing slip shows up as a plausible-looking 25 or 60.
+  it("contains the 48 Standard-track levels and 70 in All", () => {
+    // The numbers the task names, and the ones to check first: they are read from
+    // `level[main]` and `level[all]`, so a parsing slip shows up as a plausible-looking
+    // 25, 60 or 70 that happens to be the wrong one of the three.
     expect(LEVEL_INDEX.authoredCounts.get("main")).toBe(48);
+    expect(LEVEL_INDEX.authoredCounts.get("all")).toBe(70);
+    expect(levelsInTrack(LEVEL_INDEX, "all").length).toBe(70);
   });
 
   it("reaches 60 on the Standard track, because twelve are variant-only", () => {
@@ -230,7 +233,9 @@ describe("the generated catalogue", () => {
     // game rather than from the catalogue.
     const unsupported = LEVELS.filter((l) => !l.supported);
     expect(unsupported.map((l) => l.id)).toEqual(["DreiD"]);
-    expect(unsupported[0]?.unsupportedReason).toContain("third board dimension");
+    expect(unsupported[0]?.unsupportedReason).toContain(
+      "third board dimension",
+    );
     // Everything else is playable, so a regression that gates everything is caught.
     expect(LEVELS.filter((l) => l.supported).length).toBe(78);
   });
