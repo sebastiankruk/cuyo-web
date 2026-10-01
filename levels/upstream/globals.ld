@@ -1,0 +1,322 @@
+#
+#   Copyright <=2004 by Immanuel Halupczok
+#   Modified 2005,2010,2014 by Mark Weyer
+#   Maintenance modifications 2005,2011 by the cuyo developers
+#
+#   This program is free software; you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation; either version 2 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program; if not, write to the Free Software
+#   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+
+# This file contains all the definitions which are useful for more than
+# one level: the schemas and the defaults
+
+# It also mentions pics and sounds which cuyo always needs:
+# border.xpm
+# borderh.xpm
+# borderv.xpm
+# dbgZiffern.xpm
+# font-big.xpm
+# explosion.xpm
+# highlight.xpm
+# infoicons.xpm
+# menupics.xpm
+# pause.xpm
+# pktZiffern.xpm
+# pktZiffern2.xpm
+# scroll.xpm
+# titel.xpm
+# down.wav
+# explode.wav
+# land.wav
+# leftright.wav
+# levelloose.wav
+# levelwin.wav
+# menuclick.wav
+# menuscroll.wav
+# turn.wav
+# cuyo.it
+
+
+<<
+
+# The whole icon depends on the four neighbours
+schema16={
+  switch {
+    0?0?0?0? -> A;
+    0?1?0?0? -> B;
+    0?1?0?1? -> C;
+    0?0?0?1? -> D;
+    0?0?1?0? -> E;
+    0?1?1?0? -> F;
+    0?1?1?1? -> G;
+    0?0?1?1? -> H;
+    1?0?1?0? -> I;
+    1?1?1?0? -> J;
+    1?1?1?1? -> K;
+    1?0?1?1? -> L;
+    1?0?0?0? -> M;
+    1?1?0?0? -> N;
+    1?1?0?1? -> O;
+    1?0?0?1? -> P;
+  };
+  *
+};
+
+# Each quarter depends on its three neighbours - but it may only depend
+# on the diagonal neighbour if at least one of the two other neighbours
+# exist... Not yet defined.
+#schema7={
+#};
+
+# Each quarter normally depends on its two neighbours.
+# If both are present, the diagonal neighbor counts, too.
+# This schema is useful for blobs that are surrounded by "walls":
+# If a quarter has at least one missing neighbour, there is a wall.
+# Otherwise there may or may not be a wall corner,
+# which has some effect on the picture.
+schema5={
+  [qu=Q_TL] {switch {
+    0?????0? -> C;
+    1?????0? -> D;
+    0?????1? -> A;
+    1?????10 -> B;
+    1?????11 -> E;
+  };*};
+  [qu=Q_TR] {switch {
+    0?0????? -> C;
+    0?1????? -> A;
+    1?0????? -> B;
+    101????? -> E;
+    111????? -> D;
+  };*};
+  [qu=Q_BL] {switch {
+    ????0?0? -> C;
+    ????0?1? -> E;
+    ????1?0? -> D;
+    ????101? -> A;
+    ????111? -> B;
+  };*};
+  [qu=Q_BR] {switch {
+    ??0?0??? -> C;
+    ??0?1??? -> B;
+    ??1?0??? -> E;
+    ??101??? -> D;
+    ??111??? -> A;
+  };*}
+};
+
+
+
+# Each quarter depends on its two neighbours
+schema4={
+  [qu=Q_TL] {switch {
+    0?????0? -> A;
+    0?????1? -> B;
+    1?????0? -> C;
+    1?????1? -> D;
+  };*};
+  [qu=Q_TR] {switch {
+    0?1????? -> A;
+    0?0????? -> B;
+    1?1????? -> C;
+    1?0????? -> D;
+  };*};
+  [qu=Q_BL] {switch {
+    ????1?0? -> A;
+    ????1?1? -> B;
+    ????0?0? -> C;
+    ????0?1? -> D;
+  };*};
+  [qu=Q_BR] {switch {
+    ??1?1??? -> A;
+    ??0?1??? -> B;
+    ??1?0??? -> C;
+    ??0?0??? -> D;
+  };*}
+};
+
+
+
+# Each Quarter depends on its three neighbours.
+schemaDiag16={
+  [qu=Q_TL] {switch {
+    0?????00 -> E;
+    0?????10 -> F;
+    1?????00 -> N;
+    1?????10 -> G;
+    0?????01 -> C;
+    0?????11 -> L;
+    1?????01 -> J;
+    1?????11 -> K;
+  };*};
+  [qu=Q_TR] {switch {
+    000????? -> C;
+    100????? -> G;
+    001????? -> E;
+    101????? -> K;
+    010????? -> L;
+    110????? -> N;
+    011????? -> F;
+    111????? -> J;
+  };*};
+  [qu=Q_BL] {switch {
+    ????000? -> N;
+    ????100? -> J;
+    ????001? -> L;
+    ????101? -> F;
+    ????010? -> E;
+    ????110? -> C;
+    ????011? -> K;
+    ????111? -> G;
+  };*};
+  [qu=Q_BR] {switch {
+    ??000??? -> L;
+    ??100??? -> K;
+    ??001??? -> C;
+    ??101??? -> J;
+    ??010??? -> N;
+    ??110??? -> E;
+    ??011??? -> G;
+    ??111??? -> F;
+  };*}
+};
+
+
+# Each Quarter only depends on its diagonal neighbour.
+schemaDiag2={
+  [qu=Q_TL] {switch {
+    ???????0 -> A;
+    ???????1 -> B;
+  };*};
+  [qu=Q_TR] {switch {
+    ?0?????? -> A;
+    ?1?????? -> B;
+  };*};
+  [qu=Q_BL] {switch {
+    ?????0?? -> A;
+    ?????1?? -> B;
+  };*};
+  [qu=Q_BR] {switch {
+    ???0???? -> A;
+    ???1???? -> B;
+  };*}
+};
+
+
+# For hex mode. Each Quarter depends on its two neighbours.
+schemaHex4={
+  [qu=Q_TL_TL] {switch {
+    0????0 -> A*;
+    1????0 -> C*;
+  }};
+  [qu=Q_BL_TL] {switch {
+    0????1 -> B*;
+    1????1 -> D*;
+  }};
+  [qu=Q_TR_TR] {switch {
+    01???? -> A*;
+    11???? -> C*;
+  }};
+  [qu=Q_BR_TR] {switch {
+    00???? -> B*;
+    10???? -> D*;
+  }};
+  [qu=Q_BL_BL] {switch {
+    ???10? -> A*;
+    ???00? -> C*;
+  }};
+  [qu=Q_TL_BL] {switch {
+    ???01? -> B*;
+    ???11? -> D*;
+  }};
+  [qu=Q_BR_BR] {switch {
+    ??11?? -> A*;
+    ??10?? -> C*;
+  }};
+  [qu=Q_TR_BR] {switch {
+    ??00?? -> B*;
+    ??01?? -> D*;
+  }};
+};
+
+
+# For hex mode. Each Quarter depends on its three neighbours.
+schemaHex8={
+  [qu=Q_TL_TL] {switch {
+    0???00 -> A*;
+    1???00 -> E*;
+    0???10 -> C*;
+    1???10 -> G*;
+  }};
+  [qu=Q_BL_TL] {switch {
+    0???01 -> D*;
+    1???01 -> H*;
+    0???11 -> B*;
+    1???11 -> F*;
+  }};
+  [qu=Q_TR_TR] {switch {
+    001??? -> C*;
+    101??? -> G*;
+    011??? -> A*;
+    111??? -> E*;
+  }};
+  [qu=Q_BR_TR] {switch {
+    000??? -> D*;
+    100??? -> H*;
+    010??? -> B*;
+    110??? -> F*;
+  }};
+  [qu=Q_BL_BL] {switch {
+    ???100 -> A*;
+    ???000 -> E*;
+    ???110 -> C*;
+    ???010 -> G*;
+  }};
+  [qu=Q_TL_BL] {switch {
+    ???001 -> D*;
+    ???101 -> H*;
+    ???011 -> B*;
+    ???111 -> F*;
+  }};
+  [qu=Q_BR_BR] {switch {
+    ?011?? -> C*;
+    ?010?? -> G*;
+    ?111?? -> A*;
+    ?110?? -> E*;
+  }};
+  [qu=Q_TR_BR] {switch {
+    ?000?? -> D*;
+    ?001?? -> H*;
+    ?100?? -> B*;
+    ?101?? -> F*;
+  }}
+};
+
+# Default when there's one file with one icon
+default1 = *;
+
+# Default when there's one file with more than one icon (except for
+# the grass)
+default2 = {schema16};
+
+# Same as default2, but for the grass
+default2g = {pos=version;*};
+
+# Default when there are multiple files
+default3 = {file=version;schema16};
+
+# Default for the icon depicting the value of neighbours
+default_info = default2g;
+
+>>

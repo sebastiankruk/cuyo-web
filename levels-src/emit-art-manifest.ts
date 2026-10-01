@@ -35,15 +35,11 @@ import { artManifest } from "../engine/level-format/art.ts";
 import type { ArtEntry, ArtManifest } from "../engine/level-format/art.ts";
 import {
   availableLevelFiles,
-  haveUpstream,
   readGlobals,
   readLevelFile,
 } from "./level-sources.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR =
-  process.env["CUYO_DATA_DIR"] ??
-  resolve(HERE, "../.context/upstream-cuyo/data");
 const OUT = resolve(HERE, "generated/art-manifest.ts");
 
 /** The versions to resolve, matching the corpus oracle's list. */
@@ -68,26 +64,22 @@ interface Reference {
  * names are illustrative and would put keys in the manifest that no level uses.
  */
 /**
- * Every level file, from both sources.
+ * Every level file, from both committed sources.
  *
- * `levels/` as well as the upstream checkout: a contributed level naming a picture the
- * corpus does not use must still get an entry, or the build fails for the level that is
- * supposed to be adding to the game. Failing on an unknown key is the point of the
- * manifest, and a contributed level is exactly the case it exists to catch.
+ * A contributed level naming a picture the vendored levels do not use must still get an
+ * entry, or the build fails for the level that is supposed to be adding to the game.
+ * Failing on an unknown key is the point of the manifest, and a contributed level is
+ * exactly the case it exists to catch.
  */
 function levelFiles(): string[] {
-  if (!haveUpstream()) {
-    throw new Error(
-      `No upstream level data. Run "make fetch:corpus" first, or set ` +
-        `CUYO_DATA_DIR.`,
-    );
-  }
   const files = availableLevelFiles().filter((f) => f !== "globals.ld");
+  // Zero is not a legitimate state here. There are 79 vendored levels, so an empty
+  // list means an incomplete checkout or a changed directory layout - and an empty
+  // manifest would silently blank every level rather than fail.
   if (files.length === 0) {
     throw new Error(
-      "No level files found in either levels/ or the upstream checkout. Either the " +
-        "corpus is missing or the directory layout has changed, and either way an " +
-        "empty manifest would silently blank every level.",
+      "No level files found in levels/upstream/ or levels/. The vendored levels are " +
+        "committed, so this is an incomplete checkout rather than a missing fetch.",
     );
   }
   return files;
@@ -217,9 +209,9 @@ function main(): void {
   const { refs, files, levels } = collectReferences();
   if (refs.length === 0) {
     throw new Error(
-      `No picture references found in ${DATA_DIR}. Either the corpus is missing or ` +
-        `the parser stopped recognising \`pics\`, which would silently emit an empty ` +
-        `manifest and blank every level.`,
+      `No picture references found across the ${files} level files. Either the ` +
+        `vendored levels are missing or the parser stopped recognising \`pics\`, ` +
+        `which would silently emit an empty manifest and blank every level.`,
     );
   }
   // Deduplicate by key, keeping the first kind that used it.

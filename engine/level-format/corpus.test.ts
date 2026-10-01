@@ -5,13 +5,15 @@
  * These tests read that directory directly, so they fail if upstream gains
  * syntax the lexer does not handle.
  *
- * The upstream tree lives in `.context/upstream-cuyo/`, which is local-only and
- * therefore absent from a fresh clone. `CUYO_DATA_DIR` overrides the location.
- * These tests fail loudly rather than skipping: "the parser handles every real
- * level" is the assertion, and it cannot be evaluated without the corpus.
+ * The 79 level files are committed, in `levels/upstream/`, so this suite runs on a
+ * fresh clone with nothing fetched. It read a local-only checkout before, and skipped
+ * itself when the checkout was absent - which meant the strongest parser oracle in the
+ * repository silently did not exist for anyone who had not run `make corpus`. These
+ * tests now fail rather than skip: "the parser handles every real level" is the
+ * assertion, and an assertion that quietly stops running is not one.
  */
 
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LdLexError, decodeLatin1, tokenize } from "./lexer.ts";
@@ -60,15 +62,12 @@ function corpusPrng(where: string): ScriptedPrng {
   return new ScriptedPrng(values);
 }
 
-const DATA_DIR =
-  process.env["CUYO_DATA_DIR"] ??
-  resolve(import.meta.dirname, "../../.context/upstream-cuyo/data");
+/** The committed level files. See the note at the top about why these are in git. */
+const DATA_DIR = resolve(import.meta.dirname, "../../levels/upstream");
 
-const ALL_LD_FILES = existsSync(DATA_DIR)
-  ? readdirSync(DATA_DIR)
-      .filter((f) => f.endsWith(".ld"))
-      .sort()
-  : [];
+const ALL_LD_FILES = readdirSync(DATA_DIR)
+  .filter((f) => f.endsWith(".ld"))
+  .sort();
 
 interface LexedFile {
   readonly name: string;
@@ -93,12 +92,15 @@ function lexFile(name: string): LexedFile {
 }
 
 describe("upstream corpus", () => {
-  it("finds the upstream data directory", () => {
+  it("has the level files committed, not merely present locally", () => {
+    // The suite's own precondition, stated as a test so that an incomplete checkout
+    // says which file is missing rather than reporting a hundred lex failures
+    // downstream. 79 levels plus `globals.ld` and `summary.ld`.
     expect(
       ALL_LD_FILES.length,
-      `no .ld files found in ${DATA_DIR}. The upstream Cuyo tree is ` +
-        `local-only; put it at .context/upstream-cuyo or set CUYO_DATA_DIR.`,
-    ).toBeGreaterThan(50);
+      `only ${ALL_LD_FILES.length} .ld files in ${DATA_DIR}. These are committed; ` +
+        `an incomplete checkout is the only way to get this wrong.`,
+    ).toBeGreaterThanOrEqual(81);
   });
 
   it("tokenises every .ld file without error", () => {

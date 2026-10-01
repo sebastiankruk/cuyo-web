@@ -1,16 +1,26 @@
 # `levels/`
 
-**Contributed levels**, tracked in git.
+**Contributed levels, and any that replace a vendored one.** Tracked in git.
 
-Upstream Cuyo's own 79 levels are _not_ here. They are GPL-2.0 content this repository
-deliberately does not commit; they live in a local-only checkout at
-`.context/upstream-cuyo/data/`, fetched by `make corpus`. This directory is for levels
-written for this project.
+Upstream Cuyo's own 79 levels live in [`upstream/`](upstream/) in this same directory,
+committed and byte-identical to upstream's. They are GPL-2.0-or-later and so is this
+project, so shipping them costs 660 kB and saves a fresh clone a fetch.
+
+**A file here with the same name as one in `upstream/` shadows it.** That is how you fix
+an upstream level in place, without forking it under a new name — and the vendored
+original stays verbatim, which is what `make check-levels-upstream` relies on.
+
+| Directory   | Committed | What it is                                    |
+| ----------- | --------- | --------------------------------------------- |
+| `upstream/` | yes       | Upstream's 79 levels, verbatim. Do not edit.  |
+| `.`         | yes       | New levels, and corrections to vendored ones. |
 
 ## How to add one
 
 See [`docs/adding-levels.md`](../docs/adding-levels.md) — the format, the settings worth
-setting deliberately, and the checklist.
+setting deliberately, and the checklist. Upstream's own worked example is committed at
+[`upstream/example.ld`](upstream/example.ld) and demonstrates every setting with
+comments.
 
 The short version:
 
@@ -30,13 +40,18 @@ file and change its contents rather than learn a new one. A contributed level se
 indexed exactly as the original is: sections give identity and display names, and
 `level[track]` lists give grouping and order.
 
+The two summaries are parsed separately and then merged — not concatenated and scanned.
+Concatenating looks equivalent and is not: `level[track]` lists are found by their body,
+so two files' lists would be indistinguishable.
+
 ## Two things to know before you write one
 
 - **Picture names are logical keys, not file paths.** Nothing is read from disk. The build
-  generates a manifest of every key the bundled levels reference and the renderer draws
-  each one procedurally, so a level works without artwork you have not drawn. Two kinds
-  sharing a name share a colour; two different names may come out too similar to tell
-  apart at cell size. That gap is current work on the roadmap.
+  generates a manifest of every key the levels reference and the renderer draws each one
+  procedurally, so a level works without artwork you have not drawn. Colours come from a
+  palette built per level, so two kinds in one level are always far enough apart in hue
+  to tell apart at cell size — naming the same picture twice gives you the same colour,
+  which is occasionally what you want and usually is not.
 - **Cual blocks are not executed yet.** A level using one loads and then plays by the
   ordinary rules, which is subtly wrong rather than obviously broken. Please avoid Cual
   in contributions until the runtime lands.

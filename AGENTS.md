@@ -45,7 +45,10 @@ been wrong twice.
 
 - `make check` is what CI runs, and what to run before claiming something works.
 - `CUYO_AI_MODE=1 make check` strips banners and echoes for terser output.
-- `make corpus` runs the level-file corpus oracle for the parser.
+- `make check-levels-upstream` diffs the committed level files against a fetched
+  upstream tree, so "byte-identical to upstream" stays a checked claim. Needs
+  `make fetch-corpus` once; skips with a message otherwise, and is deliberately not
+  in `make check` because CI has no upstream tree.
 - `npx openspec validate --strict --all` for the change specs.
 
 ## What is actually playable

@@ -141,6 +141,23 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [ ] 6.5 Implement per-level, per-difficulty progress records (completed flag, best score) with first-completion unlocking the next level in the track, and verify unlock and record-retention behaviour
 - [ ] 6.6 Implement the level introduction screen data (name, author, description) and the seen-level skip option, and verify both
 
+### Catalogue navigation, from playing it
+
+Recorded from a play session, not designed in advance. The seven tracks do not scale to
+79 levels: a player cannot find a level they half-remember the name of, and the list is
+long enough that scrolling to the bottom is the only way to see what exists.
+
+- [ ] 6.7 Give every level card a small rendered tile — a miniature of its actual board,
+  background and kinds — so the catalogue is scannable by eye rather than by name, and verify a tile matches the level it opens
+- [ ] 6.8 Group the catalogue into collapsible sections within a track, so a track of 20 is
+  navigable, and remember which sections were open
+- [ ] 6.9 Add a name search, so a level that is half-remembered can be found
+- [ ] 6.10 Add a filter by author, since the levels are not all by one person
+- [ ] 6.11 Offer a choice of collection views — by track, by author, by completion, recently
+  played — and remember the choice
+- [ ] 6.12 Long-press a level card to show the whole track's progress inline, so the
+  catalogue can answer "how far through am I" without leaving it
+
 ## 7. Presentation
 
 - [ ] 7.1 Implement the canvas board layout that fits the largest centred 1:2 rectangle in the available area and disables image smoothing, and verify on phone and tablet viewport sizes

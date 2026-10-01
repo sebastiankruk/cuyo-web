@@ -20,7 +20,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readFileSync } from "node:fs";
 import { parseLd } from "../engine/level-format/parser.ts";
 import { Version } from "../engine/level-format/version.ts";
 import { DefinitionScope, rootScope } from "../engine/level-format/scope.ts";
@@ -43,7 +42,7 @@ import type {
   Track,
 } from "../engine/level-format/index-data.ts";
 import {
-  UPSTREAM_DIR,
+  readVendoredSummary,
   contribSummary,
   levelFileExists,
   readGlobals,
@@ -269,10 +268,7 @@ function compile(
 }
 
 function main(): void {
-  const upstreamSummary = readFileSync(
-    resolve(UPSTREAM_DIR, "summary.ld"),
-    "latin1",
-  );
+  const upstreamSummary = readVendoredSummary();
   const globals = parseLd(readGlobals(), "globals.ld");
 
   // Both summaries, upstream first so its levels take the canonical positions when a
@@ -330,7 +326,8 @@ function main(): void {
     // Same union, for the same reason: a contributed level offered on `contrib,easy`
     // must not vanish because upstream already declared that variant.
     for (const [track, perDifficulty] of part.variants) {
-      const existing = variants.get(track) ?? new Map<Difficulty, readonly string[]>();
+      const existing =
+        variants.get(track) ?? new Map<Difficulty, readonly string[]>();
       for (const [difficulty, names] of perDifficulty) {
         const merged = [...(existing.get(difficulty) ?? [])];
         for (const name of names) if (!merged.includes(name)) merged.push(name);
@@ -425,7 +422,9 @@ function main(): void {
       const track =
         [...trackPositions.keys()].find((t) =>
           (variants.get(t)?.get(difficulty) ?? []).includes(section.id),
-        ) ?? trackPositions.keys().next().value ?? "all";
+        ) ??
+        trackPositions.keys().next().value ??
+        "all";
       const compiled = compile(
         globals,
         section.filename,
