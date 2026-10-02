@@ -62,7 +62,18 @@
 
 import type { Expr, Ort } from "./expr.ts";
 import type { AssignOperator } from "./code.ts";
+import { BLOPART_MIN_CUAL } from "./const-tables.ts";
+import {
+  CONNECTION_SOLO,
+  connectionsAt,
+  matchesNeighbourPattern,
+} from "./neighbours.ts";
+import type { NeighbourField } from "./neighbours.ts";
+import { specialVariableSlot } from "./store.ts";
 import type { BlobStore, TimeSlices } from "./store.ts";
+
+/** `spezvar_kind`, whose *shadow* is what `verbindetMit` compares. */
+const KIND_SLOT = specialVariableSlot("kind");
 
 /** Where the asking blob is. Which resolution is legal depends on it. */
 export type Here =
@@ -309,4 +320,72 @@ export function writeAddressed(
   if (store === null) return false;
   slices.defer(store, slot, value, operation);
   return true;
+}
+
+/**
+ * `Blop::getVerbindungen`: the asking blob's connection bitmask, off a live board.
+ *
+ *     int Blop::getVerbindungen() const {
+ *       if (mBesitzer) return mBesitzer->getBesitzVerbindungen(mOrt.x, mOrt.y);
+ *       else           return verbindung_solo;
+ *     }
+ *
+ * **Only a blob on a cell has an owner.** The global and semiglobal blobs and a falling piece
+ * all answer `verbindung_solo`, which is `0x0100` — the ninth bit, above all eight directions.
+ * So every pattern reads as `0` in all eight positions and `1???0???` is false for all of them,
+ * because the mask only ever covers bits 0 to 7. That is not a special case to be friendly
+ * about: `kacheln4.ld` and `kacheln6.ld` ask a *falling* piece about its neighbours, and the
+ * honest answer is that a falling piece has none.
+ *
+ * The pattern arithmetic itself is `neighbours.ts`'s, from task 3.10, which is why this is a
+ * thin adapter and the file the corpus's 298 uses are checked against lives there.
+ */
+export function connectionsOf(field: AccessField): number {
+  const here = field.here;
+  if (here.kind !== "cell") return CONNECTION_SOLO;
+  return connectionsAt(neighbourFieldOf(field), here.x, here.y);
+}
+
+/**
+ * `nachbar_acode`, as the `EvalContext.neighbour` a caller hands to the evaluator.
+ *
+ *     case nachbar_acode: { return (b.getVariable(spezconst_connect) & mZahl) == mZahl2; }
+ *
+ * The bitmask is read per pattern rather than once, because a step can change a kind and
+ * `verbindetMit` reads the *shadow*, so the same blob's answer legitimately differs between two
+ * patterns evaluated in one step.
+ */
+export function neighbourReader(field: AccessField): (pattern: string) => boolean {
+  return (pattern) => matchesNeighbourPattern(connectionsOf(field), pattern);
+}
+
+/**
+ * The board as `connectionsAt` needs to see it.
+ *
+ * Two differences from `AccessField`, both forced:
+ *
+ * - `hexShift` takes the side as well, because `ld->getHexShift(rechts, x)` does. The side is
+ *   the asking blob's own, which `sideWithHalf(field, null)` already answers.
+ * - `kindAt` reads `getAlt(spezvar_kind)`, not `get`. `Blop::verbindetMit` compares
+ *   `getVariableVergangenheit(spezvar_kind)` on **both** sides, so "the neighbours as they were
+ *   at the beginning of the step" is not a snapshot of the neighbours but of the pair — and
+ *   `cual.6` says exactly that: "If some blob changes its kind during a step, the expression
+ *   will still test the neighbours as they were at the beginning of the step."
+ */
+function neighbourFieldOf(field: AccessField): NeighbourField {
+  const right = sideWithHalf(field, null);
+  return {
+    width: field.width,
+    height: field.height,
+    hex: field.hex,
+    mirrored: field.mirrored,
+    hexShift: (x) => field.hexShift(right, x),
+    // A cell with no blob reads as empty, which is `NeighbourField`'s own contract — and in
+    // practice never happens, because every cell of a field holds a blob.
+    kindAt: (x, y) => field.at(right, x, y)?.getAlt(KIND_SLOT) ?? BLOPART_MIN_CUAL,
+    // `blopart_keins` is -1, which is also `blopart_min_cual`: the last kind Cual may name, and
+    // the only sort with the board-edge special (`mVerbindetMitRand[i] = mBlopart ==
+    // blopart_keins`). One number decides both the off-board rule and what "same kind" means.
+    emptyKind: BLOPART_MIN_CUAL,
+  };
 }

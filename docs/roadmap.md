@@ -177,17 +177,30 @@ its source.
 **Groups 3 and 4 are done, and that is not the same as the runtime being done.** Task 4.13
 wired a compile pass into `make check` that names every construct in the corpus this
 runtime cannot run, by file, line and construct. It reported 1538 places in three
-constructs; 4.14 closed the 845 `call` ones and 4.15 the 395 `scoped` ones, so it now
-reports **298 in one**:
+constructs; 4.14 closed the 845 `call` ones, 4.15 the 395 `scoped` ones and 4.16 the 298
+neighbour reads, so it now reports **none at all**.
 
-| construct    | places | what is missing                                       |
-| ------------ | -----: | ----------------------------------------------------- |
-| `neighbour`  |    298 | reading a pattern out of a blob's array               |
+That is a claim worth being careful about, because _no unimplemented construct_ is not
+_"the levels run"_. The pass is static: it asks whether there is a case for each construct,
+with no board and no simulation, so `connectionsAt` can be implemented and still be wrong
+about a hex column. Only 12.3 and 12.7 will catch that.
 
-One feature rather than 298 problems, and the gate is a checked snapshot rather than a
-claim that the list is empty — so 0.4.0 is not cut while this is open. When 4.16 closes it
-the list really will be empty, and the gate wants replacing rather than loosening: an empty
-list is the success condition, and it should be asserted as one rather than guarded against.
+**Replacing the gate found three holes in the gate itself** — which is the argument for it
+having been a snapshot rather than a claim. `walkExpressions` never reached a lettered
+draw's address (`Y@(1)*`, 3372 of them) or an assignment's _target_ (`kind@@(xc@@+1,…)`,
+354, three expressions each), and `walkStatements` never reached a `sharedCall` body. No
+construct was hidden by any of them, because a coordinate cannot hold a neighbour pattern —
+but a gate that skips a third of a level's arithmetic cannot be trusted to say the rest is
+fine. So the gate now asserts the list is empty _and_ takes a census of what the corpus
+contains, which is what stops _"no gaps"_ from also meaning _"did not look"_.
+
+**A `switch` default branch is mis-parsed, and that is a parser bug rather than a runtime
+one.** `antarctic.ld`, `go2.ld`, `baggis.ld` and 26 other levels write `cond -> body; => default;`,
+which upstream's grammar has (`ausdruck PFEIL code_1 ';' PFEIL code_1 ';'`) and this parser
+does not: the default is dropped. 298 of the corpus's 600 neighbour patterns sit inside
+those default branches, so **half the neighbour patterns in the corpus are currently
+invisible** — the gate reports zero because it never sees them. This is the next thing
+worth doing, and it is group 3's task rather than group 4's.
 
 **Two tasks the checklist did not have**, found while reading upstream rather than while
 running the corpus: 4.17, where a procedure definition is only recognised at a `code_zeile`

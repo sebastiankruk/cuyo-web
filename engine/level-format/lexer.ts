@@ -332,6 +332,23 @@ export function tokenize(source: string, filename = "<input>"): Token[] {
       add(s.length, { kind: "string", text: s.text, ...p });
     }
 
+    // Neighbour patterns. Fixed length, so eight present beats six.
+    //
+    // **Added before the numbers on purpose**, which is upstream's rule order and not a
+    // preference. `scanner.ll` lists `[01?]{8}` and `[01?]{6}` at rules 5 and 6 and
+    // `([0-9]+)|(0[Xx][0-9A-Fa-f]+)` at rule 7, and flex takes the *longest* match and then the
+    // *earliest* rule. `11111111` therefore matches rules 5 and 7 at eight characters each, and
+    // rule 5 wins — it is a pattern, not the number eleven million.
+    //
+    // Found by 4.16, and the corpus has **nine** of them, all as `switch` conditions:
+    // `baggis.ld` 197-203 (the oven's eight faces), `go2.ld:61` and `wohnungen.ld:51`. Read as
+    // numbers they are almost never true, so those three levels drew one face of the oven, one
+    // border tile and one roof tile respectively — a wrong answer with nothing to fail.
+    for (const len of [8, 6]) {
+      const m = matchPattern(source, i, len);
+      if (m > 0) add(m, { kind: "neighbour", text: source.slice(i, i + m), ...p });
+    }
+
     // Numbers, including C `%i` prefixes.
     const hex = matchHex(source, i);
     if (hex > 0) {
@@ -364,12 +381,6 @@ export function tokenize(source: string, filename = "<input>"): Token[] {
         value: digits.length > 0 ? parseInt(digits, 10) : 0,
         ...p,
       });
-    }
-
-    // Neighbour patterns. Fixed length, so eight present beats six.
-    for (const len of [8, 6]) {
-      const m = matchPattern(source, i, len);
-      if (m > 0) add(m, { kind: "neighbour", text: source.slice(i, i + m), ...p });
     }
 
     // Identifiers and words. A lone letter is the letter shorthand; anything
