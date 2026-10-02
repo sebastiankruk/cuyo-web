@@ -261,7 +261,13 @@ long enough that scrolling to the bottom is the only way to see what exists.
 - [ ] 10.9 Implement the portrait-lock preference that requests orientation on start, and verify both enabled and disabled states
 - [ ] 10.10 Implement the reduced-motion option suppressing non-essential animation while preserving gameplay information, and verify blob idle animations and menu transitions are suppressed
 - [ ] 10.11 Implement audio setup deferred to the first user gesture with mute and volume controls, and verify silence before the gesture and sound after it
-- [ ] 10.12 Verify the rules dialog of 9.8 on a portrait phone: readable at the smaller size, reachable with one thumb, and that pausing covers the case where it is opened mid-fall
+- [x] 10.12 Verify the rules dialog of 9.8 on a portrait phone: readable at the smaller size, reachable with one thumb, and that pausing covers the case where it is opened mid-fall
+
+  Verified on a phone against `f052ecb` before #7 merged: the smaller face reads, the
+  dialog is clear of the board, and the catalogue footer beside it is legible at real size
+  rather than only in a shrunk screenshot. The backdrop at 62% and the close button placed
+  last and left-aligned were both guesses made without a screen; both survived being looked
+  at.
 
 ## 11. PWA and Persistence
 

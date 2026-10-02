@@ -22,10 +22,17 @@ Everything else is untouched: 3 and 4 (the Cual runtime), 6 (catalogue), 7
 **0.2.0 is cut and playable.** All 79 levels, real rules, playable on a phone. That is
 the honest description of where this is: not a game yet, but the game underneath one.
 
-**0.3.0 is in progress.** Colours are now assigned per level rather than hashed per
-picture name, so two kinds can no longer come out the same colour — the palette work
-below, which was the one thing making the board hard to read. Still to come in 0.3.0:
-the rules dialog as a pausing modal, and progress and unlocking.
+**0.3.0 is in progress, and nearly done.** Colours are now assigned per level by
+perceptual distance rather than hashed per picture name, so two kinds can no longer come
+out the same colour. The rules are a dialog that pauses the game, so reading them is no
+longer a way to lose a piece. The licence is AGPL-3.0-or-later, and the level files are
+committed, so a fresh clone needs no fetch to build.
+
+**Still to come in 0.3.0: progress and unlocking** (6.5, 6.6) — which levels you have
+finished, best scores, the next level in a track unlocking. Without it every visit starts
+from the catalogue with no memory, and that is the main thing that makes a game feel like a
+game rather than a demo. It is also entirely testable and needs no visual decisions, which
+makes it the obvious thing to pick up next.
 
 **The level files are committed.** All 79, verbatim, in `levels/upstream/`. A fresh clone
 builds, tests and plays with no fetch step, and five test files that used to skip
