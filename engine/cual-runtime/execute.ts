@@ -9,10 +9,13 @@
  * against a walker that is never busy.
  */
 
-import type { Stmt } from "./code.ts";
+import type { AssignOperator, Stmt } from "./code.ts";
 import type { Expr } from "./expr.ts";
 import type { BusySlots } from "./slots.ts";
-import type { BlobStore } from "./store.ts";
+import type { BlobStore, TimeSlices } from "./store.ts";
+import { resolveOrt, writeAddressed } from "./access.ts";
+import type { AccessField } from "./access.ts";
+import { divv, modd } from "./divmod.ts";
 
 /** What the walker needs from the blob it is running. */
 export interface ExecutionContext {
@@ -22,6 +25,18 @@ export interface ExecutionContext {
   readonly busySlots: ReadonlyMap<Stmt, BusySlots>;
   /** Evaluate an expression in this blob's context. */
   readonly evaluate: (expr: Expr) => number;
+  /**
+   * The slot of a user variable, or null if the level declared no such name.
+   *
+   * Optional, because most statements never need it and a context that only runs sequences
+   * should not have to invent a namespace. An assignment without one throws by name rather
+   * than writing to slot 0 — which would be a plausible-looking way to corrupt `file`.
+   */
+  readonly slotOf?: (name: string) => number | null;
+  /** The board, for an assignment through an address. */
+  readonly field?: AccessField;
+  /** The window deferred writes queue onto. */
+  readonly slices?: TimeSlices;
 }
 
 /**
@@ -91,6 +106,9 @@ export function runStatement(node: Stmt, ctx: ExecutionContext): boolean {
         ctx,
       );
 
+    case "assign":
+      return runAssign(node, ctx);
+
     case "busy":
       // `busy_code` is the one leaf that *is* busy: `case busy_code: busy = true;`. It is
       // how a level says "I am still working on this" without any machinery of its own, and
@@ -128,6 +146,76 @@ export function runStatement(node: Stmt, ctx: ExecutionContext): boolean {
 
     default:
       return notYet(node.kind);
+  }
+}
+
+/**
+ * `set_zeile`: an assignment, local or through an address.
+ *
+ * The operator travels with the *operand*, not with the result. `x += 1` evaluates to the
+ * number 1 and queues `add`; `applyOperation` at end-of-step then does `x = x + 1` against
+ * whatever `x` is by then. That is what makes `X@(1,0) += 1` land on the value "just before
+ * the change" rather than on the value from when it was queued.
+ *
+ * A *local* target applies immediately instead, because upstream calls `setVariable` rather
+ * than `setVariableZukunft` when `v.Ort_hier()`. So `x += 1` reads `x` as of this instant,
+ * which is why `X = X@(0,0) + 1` and `X@(0,0) += 1` differ even with no address in sight on
+ * the left-hand side.
+ */
+function runAssign(node: Extract<Stmt, { kind: "assign" }>, ctx: ExecutionContext): boolean {
+  // "Normal statements like assignments are never busy."
+  const operand = ctx.evaluate(node.value);
+  const { slotOf } = ctx;
+  if (!slotOf) {
+    throw new Error(
+      "Cual: an assignment needs a context with slotOf, so a name can be resolved to a slot",
+    );
+  }
+
+  if (node.target.kind === "positioned") {
+    const { field, slices } = ctx;
+    if (!field || !slices) {
+      throw new Error("Cual: an assignment through an address needs a field and a slice");
+    }
+    const slot = slotOf(node.target.name);
+    if (slot === null) throw new Error(`Cual: no variable named '${node.target.name}'`);
+    const resolved = resolveOrt(field, node.target.position, ctx.evaluate);
+    writeAddressed(field, resolved, slot, operand, node.operator, slices);
+    return false;
+  }
+
+  if (node.target.kind !== "variable") {
+    throw new Error(`Cual: cannot assign to a '${node.target.kind}'`);
+  }
+  const slot = slotOf(node.target.name);
+  if (slot === null) throw new Error(`Cual: no variable named '${node.target.name}'`);
+  ctx.store.set(slot, applyLocally(node.operator, ctx.store.get(slot), operand));
+  return false;
+}
+
+/** `setVariableIntern`'s switch, applied at once rather than at end-of-step. */
+function applyLocally(operation: AssignOperator, current: number, operand: number): number {
+  switch (operation) {
+    case "=":
+      return operand;
+    case "+=":
+      return current + operand;
+    case "-=":
+      return current - operand;
+    case "*=":
+      return current * operand;
+    case "/=":
+      return divv(current, operand);
+    case "%=":
+      return modd(current, operand);
+    case ".+=":
+      return current | operand;
+    case ".-=":
+      return current & ~operand;
+    default: {
+      const impossible: never = operation;
+      throw new Error(`Cual: unknown assignment operator '${String(impossible)}'`);
+    }
   }
 }
 
@@ -298,7 +386,6 @@ export function notYet(kind: string): never {
     if: "4.2",
     switch: "4.2",
     switchCase: "4.2",
-    assign: "4.7",
     scoped: "4.7",
     call: "4.6",
     draw: "4.9",

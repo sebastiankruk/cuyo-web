@@ -210,7 +210,6 @@ describe("what this task refuses", () => {
     // is never busy.
     expect(() => notYet("if")).toThrow(/task 4\.2/);
     expect(() => notYet("switch")).toThrow(/task 4\.2/);
-    expect(() => notYet("assign")).toThrow(/task 4\.7/);
     expect(() => notYet("draw")).toThrow(/task 4\.9/);
     expect(() => notYet("effect")).toThrow(/task 4\.12/);
   });
@@ -231,6 +230,23 @@ describe("what this task refuses", () => {
       expect(() => runCode(statements, ctx), source).toThrow(/task/);
     }
   });
+
+
+  it("refuses an assignment when the context cannot resolve a name to a slot", () => {
+    // `assign` is implemented, so it is out of the list above. But without `slotOf` the slot
+    // is unknown, and writing to slot 0 would land on `file` — a plausible-looking way to
+    // corrupt a level. The name goes in the message instead.
+    const statements = parseCode(lex("xc += 1;"));
+    const allocation = allocateSlots(statements);
+    const slices = new TimeSlices();
+    const ctx: ExecutionContext = {
+      store: new BlobStore(allocation.slotCount, 13, slices),
+      busySlots: allocation.busySlots,
+      evaluate: () => 1,
+    };
+    expect(() => runCode(statements, ctx)).toThrow(/needs a context with slotOf/);
+  });
+
 
   it("skips definitions and declarations, which upstream never executes", () => {
     const slices = new TimeSlices();

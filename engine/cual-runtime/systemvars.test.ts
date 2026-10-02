@@ -37,6 +37,8 @@ function harness(source: string) {
     store,
     busySlots: allocation.busySlots,
     evaluate: () => 0,
+    // No test in this file assigns, so no name resolves to a slot.
+    slotOf: () => null,
   };
   return { ctx, store, slices, statements };
 }

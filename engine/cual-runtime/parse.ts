@@ -512,10 +512,10 @@ function parseOrt(cursor: Cursor, foreign: boolean): Ort {
     // same kind of thing.
     if (open?.kind === "zeroOne") {
       cursor.next();
-      return { kind: "fall", which: { kind: "number", value: open.value }, half: null };
+      return { kind: "fall", which: { kind: "number", value: open.value }, half: null, relative: !foreign };
     }
     if (canStartExpression(open)) {
-      return { kind: "fall", which: parseExpr(cursor, 1), half: null };
+      return { kind: "fall", which: parseExpr(cursor, 1), half: null, relative: !foreign };
     }
     return foreign ? { kind: "semiglobal", half: null } : { kind: "global", half: null };
   }
@@ -547,20 +547,24 @@ function parseOrt(cursor: Cursor, foreign: boolean): Ort {
     let half: Half | null = null;
     if (cursor.takePunct(";")) half = parseHalf(cursor);
     cursor.expectPunct(")");
-    // One argument: a falling piece for `@@`, a bare address otherwise. `@@(ziel-2;!)` in
-    // augen.ld is the falling form with a half, so `half` belongs on it too.
-    return foreign
-      ? { kind: "fall", which: first, half }
-      : half === null
-        ? { kind: "global", half: null }
-        : { kind: "feld", x: first, y: { kind: "number", value: 0 }, half };
+    // **One argument is the falling form**, not the global blob: `relort_geklammert: ausdruck`
+    // builds a one-argument *relative* Ort (`ortart_relativ_fall`) and
+    // `absort_geklammert: ausdruck` an `absort_fall`. `@(1)` is that; the global blob is the
+    // *empty* address, handled above. `@@(ziel-2;!)` in augen.ld is the absolute form with a
+    // half, which is why `half` belongs on it.
+    //
+    // This used to return the global blob for `!foreign && half === null`, which silently
+    // turned `@(1)` into `@` and made every relative fall-address name the global blob.
+    return { kind: "fall", which: first, half, relative: !foreign };
   }
 
   const second = parseExpr(cursor, 1);
   let half: Half | null = null;
   if (cursor.takePunct(";")) half = parseHalf(cursor);
   cursor.expectPunct(")");
-  return { kind: "feld", x: first, y: second, half };
+  // `@` is relative and `@@` absolute — separate productions, so the flag is the
+  // difference rather than a spelling detail.
+  return { kind: "feld", x: first, y: second, half, relative: !foreign };
 }
 
 /** `parser.yy`'s `haelften_spez`: `=`, `!`, `<`, `>`. */

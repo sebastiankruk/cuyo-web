@@ -419,17 +419,16 @@ describe("cual.6's six examples", () => {
     expect(store.get(X)).not.toBe(10);
   });
 
-  it("refuses an addressed read, which is 4.7 and not this task", () => {
-    // `expr.ts` throws on `positioned` by name rather than reading the wrong slot. Asserting
-    // the refusal is the honest half of "verified": it is true today, and it will start
-    // being false in 4.7, at which point this assertion is what gets replaced by 4.7's own.
-    const statements = parseCode(lex("XC@(0, 0) += 1;"));
-    const target = (statements[0] as { target?: unknown }).target;
-    expect(target).toMatchObject({ kind: "positioned", name: "XC" });
-    expect(() => evaluate({ kind: "positioned", name: "XC", position: { kind: "feld", x: { kind: "number", value: 0 }, y: { kind: "number", value: 0 }, half: null } }, {
-      variable: () => 0,
-      random: () => 0,
-    })).toThrow(/addressed variables are not implemented/);
+  it("refuses an addressed read when the context has no addressed access", () => {
+    // The refusal moved rather than disappeared. `EvalContext.addressed` is optional, so a
+    // context that only supplies plain variables still evaluates everything else, and an
+    // addressed variable in it is refused *by name* rather than read from the wrong place.
+    expect(() =>
+      evaluate(
+        { kind: "positioned", name: "XC", position: { kind: "feld", x: { kind: "number", value: 0 }, y: { kind: "number", value: 0 }, half: null, relative: false } },
+        { variable: () => 0, random: () => 0 },
+      ),
+    ).toThrow(/needs a context with addressed access/);
   });
 
   it("refuses a deferred write, which is 3.9", () => {
@@ -670,24 +669,4 @@ describe("cual.6's six examples, with the deferred writes in place", () => {
     expect(store.get(X)).toBe(6);
   });
 
-  it("still refuses an addressed read, which is 4.7", () => {
-    // Unchanged by 3.9: the queue makes the *write* end-of-step, but reading `X@(0, 0)` is
-    // 4.7 and still throws. So the examples above are verified as queue-and-shadow
-    // mechanics, not yet end to end through the evaluator.
-    expect(() =>
-      evaluate(
-        {
-          kind: "positioned",
-          name: "XC",
-          position: {
-            kind: "feld",
-            x: { kind: "number", value: 0 },
-            y: { kind: "number", value: 0 },
-            half: null,
-          },
-        },
-        { variable: () => 0, random: () => 0 },
-      ),
-    ).toThrow(/addressed variables are not implemented/);
-  });
 });

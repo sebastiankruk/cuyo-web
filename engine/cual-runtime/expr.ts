@@ -83,8 +83,29 @@ export type Ort =
   // a falling piece, half a step - are both in the corpus, and neither is a `feld`.
   | { readonly kind: "global"; readonly half: Half | null }
   | { readonly kind: "semiglobal"; readonly half: Half | null }
-  | { readonly kind: "fall"; readonly which: Expr; readonly half: Half | null }
-  | { readonly kind: "feld"; readonly x: Expr; readonly y: Expr; readonly half: Half | null };
+  /**
+ * One coordinate. `relative` distinguishes `@(x)` — a falling-relative offset — from `@@(x)`,
+ * which is `absort_fall` and an absolute half-fall index.
+ */
+  | {
+      readonly kind: "fall";
+      readonly which: Expr;
+      readonly half: Half | null;
+      readonly relative: boolean;
+    }
+  /**
+   * Two coordinates. `relative` is the difference between `@(x,y)` and `@@(x,y)`, which are
+   * *different productions* rather than two spellings of one: `relort_geklammert` builds a
+   * relative `Ort` and `absort_geklammert` an absolute one. It has to be in the tree, because
+   * `@(0,0)` and `@@(0,0)` name different cells.
+   */
+  | {
+      readonly kind: "feld";
+      readonly x: Expr;
+      readonly y: Expr;
+      readonly half: Half | null;
+      readonly relative: boolean;
+    };
 
 /** Everything an expression can be. */
 export type Expr =
@@ -168,6 +189,20 @@ export interface EvalContext {
   readonly variable: (name: string) => number;
   /** A value in `0 .. limit - 1`, as `Aufnahme::rnd`. Throws if `limit <= 0`. */
   readonly random: (limit: number) => number;
+  /**
+   * A variable reached through an address: `positioned`.
+   *
+   * Separate from `variable` rather than folded into it, because the two differ in *which
+   * value* they see: `variable` reads the live array, and an addressed read reads the target's
+   * beginning-of-step shadow (`getVariableVergangenheit`). Optional, so a context without
+   * addressed access still evaluates everything else and an addressed variable in it throws by
+   * name rather than reading something plausible.
+   */
+  readonly addressed?: (
+    name: string,
+    position: Ort,
+    evaluate: (expr: Expr) => number,
+  ) => number;
 }
 
 /** Thrown for anything the language rules out at evaluation time. */
@@ -206,8 +241,14 @@ export function evaluate(expr: Expr, ctx: EvalContext): number {
       throw new CualError(`neighbour patterns are not implemented yet (${expr.pattern})`);
 
     case "positioned":
-      // Task 4.7, for the same reason.
-      throw new CualError(`addressed variables are not implemented yet (${expr.name})`);
+      if (!ctx.addressed) {
+        throw new CualError(
+          `addressed variable '${expr.name}' needs a context with addressed access`,
+        );
+      }
+      // The coordinate inside an address is evaluated in the same context, so `@(rnd(2),0)`
+      // draws from the simulation's sequence rather than a second generator.
+      return ctx.addressed(expr.name, expr.position, (inner) => evaluate(inner, ctx));
 
     case "range":
       return evaluateRange(expr, ctx);
