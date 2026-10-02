@@ -23,6 +23,8 @@ import {
 import { tokenize } from "../level-format/lexer.ts";
 import { parseCode } from "./code.ts";
 import { evaluate } from "./expr.ts";
+import { divv } from "./divmod.ts";
+import type { AssignOperator } from "./code.ts";
 
 function lex(source: string) {
   return tokenize(source, "test").filter((t) => t.kind !== "beginCode" && t.kind !== "endCode");
@@ -321,17 +323,20 @@ describe("time slices", () => {
     expect(slices.current).toBe(4);
   });
 
-  it("close does nothing yet, and that is 3.9's to fill in", () => {
-    // Not an oversight to be tidied away: `endGleichzeitig` applies the deferred-write queue,
-    // and a test asserting "close is a no-op" would quietly become false in 3.9. What is
-    // asserted instead is that close does not disturb the store.
+  it("opens a window, and refuses to close one that is not open", () => {
+    const slices = new TimeSlices();
+    expect(slices.isOpen).toBe(false);
+    slices.open();
+    expect(slices.isOpen).toBe(true);
+    slices.close();
+    expect(slices.isOpen).toBe(false);
+    expect(() => slices.close()).toThrow(/without beginGleichzeitig/);
+  });
+
+  it("refuses to queue a write outside a window, as setVariableZukunft's assert does", () => {
     const slices = new TimeSlices();
     const store = new BlobStore(20, 13, slices);
-    slices.open();
-    store.set(SPECIAL_VARIABLE_COUNT, 3);
-    slices.close();
-    expect(store.get(SPECIAL_VARIABLE_COUNT)).toBe(3);
-    expect(store.getAlt(SPECIAL_VARIABLE_COUNT)).toBe(0);
+    expect(() => slices.defer(store, 14, 1, "=")).toThrow(/outside a Gleichzeitig/);
   });
 });
 
@@ -440,5 +445,249 @@ describe("cual.6's six examples", () => {
     expect(store.get(X)).toBe(9);
     // And 3.9 will change this assertion. It is here so that the change is a test failing
     // rather than a behaviour shifting unnoticed.
+  });
+});
+
+/**
+ * The deferred write queue: `setVariableZukunft` and `endGleichzeitig`.
+ *
+ * The whole mechanism is two rules from `cual.6`: a write through `@` happens at the end of
+ * the step, and its *right-hand side* is evaluated immediately. Everything below is those two
+ * rules plus the order they compose in.
+ */
+describe("deferred writes", () => {
+  const slices = new TimeSlices();
+  const writer = new BlobStore(20, 13, slices);
+  const other = new BlobStore(20, 13, slices);
+  const X = SPECIAL_VARIABLE_COUNT;
+  const Y = SPECIAL_VARIABLE_COUNT + 1;
+
+  beforeEach(() => {
+    slices.open();
+    writer.reset(13);
+    other.reset(13);
+  });
+
+  it("is invisible until the window closes", () => {
+    // The task's verification: a cross-blob write is not visible to the reader until the
+    // step ends. Both blobs are in the same window, which is the whole point - simultaneity
+    // is what makes the write invisible.
+    writer.set(X, 1);
+    slices.defer(writer, X, 99, "=");
+    expect(slices.pending).toBe(1);
+    // The writer cannot see it either.
+    expect(writer.get(X)).toBe(1);
+    // Nor can a different blob of the same kind.
+    expect(other.get(X)).toBe(0);
+    slices.close();
+    expect(writer.get(X)).toBe(99);
+  });
+
+  it("applies in queue order, so two writes to one slot compose", () => {
+    writer.set(X, 5);
+    slices.defer(writer, X, 1, "+=");
+    slices.defer(writer, X, 2, "+=");
+    slices.close();
+    expect(writer.get(X)).toBe(8);
+  });
+
+  it("reads the live value at close, not the value when it was queued", () => {
+    // Statement 2 of the six: "X is set to one more than the value of X just before the
+    // change". "Just before the change" is when the queue is applied, so a write to X in
+    // between shifts the result.
+    writer.set(X, 5);
+    slices.defer(writer, X, 1, "+=");
+    writer.set(X, 10);
+    expect(writer.get(X)).toBe(10);
+    slices.close();
+    expect(writer.get(X)).toBe(11);
+  });
+
+  it("does not preserve, so it cannot overwrite the next slice's baseline", () => {
+    // `endGleichzeitig` writes through `setVariableIntern`. A preserve here would replace
+    // the beginning-of-slice values the *next* slice's `@` reads are measured against.
+    slices.open();
+    writer.set(X, 5); // shadow taken here: X was 0 at the start of the slice
+    slices.defer(writer, X, 77, "=");
+    slices.close();
+    expect(writer.get(X)).toBe(77);
+    // The shadow still says what the slice began with. If the deferred write had preserved,
+    // this would be 77 and the next slice's `@` reads would be measured against it.
+    expect(writer.getAlt(X)).toBe(0);
+    slices.open();
+    writer.set(X, 1);
+    // The beginning of the new slice is 77 - the deferred write did land.
+    expect(writer.getAlt(X)).toBe(77);
+  });
+
+  it("applies every operator, with divv and modd for the arithmetic ones", () => {
+    const cases: [AssignOperator, number, number][] = [
+      ["=", 7, 5],
+      ["+=", 7, 12],
+      ["-=", 7, 2],
+      ["*=", 7, 35],
+      // divv(7, 5) is 1 and modd(7, 5) is 2 - floor division, not truncation.
+      ["/=", 7, 1],
+      ["%=", 7, 2],
+      [".+=", 0b1100, 0b1101], // 12 | 5
+      [".-=", 0b1111, 0b1010], // 15 & ~5
+    ];
+    for (const [operator, initial, expected] of cases) {
+      slices.open();
+      writer.reset(13);
+      writer.set(X, initial);
+      slices.defer(writer, X, 5, operator);
+      slices.close();
+      expect(writer.get(X), `${initial} ${operator}= 5`).toBe(expected);
+    }
+  });
+
+  it("divides and mods with divv and modd, not JS operators", () => {
+    // JS `/` truncates toward zero and `%` takes the sign of the dividend; Cual floors both
+    // and documents the difference. A queued `/=` and `%=` must not use the built-ins.
+    slices.open();
+    writer.reset(13);
+    writer.set(X, -7);
+    slices.defer(writer, X, 3, "/=");
+    slices.close();
+    expect(writer.get(X)).toBe(divv(-7, 3));
+    expect(writer.get(X)).toBe(-3);
+  });
+
+  it("clears the queue when the next window opens, as gZZAnz = 0 does", () => {
+    writer.set(X, 1);
+    slices.defer(writer, X, 99, "=");
+    expect(slices.pending).toBe(1);
+    // The write is superseded: the queue is reset, not drained.
+    slices.open();
+    expect(slices.pending).toBe(0);
+    slices.close();
+    expect(writer.get(X)).toBe(1);
+  });
+
+  it("still counts pending entries after a close, which is upstream's gZZAnz", () => {
+    // Faithful rather than tidy. Clearing on close would make `pending` mean "writes this
+    // window" where upstream means "writes not yet superseded by the next open".
+    slices.defer(writer, X, 1, "=");
+    slices.close();
+    expect(slices.pending).toBe(1);
+  });
+
+  it("abandons the queue on abort, so a failed window applies nothing", () => {
+    // `abbruchGleichzeitig` is called from upstream's error constructor. Without it a failed
+    // step would still apply whatever had been queued before the failure - which is worse
+    // than not applying the queue at all.
+    writer.set(X, 1);
+    slices.defer(writer, X, 99, "=");
+    slices.abort();
+    expect(slices.pending).toBe(0);
+    expect(() => slices.close()).toThrow();
+    expect(writer.get(X)).toBe(1);
+  });
+
+  it("writes to whichever blob was queued, not to the last one touched", () => {
+    // The queue holds the blob, not just the slot. Two blobs, two slots, one queue.
+    writer.set(X, 1);
+    other.set(Y, 2);
+    slices.defer(other, Y, 20, "+=");
+    slices.defer(writer, X, 10, "+=");
+    slices.close();
+    expect(writer.get(X)).toBe(11);
+    expect(other.get(Y)).toBe(22);
+  });
+
+  it("gives each blob its own shadow across a cross-blob window", () => {
+    // Two blobs, one window, each preserving on its own first write. The point of the whole
+    // design: same kind, same compiled tree, same slot numbers, independent state.
+    writer.set(X, 1);
+    other.set(X, 100);
+    slices.open(); // a new slice begins with writer.X = 1 and other.X = 100
+    writer.set(X, 2);
+    other.set(X, 200);
+    slices.defer(writer, X, 42, "=");
+    slices.close();
+    // Each blob's shadow is its own, from its own first write in this slice.
+    expect(writer.getAlt(X)).toBe(1);
+    expect(other.getAlt(X)).toBe(100);
+    expect(writer.get(X)).toBe(42);
+    expect(other.get(X)).toBe(200);
+  });
+});
+
+describe("cual.6's six examples, with the deferred writes in place", () => {
+  const slices = new TimeSlices();
+  const store = new BlobStore(20, 13, slices);
+  const X = SPECIAL_VARIABLE_COUNT;
+
+  beforeEach(() => {
+    slices.open();
+    store.reset(13);
+  });
+
+  it("2) X@(0, 0) += 1 sets X one more than the value just before the change", () => {
+    store.set(X, 5);
+    slices.open();
+    // The right-hand side is the literal 1, so the queue holds 1 and the operation.
+    slices.defer(store, X, 1, "+=");
+    // Mid-step, X has moved on - which the documented result depends on.
+    store.set(X, 9);
+    expect(store.get(X)).toBe(9);
+    slices.close();
+    // "one more than the value of X just before the change" - not 6, and not 10.
+    expect(store.get(X)).toBe(10);
+  });
+
+  it("5) X@(0, 0) = X + 1 sets X one more than the *current* value", () => {
+    store.set(X, 5);
+    slices.open();
+    // The right-hand side is evaluated immediately, so the queue holds a literal 6.
+    slices.defer(store, X, store.get(X) + 1, "=");
+    store.set(X, 9);
+    slices.close();
+    expect(store.get(X)).toBe(6);
+  });
+
+  it("6) X@(0, 0) = X@(0, 0) + 1 sets X one more than the beginning-of-step value", () => {
+    store.set(X, 5);
+    slices.open();
+    store.set(X, 9);
+    // Both sides are evaluated immediately: the read is the shadow, the result a literal.
+    slices.defer(store, X, store.getAlt(X) + 1, "=");
+    slices.close();
+    expect(store.get(X)).toBe(6);
+  });
+
+  it("2), 5) and 6) all agree, which is the difference from 1) and 3) they exist to show", () => {
+    // The man page's point is that a deferred write ignores what happens in between. All
+    // three produce 6 from X = 5 at the start of the step and X = 9 mid-step, while 1) and 3)
+    // produce 10.
+    store.set(X, 5);
+    slices.open();
+    store.set(X, 9);
+    slices.defer(store, X, 1, "+=");
+    slices.defer(store, X, store.getAlt(X) + 1, "=");
+    slices.close();
+    expect(store.get(X)).toBe(6);
+  });
+
+  it("still refuses an addressed read, which is 4.7", () => {
+    // Unchanged by 3.9: the queue makes the *write* end-of-step, but reading `X@(0, 0)` is
+    // 4.7 and still throws. So the examples above are verified as queue-and-shadow
+    // mechanics, not yet end to end through the evaluator.
+    expect(() =>
+      evaluate(
+        {
+          kind: "positioned",
+          name: "XC",
+          position: {
+            kind: "feld",
+            x: { kind: "number", value: 0 },
+            y: { kind: "number", value: 0 },
+            half: null,
+          },
+        },
+        { variable: () => 0, random: () => 0 },
+      ),
+    ).toThrow(/addressed variables are not implemented/);
   });
 });
