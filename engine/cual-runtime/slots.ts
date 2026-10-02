@@ -19,7 +19,7 @@
  * | `a, b` | `folge_code` | 1 | `commaSequence` |
  * | `a; b` | `stapel_code` | 0 | `sequence` |
  * | `if c -> a else b` | `bedingung_code` | 2 | `if` |
- * | one `switch` case | `bedingung_code` | 2 | `switch` -> `cases[i]` |
+ * | one `switch` case | `bedingung_code` | 2 | `switchCase` |
  * | `{ ... }` | *no node at all* | 0 | `block` |
  * | `switch { ... }` | *no node at all* | 0 | `switch` itself |
  * | `default x = 3` | `neuerDefault` on an existing slot | 0 | `defaultDecl` |
@@ -35,7 +35,7 @@
  * a number in the array that upstream never allocates.
  */
 
-import type { Stmt } from "./code.ts";
+import type { Stmt, SwitchCase } from "./code.ts";
 import { SPECIAL_VARIABLE_COUNT } from "./store.ts";
 
 /**
@@ -205,6 +205,19 @@ export function allocateSlots(statements: readonly Stmt[]): Allocation {
   const allocator = new SlotAllocator();
   const busySlots = new Map<Stmt, BusySlots>();
 
+  /**
+   * A case is a `bedingung_code` with two flags, and the rest of the switch hangs off its
+   * `otherwise` - so the whole list is walked as one chain.
+   */
+  const visitCase = (entry: SwitchCase): void => {
+    visit(entry.body);
+    if (entry.otherwise) visit(entry.otherwise);
+    busySlots.set(entry, {
+      first: allocator.allocateBool(),
+      second: allocator.allocateBool(),
+    });
+  };
+
   const visit = (node: Stmt): void => {
     switch (node.kind) {
       case "varDecl":
@@ -231,14 +244,12 @@ export function allocateSlots(statements: readonly Stmt[]): Allocation {
       case "switch":
         // The braces are transparent upstream, so the `switch` node itself owns nothing and
         // each case is a `bedingung_code` with two flags of its own.
-        for (const entry of node.cases) {
-          visit(entry.body);
-          if (entry.otherwise) visit(entry.otherwise);
-          busySlots.set(entry, {
-            first: allocator.allocateBool(),
-            second: allocator.allocateBool(),
-          });
-        }
+        visitCase(node.case);
+        return;
+      case "switchCase":
+        // Reached through a previous case's `otherwise`, which is where the rest of the list
+        // lives. `switch`'s own branch only sees the head.
+        visitCase(node);
         return;
       case "sequence":
       case "block":

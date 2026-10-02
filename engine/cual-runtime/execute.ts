@@ -60,6 +60,37 @@ export function runStatement(node: Stmt, ctx: ExecutionContext): boolean {
     case "commaSequence":
       return runCommaSequence(node, ctx);
 
+    case "if":
+      return runCondition(
+        node,
+        () => ctx.evaluate(node.condition) !== 0,
+        node.then,
+        node.otherwise ?? NOTHING,
+        node.latching,
+        node.elseLatching ?? false,
+        ctx,
+      );
+
+    case "switch":
+      // The braces are transparent upstream: `switch { ... }` returns `auswahl_liste`
+      // unchanged, and the list is already a chain of `bedingung_code`s hanging off each
+      // case's `otherwise`.
+      return runStatement(node.case, ctx);
+
+    case "switchCase":
+      return runCondition(
+        node,
+        () => ctx.evaluate(node.condition) !== 0,
+        node.body,
+        node.otherwise ?? NOTHING,
+        node.latching,
+        // mZahl & 2: whether the *second* arrow latches. `pacman.ld` writes
+        // `=> R,R,R,R,R,R,R; ->` - a latching animation with a default that does not latch -
+        // so this cannot be either arrow's value or a constant.
+        node.otherwiseLatching,
+        ctx,
+      );
+
     case "busy":
       // `busy_code` is the one leaf that *is* busy: `case busy_code: busy = true;`. It is
       // how a level says "I am still working on this" without any machinery of its own, and
@@ -84,6 +115,126 @@ export function runStatement(node: Stmt, ctx: ExecutionContext): boolean {
 
     default:
       return notYet(node.kind);
+  }
+}
+
+/** The `nop_code` upstream puts in `mF3` for a condition with no else. */
+const NOTHING: Stmt = { kind: "nothing" };
+
+/**
+ * `bedingung_code`: one `if`, or one `switch` case. The same code upstream, because
+ * upstream's is the same code - `IF_TOK ausdruck PFEIL code_1` and every `auswahl_liste`
+ * entry both build a `bedingung_code` whose `mF1` is the condition, `mF2` the first body and
+ * `mF3` the second.
+ *
+ * Two flags, and this is the part that makes `->` and `=>` differ:
+ *
+ *     bool vast1 = b.getBoolVariable(mBool1Nr);
+ *     bool vast2 = b.getBoolVariable(mBool2Nr);
+ *     bool wahl1;
+ *     if (vast1 && (mZahl & 1))        wahl1 = true;
+ *     else if (vast2 && (mZahl & 2))   wahl1 = false;
+ *     else                             wahl1 = mF1->eval(b);
+ *
+ *     if (vast1 && !wahl1) mF2->busyReset(b);
+ *     if (vast2 && wahl1)  mF3->busyReset(b);
+ *
+ *     if (wahl1) { mF2->eval(b, busy); b.setBoolVariable(mBool1Nr, busy);
+ *                  b.setBoolVariable(mBool2Nr, false); busy &= !!(mZahl & 1); }
+ *     else      { mF3->eval(b, busy); b.setBoolVariable(mBool1Nr, false);
+ *                  b.setBoolVariable(mBool2Nr, busy); busy &= !!(mZahl & 2); }
+ *
+ * Read `mZahl & 1` as "this branch latches". `vast1` is "last time this ran branch 1 *and*
+ * branch 1 was busy", so a `=>` branch that is still busy keeps being chosen without the
+ * condition being re-tested - which is the whole difference between `=>` and `->`. And
+ * `busy &= latching` is why a `->` condition is never busy: it re-tests next step, so there
+ * is nothing to wait for, and the busy flag never propagates outward.
+ */
+function runCondition(
+  owner: Stmt,
+  condition: () => boolean,
+  then: Stmt,
+  otherwise: Stmt,
+  thenLatches: boolean,
+  elseLatches: boolean,
+  ctx: ExecutionContext,
+): boolean {
+  const slots = ctx.busySlots.get(owner);
+  if (!slots) {
+    throw new Error(
+      `Cual: a '${owner.kind}' has no busy slots, so allocateSlots was not run on this tree`,
+    );
+  }
+  const wasThen = ctx.store.busyGet(slots.first);
+  const wasElse = ctx.store.busyGet(slots.second);
+
+  let chooseThen: boolean;
+  if (wasThen && thenLatches) chooseThen = true;
+  else if (wasElse && elseLatches) chooseThen = false;
+  else chooseThen = condition();
+
+  // The branch we are leaving gets its busy state cleared, recursively: it may contain comma
+  // sequences mid-animation, and their flags are per node.
+  if (wasThen && !chooseThen) resetBusy(then, ctx);
+  if (wasElse && chooseThen) resetBusy(otherwise, ctx);
+
+  if (chooseThen) {
+    const busy = runStatement(then, ctx);
+    ctx.store.busySet(slots.first, busy);
+    ctx.store.busySet(slots.second, false);
+    return busy && thenLatches;
+  }
+  const busy = runStatement(otherwise, ctx);
+  ctx.store.busySet(slots.first, false);
+  ctx.store.busySet(slots.second, busy);
+  return busy && elseLatches;
+}
+
+/**
+ * `Code::busyReset`: clear this node's flags and every flag below it.
+ *
+ * "Resettet den Busy-Status von diesem Baum. Ist etwas ineffizient" - resets the busy status
+ * of this tree, and is somewhat inefficient. It does not *run* anything; it only clears.
+ */
+export function resetBusy(node: Stmt, ctx: ExecutionContext): void {
+  switch (node.kind) {
+    case "commaSequence":
+    case "if":
+    case "switchCase": {
+      const slots = ctx.busySlots.get(node);
+      if (!slots) return;
+      ctx.store.busySet(slots.first, false);
+      ctx.store.busySet(slots.second, false);
+      break;
+    }
+    default:
+      break;
+  }
+  switch (node.kind) {
+    case "sequence":
+    case "block":
+      for (const child of node.body) resetBusy(child, ctx);
+      return;
+    case "commaSequence":
+      for (const child of node.parts) resetBusy(child, ctx);
+      return;
+    case "if":
+      resetBusy(node.then, ctx);
+      if (node.otherwise) resetBusy(node.otherwise, ctx);
+      return;
+    case "switch":
+      resetBusy(node.case, ctx);
+      return;
+    case "switchCase":
+      resetBusy(node.body, ctx);
+      if (node.otherwise) resetBusy(node.otherwise, ctx);
+      return;
+    case "scoped":
+    case "procedureDef":
+      resetBusy(node.body, ctx);
+      return;
+    default:
+      return;
   }
 }
 

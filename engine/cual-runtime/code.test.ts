@@ -130,16 +130,52 @@ describe("if and else", () => {
 });
 
 describe("switch", () => {
-  it("collects the cases in order", () => {
-    const stmt = one("switch { busy_num -> busy; busy_num -> busy; }");
+  /** The cases of a switch, following the `otherwise` chain from the head. */
+  function casesOf(stmt: ReturnType<typeof one>) {
     if (stmt.kind !== "switch") throw new Error("expected a switch");
-    expect(stmt.cases).toHaveLength(2);
+    const found: (typeof stmt)["case"][] = [];
+    let entry: typeof stmt["case"] | null = stmt.case;
+    while (entry) {
+      found.push(entry);
+      entry = entry.otherwise && entry.otherwise.kind === "switchCase" ? entry.otherwise : null;
+    }
+    return found;
+  }
+
+  it("chains the cases through `otherwise`, in the order written", () => {
+    // `ausdruck PFEIL code_1 ';' auswahl_liste` puts the rest of the list in the case's
+    // `mF3`, so the list is a right-nested chain rather than a flat array. Flat, every case's
+    // condition would be evaluated on every step - which for `switch { 1:5 -> a; 1:5 -> b; }`
+    // draws two randoms where upstream draws one.
+    const stmt = one("switch { busy_num -> busy; busy_num -> busy; }");
+    const cases = casesOf(stmt);
+    expect(cases).toHaveLength(2);
+    // The first case's `mF3` is the second case, and the last case's is nothing - the `nop_code`
+    // upstream puts there for the one-arrow shape.
+    expect(stmt.kind === "switch" && stmt.case.otherwise?.kind).toBe("switchCase");
+    expect(cases[1].otherwise).toBeNull();
   });
 
   it("records each case's arrow", () => {
     const stmt = one("switch { busy_num -> busy; busy_num => busy; }");
-    if (stmt.kind !== "switch") throw new Error("expected a switch");
-    expect(stmt.cases.map((c) => c.latching)).toEqual([false, true]);
+    expect(casesOf(stmt).map((c) => c.latching)).toEqual([false, true]);
+  });
+
+  it("keeps an explicit default instead of chaining past it", () => {
+    // `-> body` after a case is the second shape's second body and ends the list, so nothing
+    // is chained into it.
+    const stmt = one("switch { busy_num -> busy; -> 5; }");
+    const cases = casesOf(stmt);
+    expect(cases).toHaveLength(1);
+    expect(stmt.kind === "switch" && stmt.case.otherwise?.kind).toBe("number");
+  });
+
+  it("refuses a case after an explicit default rather than dropping it", () => {
+    // `auswahl_liste` cannot continue after the two-arrow shape, so this is not valid Cual.
+    // Silently discarding the second case would give a switch that quietly ignores a case.
+    expect(() => parse("switch { busy_num -> busy; -> 5; busy_num -> busy; }")).toThrow(
+      /ends the switch/,
+    );
   });
 
   it("refuses a switch with no cases", () => {
