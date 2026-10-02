@@ -1,7 +1,27 @@
 # Cuyo — web
 
-[![Latest Release](https://img.shields.io/github/v/release/sebastiankruk/cuyo-web?color=blue&label=version)](https://github.com/sebastiankruk/cuyo-web/releases)
-[![CI Quality](https://github.com/sebastiankruk/cuyo-web/actions/workflows/quality.yml/badge.svg)](https://github.com/sebastiankruk/cuyo-web/actions/workflows/quality.yml)
+<!--
+  The version and CI badges are absent on purpose, and should come back if the repository
+  is ever made public.
+
+  Both need to read the repository without a token, and both fail on a private one — in
+  two different ways, which is why they looked like one bug and were not:
+
+    - The CI badge is GitHub's own endpoint, and it returns a hard 404 to an
+      unauthenticated request for a private repository. Not a rendering problem; the image
+      does not exist for anyone outside the repository.
+    - The version badge returns a valid image saying "no releases or repo not found",
+      because there are no GitHub releases *and* shields.io cannot see a private
+      repository. It would keep saying that until a release is published, even if the
+      repository were public.
+
+  A broken image in a README is worse than no badge: it says something is wrong with the
+  project when what is wrong is that the badge cannot work. The versions below are
+  different — they are static, so they render regardless of who is looking, and they are
+  kept for exactly that reason.
+
+  CI status lives in the Actions tab, which does work for a private repository.
+-->
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSING.md)
 [![Node Version](https://img.shields.io/badge/Node-22%2B-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![TypeScript Version](https://img.shields.io/badge/TypeScript-6-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
