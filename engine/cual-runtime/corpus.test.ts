@@ -21,30 +21,45 @@ import { describe, expect, it } from "vitest";
 import { decodeLatin1, tokenize } from "../level-format/lexer.ts";
 import type { Token } from "../level-format/lexer.ts";
 import { parseCode } from "./code.ts";
+import { allocateSlots } from "./slots.ts";
 import type { Stmt } from "./code.ts";
 
 /** Every `<< >>` block in every level file, with the file and line it came from. */
-function cualBlocks(): { file: string; endLine: number; tokens: Token[] }[] {
-  const dir = resolve(import.meta.dirname, "../../levels/upstream");
-  const blocks: { file: string; endLine: number; tokens: Token[] }[] = [];
-  for (const file of readdirSync(dir).filter((f) => f.endsWith(".ld")).sort()) {
-    const tokens = tokenize(decodeLatin1(readFileSync(join(dir, file))), file);
-    let depth = 0;
-    let buffer: Token[] = [];
-    for (const token of tokens) {
-      if (token.kind === "beginCode") {
-        depth += 1;
-        buffer = [];
-        continue;
-      }
-      if (token.kind === "endCode") {
-        depth -= 1;
-        if (buffer.length) blocks.push({ file, endLine: token.line, tokens: buffer });
-        buffer = [];
-        continue;
-      }
-      if (depth > 0) buffer.push(token);
+function cualBlocksIn(file: string, src: string): { endLine: number; tokens: Token[] }[] {
+  const blocks: { endLine: number; tokens: Token[] }[] = [];
+  const tokens = tokenize(src, file);
+  let depth = 0;
+  let buffer: Token[] = [];
+  for (const token of tokens) {
+    if (token.kind === "beginCode") {
+      depth += 1;
+      buffer = [];
+      continue;
     }
+    if (token.kind === "endCode") {
+      depth -= 1;
+      if (buffer.length) blocks.push({ endLine: token.line, tokens: buffer });
+      buffer = [];
+      continue;
+    }
+    if (depth > 0) buffer.push(token);
+  }
+  return blocks;
+}
+
+function levelDir(): string {
+  return resolve(import.meta.dirname, "../../levels/upstream");
+}
+
+function levelFiles(): string[] {
+  return readdirSync(levelDir()).filter((f) => f.endsWith(".ld")).sort();
+}
+
+function cualBlocks(): { file: string; endLine: number; tokens: Token[] }[] {
+  const blocks: { file: string; endLine: number; tokens: Token[] }[] = [];
+  for (const file of levelFiles()) {
+    const src = decodeLatin1(readFileSync(join(levelDir(), file)));
+    for (const block of cualBlocksIn(file, src)) blocks.push({ file, ...block });
   }
   return blocks;
 }
@@ -93,9 +108,7 @@ describe("Cual statement parser against the corpus", () => {
     // the failure mode this file exists to prevent. Task 3.5 is worded "all 81 levels
     // parse"; there are 82 `.ld` files here, because `summary.ld` holds the level list
     // rather than being a level, and it carries Cual of its own.
-    expect(readdirSync(resolve(import.meta.dirname, "../../levels/upstream")).filter((f) =>
-      f.endsWith(".ld"),
-    )).toHaveLength(82);
+    expect(levelFiles()).toHaveLength(82);
     expect(blocks.length).toBe(339);
   });
 
@@ -130,6 +143,59 @@ describe("Cual statement parser against the corpus", () => {
       0,
     );
     expect(count, `no ${_name} found in the corpus`).toBeGreaterThan(0);
+  });
+
+  it("allocates the same slots every time it is asked", () => {
+    // Task 3.6's verification, verbatim: "verify slot counts are stable for a repeated
+    // parse". Asserted over all 339 blocks rather than over two fixtures, because the
+    // failure it guards against - an allocator whose numbering depends on parse order or on
+    // shared state between blocks - would show up in one block out of 339 and not in a
+    // hand-picked pair.
+    const digest = () =>
+      blocks.map((block) => {
+        const allocation = allocateSlots(parseCode(block.tokens));
+        return [
+          allocation.slotCount,
+          allocation.boolCount,
+          allocation.declaredCount,
+          // The bit numbers themselves, not just how many there are.
+          [...allocation.busySlots.values()].map((s) => `${s.first}/${s.second}`).join(","),
+        ].join(":");
+      });
+
+    const first = digest();
+    const second = digest();
+    expect(second).toEqual(first);
+    // And a third pass, after the others, in case something accumulated.
+    expect(digest()).toEqual(first);
+  });
+
+  it("allocates a level's slots in one run, not one per block", () => {
+    // `getDatenLaenge` is per level knoten, and a level's Cual is spread over several
+    // `<< >>` blocks whose procedures share one array with the block that calls them. So the
+    // level-level allocation is a single run over all of that file's statements.
+    //
+    // Restarting the allocator per block is not just a different number, it is a *larger*
+    // one: each restart begins a fresh 32-bit block, so a level whose flags total 40 across
+    // two blocks needs 2 ints in one run and 2 per block. The relationship is asserted
+    // because the comment above claims it, and a claim about an optimisation nobody measures
+    // is the kind that quietly stops being true.
+    let levelTotal = 0;
+    let perBlockTotal = 0;
+    let filesWithCual = 0;
+    for (const file of levelFiles()) {
+      const src = decodeLatin1(readFileSync(join(levelDir(), file)));
+      const blocks = cualBlocksIn(file, src);
+      if (blocks.length === 0) continue;
+      filesWithCual += 1;
+      levelTotal += allocateSlots(blocks.flatMap((b) => parseCode(b.tokens))).slotCount;
+      for (const block of blocks) {
+        perBlockTotal += allocateSlots(parseCode(block.tokens)).slotCount;
+      }
+    }
+    expect(filesWithCual).toBeGreaterThan(70);
+    expect(levelTotal).toBeGreaterThan(300);
+    expect(levelTotal).toBeLessThan(perBlockTotal);
   });
 
   it("finds the constructs where the corpus puts them", () => {

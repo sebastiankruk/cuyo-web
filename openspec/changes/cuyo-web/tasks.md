@@ -87,7 +87,7 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [x] 3.3 Implement `rnd(n)` and `gcd(a,b)` on the simulation RNG and verify `rnd` stays in range and `gcd` matches known values
 - [x] 3.4 Implement the Cual lexer (keywords, identifiers, numbers, letters, patterns, strings, all operators and both arrows) and verify it tokenises `globals.ld` and every level's Cual block
 - [x] 3.5 Implement the Cual parser producing a code tree covering procedures, variable declarations, `default`, assignments and compound assignments, scoped `[x=e]` blocks, `if`/`else`, `switch`, comma sequences, `busy`, draw commands and effect commands, and verify all 81 levels parse
-- [ ] 3.6 Implement compile-time variable slot allocation, including the reserved slot per potentially-busy code node, and verify slot counts are stable for a repeated parse
+- [x] 3.6 Implement compile-time variable slot allocation, including the reserved slot per potentially-busy code node, and verify slot counts are stable for a repeated parse
 - [ ] 3.7 Implement the per-blob variable store as a single `Int32Array` holding user variables and busy flags, and verify busy flags are independent between two blobs of the same kind
 - [ ] 3.8 Implement the begin-of-step shadow copy with per-time-slice refresh (draw, key and land events each opening their own slice) and verify the six documented `@`-assignment examples produce exactly the documented results
 - [ ] 3.9 Implement the deferred write queue applied at end-of-step, and verify a cross-blob write is invisible until the step ends
