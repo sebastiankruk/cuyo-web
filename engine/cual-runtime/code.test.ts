@@ -287,9 +287,14 @@ describe("draw commands", () => {
     if (bare.kind !== "letterDraw") throw new Error("expected a letter draw");
     expect(bare.letter).toBe(0);
     expect(bare.position).toBeNull();
-    const placed = one("A@(1, 2)");
+    // `stern_at: '*' | '*' ort | ort '*'` - so a position after a letter is *always* closed
+    // by a `*`, in either order. `A@(1, 2)` on its own is not in the language: the third
+    // alternative is `ort '*'`, and dropping the star would make `A@(1,2)@(-1,0)` ambiguous
+    // with two draws in a row. `Y@(1)*` is 3d.ld's spelling.
+    const placed = one("A@(1, 2)*");
     if (placed.kind !== "letterDraw") throw new Error("expected a letter draw");
     expect(placed.position?.kind).toBe("feld");
+    expect(() => one("A@(1, 2)")).toThrow(/expected '\*'/);
   });
 
   it("parses 'zahl buch_stern' as a two-statement sequence", () => {

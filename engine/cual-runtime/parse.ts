@@ -153,8 +153,14 @@ export const LEVEL_OF_COLON =
 
 /** One expression, stopping before anything binding looser than `:`. */
 export function parseExpressionBeforeColon(cursor: Cursor): Expr {
-  return parseExpr(cursor, LEVEL_OF_COLON + 1);
+  // Level 1, with `:` named as a terminator - see `parseExpr`. Doing this by level instead
+  // stopped at the first `+`, which made `default inhibit = DIR_UUL+DIR_DDL+DIR_DDR+DIR_UUR;`
+  // in gold.ld read as the single constant `DIR_UUL` with a `+` left over as a statement.
+  void LEVEL_OF_COLON;
+  return parseExpr(cursor, 1, STOP_AT_COLON);
 }
+
+const STOP_AT_COLON: ReadonlySet<string> = new Set([":"]);
 
 /**
  * The text an operator token carries, or null if it is not one.
@@ -283,11 +289,19 @@ function describe(token: Token): string {
  *
  * `minLevel` is the loosest binding this call may consume, so a caller can say "parse an
  * operand of level N" and have the operators above N stop the recursion.
+ *
+ * `stopBefore` names operators that end the expression even though their level would
+ * otherwise allow them. It exists for one caller, and a single `minLevel` cannot express it:
+ * in `var x = a + b : reapply` the `:` has to end the value, but `:` is level 7 and `+` is
+ * level 6, so "level 7 and tighter" would throw away the addition as well. Upstream has no
+ * such problem because `echter_default` ends in `konstante`, which has no `:` production at
+ * all - the ambiguity only exists once the grammar is flattened into precedence levels.
  */
-function parseExpr(cursor: Cursor, minLevel: number): Expr {
+function parseExpr(cursor: Cursor, minLevel: number, stopBefore?: ReadonlySet<string>): Expr {
   let left = parseUnary(cursor);
 
   for (;;) {
+    if (stopBefore?.has(operatorText(cursor.peek()) ?? "")) break;
     // `== ..` is its own production with three shapes, and it cannot be told apart from a
     // plain `==` until the right operand has been parsed: the grammar is
     //
@@ -315,10 +329,10 @@ function parseExpr(cursor: Cursor, minLevel: number): Expr {
           kind: "range",
           value: left,
           lower: null,
-          upper: parseExpr(cursor, LEVEL_OF_RANGE),
+          upper: parseExpr(cursor, LEVEL_OF_RANGE, stopBefore),
         };
       } else {
-        const bound = parseExpr(cursor, LEVEL_OF_EQ + 1);
+        const bound = parseExpr(cursor, LEVEL_OF_EQ + 1, stopBefore);
         if (cursor.peek()?.kind === "range") {
           cursor.next();
           builtRange = true;
@@ -353,7 +367,7 @@ function parseExpr(cursor: Cursor, minLevel: number): Expr {
     // below would then find nothing left to object to - `1 . 2 . 3` parsed as `1 . (2 . 3)`
     // instead of being refused. The check only works if the chain reaches this level.
     const nextMin = infix.level + 1;
-    const right = parseExpr(cursor, nextMin);
+    const right = parseExpr(cursor, nextMin, stopBefore);
 
     if (associativity === "nonassoc" && infixFor(cursor.peek())?.level === infix.level) {
       cursor.fail(`'${infix.op}' is not associative and cannot be chained`);
