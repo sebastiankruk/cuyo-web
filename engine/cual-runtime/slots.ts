@@ -255,6 +255,15 @@ export function allocateSlots(statements: readonly Stmt[]): Allocation {
       case "block":
         for (const child of node.body) visit(child);
         return;
+      case "sharedCall":
+        // The held body is numbered exactly once no matter how many `&name` sites hold it,
+        // because they all hold the *same* statements - that is the sharing. Visiting it per
+        // site would give each one its own flag and silently turn `&` back into a plain call.
+        //
+        // Found by the man page's ampersand example failing: a shared animation's flags were
+        // not allocated at all, so `&anim` advanced every step instead of one frame per step.
+        for (const child of node.body) visit(child);
+        return;
       case "scoped":
       case "procedureDef":
         // A procedure body's flags are counted against the level, not the procedure: a

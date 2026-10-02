@@ -176,12 +176,12 @@ its source.
 
 **Groups 3 and 4 are done, and that is not the same as the runtime being done.** Task 4.13
 wired a compile pass into `make check` that names every construct in the corpus this
-runtime cannot run, by file, line and construct. It reports **1538 places in three
-constructs**, and they are now tasks 4.14-4.16:
+runtime cannot run, by file, line and construct. It reported 1538 places in three
+constructs; 4.14 closed the 845 `call` ones and it now reports **693 in two**. The rest are tasks
+4.15, 4.16 and — found along the way — 4.17 and 4.18:
 
 | construct    | places | what is missing                                       |
 | ------------ | -----: | ----------------------------------------------------- |
-| `call`       |    845 | `Code::aufrufen`: the `&name` form, and return values |
 | `scoped`     |    395 | `[x = expr]` blocks                                   |
 | `neighbour`  |    298 | reading a pattern out of a blob's array               |
 

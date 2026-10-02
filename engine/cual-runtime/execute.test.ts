@@ -210,7 +210,6 @@ describe("what this task refuses", () => {
     // is never busy.
     // Every kind the walker still refuses, so a new one cannot be added without a task.
     expect(() => notYet("scoped")).toThrow(/task 4\.7/);
-    expect(() => notYet("call")).toThrow(/task 4\.6/);
     // The kinds that have left the list say "?" instead. `if`, `switch` and `switchCase` were
     // still in it until the compile gate (4.13) read it and reported 1364 `if` gaps in a corpus
     // where every `if` runs — so these three are asserted on purpose: a table nobody reads
@@ -220,6 +219,9 @@ describe("what this task refuses", () => {
     expect(() => notYet("switchCase")).toThrow(/task \?/);
     expect(() => notYet("effect")).toThrow(/task \?/);
     expect(() => notYet("draw")).toThrow(/task \?/);
+    // `call` left the list in 4.14: `linkCalls` resolves it, and an unresolved one throws from
+    // the walker naming the procedure.
+    expect(() => notYet("call")).toThrow(/task \?/);
   });
 
   it("refuses them when they turn up in a tree, rather than skipping them", () => {
@@ -234,7 +236,7 @@ describe("what this task refuses", () => {
     // `tor_1;` is a call to an undefined procedure, which is the still-refused `call`
     // statement; `{ 5, 7; 8; }` puts one in the *then* branch of a taken `if`, so the test
     // proves the walker reaches a refused construct rather than skipping over it.
-    for (const source of ["{ tor_1; }", "{ 5; if 1 -> { tor_1; } }"]) {
+    for (const source of ["{ [xx = 1] *; }", "{ 5; if 1 -> { [xx = 1] *; } }"]) {
       const statements = parseCode(lex(source));
       const allocation = allocateSlots(statements);
       const ctx: ExecutionContext = {
