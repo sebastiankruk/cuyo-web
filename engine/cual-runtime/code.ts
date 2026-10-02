@@ -38,6 +38,14 @@ export type AssignOperator = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | ".+=" | ".
 
 /** One `switch` case. */
 export interface SwitchCase {
+  /**
+   * So a case is addressable like any other node.
+   *
+   * It was not a discriminated variant, because nothing walked into cases before slot
+   * allocation did. A case is a `bedingung_code` upstream and owns two busy flags of its
+   * own, so it has to be findable from the node it hangs off - keyed here, and by identity.
+   */
+  readonly kind: "switchCase";
   /** The condition, as written. */
   readonly condition: Expr;
   readonly body: Stmt;
@@ -86,6 +94,8 @@ export type Stmt =
       readonly elseLatching: boolean | null;
     }
   | { readonly kind: "switch"; readonly cases: readonly SwitchCase[] }
+  /** One `switch` case, i.e. one upstream `bedingung_code`. */
+  | SwitchCase
   | {
       readonly kind: "assign";
       readonly target: Expr;
@@ -674,7 +684,7 @@ function parseSwitchCase(cursor: SharedCursor): SwitchCase {
     otherwise = parseCode1(cursor);
     cursor.expectPunct(";");
   }
-  return { condition, body, latching, otherwise };
+  return { kind: "switchCase", condition, body, latching, otherwise };
 }
 
 /** `->` and `=>` are the same token with a value, so read it as one. */
