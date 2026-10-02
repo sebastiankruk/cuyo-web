@@ -342,16 +342,22 @@ function parseExpr(cursor: Cursor, minLevel: number, stopBefore?: ReadonlySet<st
         }
       }
       // `==..` is declared `%nonassoc`, so a range may not itself be the left operand of
-      // another range. Only the directly detectable shape is refused: an `==` whose right
-      // side *starts* with `..` is unambiguously a second range. `a == b..c == d..e` needs
-      // unbounded lookahead to tell from `(a == b..c) == d` followed by a stray `..`, which
-      // bison decides from its LALR tables and this parser cannot. That form is accepted
-      // and grouped as `(a == b..c) == (d..e)`; the corpus contains no instance of it.
+      // another range, and `intervall` ends at its bounds - a `==` straight after a finished
+      // range is not in the grammar.
       //
-      // The check is scoped to `builtRange` on purpose: a plain `==` is `%left` and may
-      // chain freely, and an earlier version fired after every `==` and so refused
-      // `1 == 1 == 1`.
-      if (builtRange && operatorText(cursor.peek()) === "==" && cursor.peek(1)?.kind === "range") {
+      // This used to check only the directly detectable shape, an `==` whose right side
+      // *starts* with `..`, because deciding the wider case needs unbounded lookahead. It
+      // then passed `1 == 1 .. == 2 .. 4` for the wrong reason and still rejected it, but
+      // only because `parseUpperBound` happened to demand an operand after the `..` and
+      // found the `==`. Letting an open upper bound be genuinely open took that accident
+      // away and left the input building `1 == (1.. == (2..4))` in silence, so the check is
+      // now the honest one.
+      //
+      // Known limitation: upstream *does* accept `(a == b..c) == (d..e)`, because a
+      // parenthesised range is an ordinary `ausdruck` and bison's LALR tables can tell it
+      // from the unparenthesised chain. Refusing both is the safe direction - it rejects code
+      // rather than inventing a tree - and the corpus contains no instance either way.
+      if (builtRange && operatorText(cursor.peek()) === "==") {
         cursor.fail("'==' cannot be chained with a range comparison");
       }
       continue;
@@ -506,12 +512,12 @@ function parseOrt(cursor: Cursor, foreign: boolean): Ort {
     // same kind of thing.
     if (open?.kind === "zeroOne") {
       cursor.next();
-      return { kind: "fall", which: { kind: "number", value: open.value } };
+      return { kind: "fall", which: { kind: "number", value: open.value }, half: null };
     }
     if (canStartExpression(open)) {
-      return { kind: "fall", which: parseExpr(cursor, 1) };
+      return { kind: "fall", which: parseExpr(cursor, 1), half: null };
     }
-    return foreign ? { kind: "semiglobal" } : { kind: "global" };
+    return foreign ? { kind: "semiglobal", half: null } : { kind: "global", half: null };
   }
 
   cursor.expectPunct("(");
@@ -519,7 +525,21 @@ function parseOrt(cursor: Cursor, foreign: boolean): Ort {
   // and `@@()` are legal and mean "the global" and "the semiglobal". Reading an expression
   // unconditionally fails on the closing bracket.
   if (cursor.takePunct(")")) {
-    return foreign ? { kind: "semiglobal" } : { kind: "global" };
+    return foreign ? { kind: "semiglobal", half: null } : { kind: "global", half: null };
+  }
+
+  // `absort`'s third shape is `'(' absort_geklammert ';' haelften_spez ')'`, and
+  // `absort_geklammert` has an *empty* alternative - so a `;` can be the very first thing
+  // inside the brackets, with no expression in front of it at all. `@@(;!)` in augen.ld,
+  // bonimali.ld, dungeon.ld and kachelnR.ld is the semiglobal, half a step to the right of
+  // me; `@@(;>)` the same downwards. Parsing the expression first demanded one that the
+  // grammar does not require, and reported "expected an expression, found ';'".
+  const afterOpen = cursor.peek();
+  if (afterOpen?.kind === "punct" && afterOpen.text === ";") {
+    cursor.next();
+    const half = parseHalf(cursor);
+    cursor.expectPunct(")");
+    return foreign ? { kind: "semiglobal", half } : { kind: "global", half };
   }
 
   const first = parseExpr(cursor, 1);
@@ -527,11 +547,12 @@ function parseOrt(cursor: Cursor, foreign: boolean): Ort {
     let half: Half | null = null;
     if (cursor.takePunct(";")) half = parseHalf(cursor);
     cursor.expectPunct(")");
-    // One argument: a falling piece for `@@`, a bare address otherwise.
+    // One argument: a falling piece for `@@`, a bare address otherwise. `@@(ziel-2;!)` in
+    // augen.ld is the falling form with a half, so `half` belongs on it too.
     return foreign
-      ? { kind: "fall", which: first }
+      ? { kind: "fall", which: first, half }
       : half === null
-        ? { kind: "global" }
+        ? { kind: "global", half: null }
         : { kind: "feld", x: first, y: { kind: "number", value: 0 }, half };
   }
 
@@ -570,32 +591,12 @@ function parseHalf(cursor: Cursor): Half {
  * enclosing statement.
  */
 function parseUpperBound(cursor: Cursor): Expr | null {
-  const next = cursor.peek();
-  if (next === undefined) return null;
-  if (next.kind === "punct" && (next.text === ";" || next.text === ")")) return null;
+  // `intervall: ausdruck BIS_TOK` is a complete production with no upper bound, so the only
+  // question is whether one was written. Enumerating the tokens that end a statement - end
+  // of code, `;`, `)` - is the wrong shape of test: `size == 4.. -> 3` in darken.ld ends the
+  // bound with an arrow, which that list does not contain, and it read the `->` as the
+  // start of a bound. `canStartExpression` is the same question asked the right way round,
+  // and it says no for every one of them.
+  if (!canStartExpression(cursor.peek())) return null;
   return parseExpr(cursor, LEVEL_OF_RANGE);
-}
-
-/**
- * Parse Cual code, which is statements rather than a bare expression.
- *
- * Rejects everything for now rather than returning a partial tree. Task 3.5's other half is
- * `if`, `switch`, `var`, `default`, assignments, `busy`, comma sequences and the draw and
- * effect commands; a parser that accepted some of them and ignored the rest would make
- * "all 81 levels parse" true for the wrong reason.
- */
-export function parseCode(tokens: readonly Token[]): never {
-  const cursor = new Cursor(tokens);
-  if (cursor.atEnd()) {
-    throw new CualSyntaxError("empty code block", 0, 0);
-  }
-  const token = cursor.next();
-  // A plain `throw` rather than `cursor.fail`, so the `never` return type does not depend on
-  // the caller proving that `fail` cannot return.
-  throw new CualSyntaxError(
-    `${describe(token)} starts a Cual statement, and the statement parser is not written ` +
-      `yet (task 3.5). Only expressions parse so far.`,
-    token.line,
-    token.col,
-  );
 }
