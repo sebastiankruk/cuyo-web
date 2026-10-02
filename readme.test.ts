@@ -50,7 +50,13 @@ describe("README badges", () => {
   it("are all static, so they render for everyone", () => {
     // Static means the URL path is `/badge/...`: shields.io draws the text it is given
     // without asking anything about the repository.
-    const dynamic = all.filter((b) => !/img\.shields\.io\/badge\//.test(b.url));
+    //
+    // Anchored at the start on purpose. Unanchored, `https://example.com/img.shields.io/
+    // badge/something` reads as static and passes, which is the same category of bug as
+    // the one this file exists to catch - a badge URL that looks fine and is not. CodeQL
+    // called it (`js/regex/missing-regexp-anchor`) after eight CI jobs were green.
+    const STATIC_BADGE = /^https:\/\/img\.shields\.io\/badge\//;
+    const dynamic = all.filter((b) => !STATIC_BADGE.test(b.url));
     expect(
       dynamic.map((b) => `${b.alt} -> ${b.url}`),
       "badges that need an unauthenticated read of the repository; they render " +
@@ -75,9 +81,11 @@ describe("README badges", () => {
     // The version badge was one of these: a *valid* image carrying the words "no releases
     // or repo not found", which is worse than a broken one because it reads as a real
     // statement about the project rather than a failure of the badge.
-    const reads = all.filter((b) =>
-      /img\.shields\.io\/(?!badge\/)/.test(b.url),
-    );
+    // Anchored for the same reason as `STATIC_BADGE`, and it has to agree with it: if
+    // these two disagree about where a shields.io URL starts, a badge can pass one test
+    // and fail the other for reasons no reader of the file would predict.
+    const SHIELDS_HOST = /^https:\/\/img\.shields\.io\/(?!badge\/)/;
+    const reads = all.filter((b) => SHIELDS_HOST.test(b.url));
     expect(
       reads.map((b) => `${b.alt} -> ${b.url}`),
       "shields.io badges that read the repository cannot work while it is private",
