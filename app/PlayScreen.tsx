@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GameLoop } from "./game-loop.ts";
+import { RulesDialog } from "./RulesDialog.tsx";
 import { Simulation } from "../engine/game-core/simulation.ts";
 import type { Phase } from "../engine/game-core/simulation.ts";
 import type { LevelDef } from "../engine/level-format/level-data.ts";
@@ -10,7 +11,10 @@ import {
   buildPalette,
   colourFor as paletteColourFor,
 } from "../render/palette.ts";
-import { COMMIT as BUILD_COMMIT, DIRTY as BUILD_DIRTY } from "virtual:build-stamp";
+import {
+  COMMIT as BUILD_COMMIT,
+  DIRTY as BUILD_DIRTY,
+} from "virtual:build-stamp";
 import {
   NO_TOUCH,
   applyGesture,
@@ -98,6 +102,12 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
   const sim = simRef.current.sim;
 
   const [hud, setHud] = useState<Hud>(INITIAL_HUD);
+  // Whether the rules dialog is open, and therefore whether the game is running.
+  //
+  // Held here rather than inside the dialog because the loop is the thing that has to
+  // stop, and the loop lives outside React. A dialog that paused the game by itself would
+  // have to know about the loop, which is the coupling worth avoiding.
+  const [rulesOpen, setRulesOpen] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -187,6 +197,16 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
       loopRef.current = null;
     };
   }, [sim]);
+
+  // Pause the loop while the dialog is open.
+  //
+  // On the loop rather than through React state: the loop is created in an effect and
+  // lives outside React, and routing the pause through state would make closing the
+  // dialog and resuming the game two separate updates that could disagree for a frame.
+  // Assigning `paused` is idempotent and takes effect on the next tick.
+  useEffect(() => {
+    if (loopRef.current !== null) loopRef.current.paused = rulesOpen;
+  }, [rulesOpen]);
 
   const release = useCallback(() => {
     for (const t of heldTimers.current) {
@@ -327,53 +347,30 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
           {level.author !== "" && <span>{level.author}</span>}
         </div>
         {/*
-          The rules, one tap away. They were previously a bare `10` with a tooltip,
-          which answers "how many are left" and none of "of what", "how many make a
-          group", or - the one that made `Hormones` look unwinnable - "do diagonals
-          count". A `<details>` element rather than a panel, because the answer is
-          wanted once and then in the way; and `<details>` rather than a button with
-          state, because it stays keyboard- and screen-reader-correct for free.
+          The rules, one tap away. They were previously a bare `10` with a tooltip, which
+          answers "how many are left" and none of "of what", "how many make a group", or -
+          the one that made `Hormones` look unwinnable - "do diagonals count".
         */}
-        <details className="play__rules">
-          <summary className="chip">How to play</summary>
-          <div className="play__rulesBody">
-            {/*
-              A swatch rather than the kind's name. Upstream calls the goal kind
-              `inGras` or `inBunt`, which is artwork naming; a colour is something
-              the player can look for on the board.
-            */}
-            {goals.targetArtKey !== null && (
-              <p className="play__rulesSwatch">
-                <span
-                  className="play__swatch"
-                  style={{
-                    background: paletteColourFor(
-                      // The same palette the board is drawn with, built from the
-                      // level's kinds rather than hashed from the art key - so the
-                      // swatch beside "these are the blobs to clear" is the colour of
-                      // those blobs and cannot drift from it.
-                      buildPalette(level.kinds, {
-                        background: level.colours.background,
-                      }),
-                      goalKindIndex(level, goals.targetName),
-                    ),
-                  }}
-                  aria-hidden="true"
-                />
-                <span title={goals.targetName ?? undefined}>
-                  {goals.targetNeedsChain
-                    ? "These are cleared by an explosion landing next to them."
-                    : "These are the blobs to clear."}
-                </span>
-              </p>
-            )}
-            <ul>
-              {goalSummaryLines(goals).map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          </div>
-        </details>
+        {/*
+          The rules, one tap away, in a dialog that pauses the game.
+
+          This was a `<details>` dropdown, which was fine as markup and wrong as
+          behaviour: opening it mid-fall did not pause, so reading the rules was a way to
+          lose a piece you were watching. A modal is the honest answer - it is a
+          distraction, so it stops the game being a distraction.
+
+          A button rather than `<details>` because the open state now means something the
+          browser cannot know: the loop has to be paused. And the focus handling is
+          applied from `dialog.ts`, which is where it can be tested - a focus trap cannot
+          be seen in a screenshot and a keyboard user finds out immediately.
+        */}
+        <button
+          type="button"
+          className="chip"
+          onClick={() => setRulesOpen(true)}
+        >
+          How to play
+        </button>
         <div className="play__stats">
           <span title="Score">{hud.score}</span>
           <span title="Goal blobs remaining">{hud.goals}</span>
@@ -381,6 +378,27 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
         </div>
       </header>
 
+      {rulesOpen && (
+        <RulesDialog
+          targetColour={
+            goals.targetArtKey === null
+              ? null
+              : paletteColourFor(
+                  // The same palette the board is drawn with, built from the level's
+                  // kinds, so the swatch beside "these are the blobs to clear" is the
+                  // colour of those blobs and cannot drift from it.
+                  buildPalette(level.kinds, {
+                    background: level.colours.background,
+                  }),
+                  goalKindIndex(level, goals.targetName),
+                )
+          }
+          targetName={goals.targetName}
+          targetNeedsChain={goals.targetNeedsChain}
+          lines={goalSummaryLines(goals)}
+          onClose={() => setRulesOpen(false)}
+        />
+      )}
       <div className="play__board">
         <canvas ref={canvasRef} className="play__canvas" />
         {/*

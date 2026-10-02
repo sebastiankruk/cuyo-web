@@ -37,37 +37,70 @@ function declaration(selector: string, property: string): string | null {
   return m?.[1]?.trim() ?? null;
 }
 
-describe("the rules panel is on screen", () => {
-  // The reported bug: opening "How to play" pushed the panel off the left edge, so
-  // every bullet lost its first few characters. It was `position: absolute; right: 0`
-  // inside a button that sits ~290px from the left of a phone screen, with a width of
-  // up to 20rem - so the panel began at about -30px, and `.play { overflow: hidden }`
-  // cropped it there rather than letting it escape.
-  it("is positioned against the viewport, not against the button", () => {
-    expect(declaration(".play__rulesBody", "position")).toBe("fixed");
-  });
-
-  it("is inset from both edges and centred, so it cannot overflow either", () => {
-    // `right: 0` alone is what put it off screen. Both insets plus auto margins and a
-    // max width is a combination that cannot produce a negative left edge at any
-    // viewport width, which is the property rather than any one declaration.
-    expect(declaration(".play__rulesBody", "left")).not.toBeNull();
-    expect(declaration(".play__rulesBody", "right")).not.toBeNull();
-    expect(declaration(".play__rulesBody", "margin-inline")).toBe("auto");
-    expect(declaration(".play__rulesBody", "max-width")).not.toBeNull();
-  });
-
-  it("cannot be taller than the screen, and scrolls instead", () => {
-    // The rules are longer than the gap under the HUD on a landscape phone, and a panel
-    // that runs off the bottom cannot be read at all.
-    expect(declaration(".play__rulesBody", "max-height")).toContain("dvh");
-    expect(declaration(".play__rulesBody", "overflow-y")).toBe("auto");
-  });
-
-  it("clears the safe area, so it is not under a notch", () => {
-    expect(declaration(".play__rulesBody", "top")).toContain(
-      "env(safe-area-inset-top",
+describe("the rules dialog is on screen", () => {
+  // The reported bug, and the one this file exists for: the rules used to be a
+  // `<details>` dropdown in the HUD, positioned `absolute; right: 0` *inside the button
+  // that opened it*, up to 20rem wide. On a phone that button's right edge was 290px from
+  // the left of the screen and the panel was 320px wide, so the panel began at -30px and
+  // every line lost its first characters.
+  //
+  // It is now a `<dialog>` shown with `showModal()`, which is in the top layer and sized
+  // against the viewport by the browser. These assert the properties that make that hold,
+  // rather than the geometry - `max-width` in `rem` with `margin: auto` cannot produce a
+  // negative left edge at any viewport size, which is the property.
+  it("is a modal dialog, not a positioned dropdown", () => {
+    // The markup, not the file: the explanatory comments above the JSX mention the old
+    // element by name, so a substring check on the whole file matches a comment and passes
+    // a regression. Found that way.
+    const markup = (file: string): string =>
+      readFileSync(resolve(import.meta.dirname, file), "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "");
+    expect(markup("PlayScreen.tsx")).not.toContain("<details");
+    expect(markup("PlayScreen.tsx")).toContain("<RulesDialog");
+    const dialog = readFileSync(
+      resolve(import.meta.dirname, "RulesDialog.tsx"),
+      "utf8",
     );
+    expect(dialog).toContain("showModal()");
+  });
+
+  it("pauses the game while it is open", () => {
+    // The reason it became a modal rather than staying a dropdown: reading the rules
+    // mid-fall used to be a way to lose a piece you were watching.
+    const app = readFileSync(
+      resolve(import.meta.dirname, "PlayScreen.tsx"),
+      "utf8",
+    );
+    expect(app).toMatch(/\.paused = rulesOpen/);
+  });
+
+  it("capped in rem rather than viewport width, so it is the same size everywhere", () => {
+    // A `vw` width on a wide screen makes a dialog the size of the board, which is the
+    // opposite of what a dialog is for.
+    expect(declaration(".rules", "max-width")).toMatch(/rem/);
+    expect(declaration(".rules", "max-width")).not.toMatch(/vw[^)]*$/);
+    expect(declaration(".rules", "margin")).toBe("auto");
+  });
+
+  it("in a smaller face than the HUD, which is the point of it being a dialog", () => {
+    const rules = Number(/font-size:\s*([\d.]+)rem/.exec(rule(".rules"))?.[1]);
+    const hud = Number(/font-size:\s*([\d.]+)rem/.exec(rule(".chip"))?.[1]);
+    expect(rules).toBeGreaterThan(0);
+    expect(hud).toBeGreaterThan(0);
+    expect(rules, "the dialog must not be as large as the HUD").toBeLessThan(
+      hud,
+    );
+  });
+
+  it("keeps a thumb-sized close button last in the dialog", () => {
+    // A close target under 44px is hard to hit, and it is the one control in here that
+    // has to be reachable on a phone without aiming.
+    expect(rule(".rules .btn")).toContain("min-height");
+  });
+
+  it("has a backdrop, so the board behind is not still being played", () => {
+    expect(rule(".rules::backdrop")).toContain("background");
   });
 });
 
@@ -86,9 +119,15 @@ describe("the HUD is not out of room", () => {
 
   it("has one auto margin in the row, not two competing for the slack", () => {
     // `.play__rules` and `.play__stats` both carried `margin-left: auto`, so how much
-    // room the name got depended on how wide the rules button and the stats happened to
-    // be. One auto margin puts the slack next to the stats, where it belongs.
-    expect(declaration(".play__rules", "margin-left")).toBeNull();
+    // room the level's name got depended on how wide the rules button and the stats
+    // happened to be. One auto margin puts the slack next to the stats, where it belongs.
     expect(declaration(".play__stats", "margin-left")).toBe("auto");
+    // Nothing in the HUD row may push right but the stats: a second one splits the slack
+    // and the name loses to whichever is wider.
+    for (const selector of [".play__title", ".chip", ".play__stats"]) {
+      if (selector !== ".play__stats") {
+        expect(declaration(selector, "margin-left")).toBeNull();
+      }
+    }
   });
 });

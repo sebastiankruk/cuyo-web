@@ -483,113 +483,71 @@ button::-moz-focusring {
 }
 
 /*
- * The rules panel.
+ * The rules dialog.
  *
- * A `<details>` styled to match the HUD chips, so it reads as part of the bar rather
- * than as an overlay that appeared. The body is absolutely positioned so that
- * opening it does not push the board down and resize the canvas - which would be a
- * poor time to re-measure, and on a phone would move the board under the player's
- * thumb.
+ * A `<dialog>` shown with `showModal()`, so the browser supplies the top layer, the
+ * backdrop, the Escape key and the inertness of the page behind it. The rules were a
+ * `<details>` dropdown in the HUD, which was fine as markup and wrong as behaviour:
+ * opening it mid-fall did not pause, so reading the rules was a way to lose a piece you
+ * were watching.
+ *
+ * **In a smaller face than the HUD, deliberately.** A dialog is a distraction from the
+ * board, and at HUD size it reads as another part of the board. It is also the longest
+ * text in the game, and at the HUD's size on a phone that is a wall of it. Small and
+ * centred says "read this, then go back".
+ *
+ * `max-width` in `rem` rather than `vw`, so the dialog is the same physical size on
+ * every screen and the board behind it stays visible around it on a tablet.
  */
-.play__rules {
-  /*
-   * `position: relative` only to give the open panel a stacking context; the panel
-   * itself is fixed against the viewport, so it does not depend on this.
-   *
-   * No `margin-left: auto` here. The stats already carry one, and two auto margins in
-   * one flex row split the slack between them - so how much room the level's name got
-   * depended on how wide the rules button and the stats happened to be. One auto margin
-   * puts the slack where it belongs, next to the stats.
-   */
-  position: relative;
-  flex: none;
-}
-
-.play__rules > summary {
-  list-style: none;
-  cursor: pointer;
-  user-select: none;
-}
-
-.play__rules > summary::-webkit-details-marker {
-  display: none;
-}
-
-.play__rules[open] > summary {
-  border-color: var(--accent);
-}
-
-/*
- * The rules panel.
- *
- * A `<details>` styled to match the HUD chips, so it reads as part of the bar rather
- * than as an overlay that appeared. The body is out of flow so that opening it does not
- * push the board down and resize the canvas - which would be a poor time to re-measure,
- * and on a phone would move the board under the player's thumb.
- *
- * **Positioned against the viewport, not against the button.**
- *
- * It used to be `position: absolute; right: 0` inside the button, which is a trap: the
- * panel is up to 20rem wide, and anchored to a button that sits a couple of hundred
- * pixels from the *left* of a phone screen, the panel's left edge lands off the screen.
- * Measured on the screenshot that prompted this: the button's right edge was 290px from
- * the left, the panel 320px wide, so it started at -30px. Every line was clipped, the
- * first characters of all six bullets gone, and `.play { overflow: hidden }` finished the
- * job by cropping it at the screen edge rather than letting it escape.
- *
- * `78vw` did not save it either, because the anchor moves with the button and the
- * overflow is in the *anchor*, not the width. On a narrower phone the button sits further
- * left still and proportionally more of the panel falls off.
- *
- * Fixed positioning plus an inset from both edges, centred, with a max width, makes it
- * impossible to be off-screen at any viewport size. The cost is that `top` is now a
- * number rather than derived from the button, so it has to clear the HUD by hand; the
- * value below is the HUD's height plus a little air, and `app/hud.test.ts` pins the
- * properties that actually matter rather than this number.
- */
-.play__rulesBody {
-  position: fixed;
-  /* Clears the HUD. Must stay in step with `.play__hud`'s height below. */
-  top: calc(env(safe-area-inset-top, 0px) + 3.9rem);
-  left: 0.75rem;
-  right: 0.75rem;
-  margin-inline: auto;
-  max-width: 22rem;
-  /*
-   * A short viewport must not run the rules off the bottom, and the rules are longer
-   * than the gap under the HUD on a landscape phone. Scrolls rather than overflowing.
-   */
-  max-height: calc(100dvh - 5.5rem);
-  overflow-y: auto;
-  /* Scrolling the rules should not scroll the page behind them. */
-  overscroll-behavior: contain;
-  z-index: 5;
-  padding: 0.7rem 0.85rem;
-  background: var(--panel);
+.rules {
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
-  font-size: 0.85rem;
-  line-height: 1.45;
+  background: var(--panel);
+  color: var(--text);
+  /* Below the HUD's 0.85rem, and above the dev overlay's 0.7rem: this is prose the player
+     is asked to read, not a label. */
+  font-size: 0.82rem;
+  line-height: 1.5;
+  max-width: min(22rem, 90vw);
+  /* The dialog is positioned against the viewport, so it cannot be pushed off screen by
+     the width of the element that opened it - which is what put the old dropdown's left
+     edge at -30px on a phone. */
+  margin: auto;
 }
 
-.play__rulesBody ul {
+.rules::backdrop {
+  background: rgb(8 10 14 / 62%);
+}
+
+.rules__body {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem 1rem;
+}
+
+.rules__title {
   margin: 0;
-  padding-left: 1.1rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
 }
 
-.play__rulesBody li + li {
-  margin-top: 0.3rem;
-}
-
-.play__rulesSwatch {
+.rules__swatch {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 0 0 0.5rem;
+  margin: 0;
   color: var(--muted);
 }
 
+/*
+ * The goal colour, as a chip.
+ *
+ * The shape of the chip rather than a plain square, so at 1.1rem it reads as the same
+ * kind of thing as a blob rather than as a colour sample. It has a border because the
+ * goal colour can be close to the panel's own background, and a swatch that disappears
+ * into the dialog is worse than no swatch.
+ */
 .play__swatch {
   flex: none;
   width: 1.1rem;
@@ -598,55 +556,28 @@ button::-moz-focusring {
   border: 1px solid var(--line);
 }
 
+.rules__list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.rules__list li + li {
+  margin-top: 0.35rem;
+}
+
+/* A thumb-sized close, and last so the dialog reads top-to-bottom as prose then action. */
+.rules .btn {
+  min-height: 2.75rem;
+  justify-self: start;
+}
+
 /*
- * Narrow phones.
- *
- * The level's name is the one thing in the bar that says which level you are playing,
- * so it is never hidden - an earlier version dropped it to make room for the stats,
- * which left a game with no way to say what it was. Instead the name truncates, and the
- * parts that can shrink do: the rules button becomes an icon, and the stats keep only
- * the two numbers a player reads mid-game.
+ * Wide screens: the board is 1:2 and portrait suits it, so a landscape dialog is mostly
+ * empty. Capped rather than centred, so it stays beside the board instead of over it.
  */
-@media (max-width: 30rem) {
-  .play__rules {
-    margin-left: 0.4rem;
-  }
-
-  .play__rulesBody {
-    width: min(20rem, 88vw);
-  }
-
-  .play__rules > summary {
-    /* The words do not fit; the meaning does. */
-    font-size: 0;
-    padding: 0.35rem 0.6rem;
-  }
-
-  .play__rules > summary::after {
-    content: "?";
-    font-size: 0.95rem;
-  }
-
-  .play__title {
-    /* Truncate rather than disappear, and take the slack before the stats do. */
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .play__title strong,
-  .play__title span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* The author is the first thing that can go; the name is what matters. */
-  .play__title span {
-    display: none;
-  }
-
-  .play__stats {
-    flex: none;
+@media (orientation: landscape) and (min-width: 40rem) {
+  .rules {
+    margin: auto auto auto 1rem;
   }
 }
 
