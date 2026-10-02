@@ -135,6 +135,20 @@ function punctAhead(cursor: SharedCursor, offset = 0): string | null {
   return token?.kind === "punct" ? token.text : null;
 }
 
+/**
+ * Whether an address follows: `@` or `@@`.
+ *
+ * Two spellings and *two token kinds*: `scanner.ll` returns `@@` as a named operator
+ * (`FREMD_TOK`) and `@` as a bare character. Checking only for punctuation therefore sees
+ * half of every address in the language - `7A*@@(col,row)` in aliens.ld left its whole
+ * `@@(col,row)` behind to be read as a statement, and 52 blocks reported `expected '}'`.
+ */
+function isOrtAhead(cursor: SharedCursor, offset = 0): boolean {
+  const token = cursor.peek(offset);
+  if (token?.kind === "punct") return token.text === "@";
+  return token?.kind === "operator" && token.text === "@@";
+}
+
 /** Whether a punctuation token `offset` ahead equals `text`. */
 function isPunctAhead(cursor: SharedCursor, text: string, offset = 0): boolean {
   return punctAhead(cursor, offset) === text;
@@ -358,6 +372,21 @@ function parseCodeSequence(cursor: SharedCursor): Stmt {
   return { kind: "sequence", body: parts };
 }
 
+/**
+ * Whether the statement here may be empty.
+ *
+ * `code_1` has an empty production, so it can be empty in three places: before a `,`
+ * between comma-sequence members, before the `;` that ends one - `switch { gemalt -> ; ... }`
+ * in angst.ld is a case whose body does nothing - and at the end of a block.
+ *
+ * Allowing it before `;` is the riskier of the two, because a missing statement and an
+ * empty one look the same. Upstream resolves it with LALR tables and a hand-written parser
+ * cannot, and the alternative - refusing - rejects a construct the corpus uses sixteen times.
+ */
+function isEmptyMemberAhead(cursor: SharedCursor): boolean {
+  return isPunctAhead(cursor, ",") || isPunctAhead(cursor, ";") || isBlockEnd(cursor);
+}
+
 /** Whether the next token closes the enclosing block rather than continuing a statement. */
 function isBlockEnd(cursor: SharedCursor): boolean {
   const token = cursor.peek();
@@ -379,13 +408,20 @@ function isBlockEnd(cursor: SharedCursor): boolean {
  * punctuators exist.
  */
 function parseCode1(cursor: SharedCursor): Stmt {
-  const first = parseCode1Single(cursor);
+  // An empty member is legal, and `code_1` can be empty between commas:
+  // `if 1:5 => {,,,,,version=rnd(3)}` in aliens.ld is a comma sequence whose first five
+  // members do nothing. Only legal *here* - at the start of a `code` the same check is
+  // `isBlockEnd`, and a `,` there is a real separator.
+  const first: Stmt = isEmptyMemberAhead(cursor)
+    ? { kind: "nothing" }
+    : parseCode1Single(cursor);
   if (!isPunctAhead(cursor, ",")) return first;
   const parts: Stmt[] = [first];
   while (cursor.takePunct(",")) {
-    // A trailing comma before the end of the block leaves an empty member, which is legal:
-    // `code_1` may be empty.
-    if (isBlockEnd(cursor)) break;
+    // An empty member is legal on either side of a comma, since `code_1` may be empty:
+    // `{,,,,,busy}` in aliens.ld. Checking only for the end of the block here missed the
+    // leading ones and failed on the second comma.
+    if (isEmptyMemberAhead(cursor)) break;
     parts.push(parseCode1Single(cursor));
   }
   return { kind: "commaSequence", parts };
@@ -449,18 +485,29 @@ function parseCode1Single(cursor: SharedCursor): Stmt {
   }
 
   if (token.kind === "number" || token.kind === "zeroOne") {
-    const save = cursor.mark();
-    const assigned = tryParseAssignment(cursor);
-    if (assigned !== null) return assigned;
-    cursor.reset(save);
+    // No assignment probe here, deliberately. `set_zeile` starts with `variable`, and
+    // `variable` is a word or a letter — never a number — so a number can never be an
+    // assignment target. Probing for one anyway made `1*` parse as `1 * <missing operand>`
+    // and fail with "unexpected end of code", when it is in fact `code_1: zahl` followed by
+    // `code_1: buch_stern` — a number that means nothing, then a draw. `Baelle1={...;1*}` is
+    // that shape, and 11 blocks are.
+    //
     // `code_1: zahl buch_stern` builds `stapel_code(zahl, buch_stern)` - a sequence of two
-    // statements, where the number stands alone and means nothing. Written `2 R *` in
-    // schemen.ld, so it occurs.
-    if (cursor.peek(1)?.kind === "letter") {
+    // statements. Written `2 R *` in schemen.ld, so it occurs.
+    const after = cursor.peek(1);
+    const startsSternAt =
+      after?.kind === "letter" || (after?.kind === "punct" && after.text === "*");
+    if (startsSternAt || isOrtAhead(cursor, 1)) {
       const number: Stmt = { kind: "number", value: token.value };
       cursor.next();
-      return { kind: "sequence", body: [number, parseLetterDraw(cursor)] };
+      return { kind: "sequence", body: [number, parseBuchStern(cursor)] };
     }
+    // `cursor.next()` before the return. A bare number as a statement is legal and means
+    // nothing - `9;` opens a long run of draws in aliens.ld - and this path returned the
+    // node without consuming it, so the loop above had made no progress and `parseCode`'s
+    // guard fired. Read here as "the number was never parsed", which is a confusing way to
+    // learn that.
+    cursor.next();
     return { kind: "number", value: token.value };
   }
 
@@ -473,6 +520,20 @@ function parseCode1Single(cursor: SharedCursor): Stmt {
 }
 
 /**
+ * `buch_stern`: a letter, a `*`, or an address followed by `*`.
+ *
+ * All three are the same production's alternatives, and which one it is depends only on
+ * which token comes first. Needed separately from `parseCode1Single` because
+ * `code_1: zahl buch_stern` needs it *without* a statement separator - `Baelle1={...;1*}` has
+ * no `;` between the `1` and the `*`, and a parser that only recognised a following letter
+ * stopped the statement there and then asked for the closing brace.
+ */
+function parseBuchStern(cursor: SharedCursor): Stmt {
+  if (isPunctAhead(cursor, "*") || isOrtAhead(cursor)) return parseDraw(cursor);
+  return parseLetterDraw(cursor);
+}
+
+/**
  * `buch_stern`: a letter, optionally followed by a position.
  *
  * `A` on its own is a draw command, and `A@(2,3)` draws at a place. The same two shapes as
@@ -482,11 +543,19 @@ function parseCode1Single(cursor: SharedCursor): Stmt {
 function parseLetterDraw(cursor: SharedCursor): Stmt {
   const letter = cursor.next();
   if (letter.kind !== "letter") cursor.fail("expected a letter", letter);
-  // `buch_stern: BUCHSTABE_TOK stern_at`, and `stern_at` starts with `*`. So in `2R*` the
-  // star belongs to the letter's draw rather than being a statement of its own - `R` already
-  // means "draw R", and `R*` means the same thing. Written `2 R *` in schemen.ld.
-  cursor.takePunct("*");
-  const position = isPunctAhead(cursor, "@") ? takeOrt(cursor) : null;
+  // `buch_stern: BUCHSTABE_TOK stern_at`, and `stern_at` is `'*' | '*' ort | ort '*'`. So all
+  // three of `R`, `R*`, `R*@(1)` and `R@(1)*` are one letter followed by one `stern_at`.
+  //
+  // The last of those is `Y@(1)*` in 3d.ld, and consuming only the address left the star to
+  // be read as a statement of its own - which is why 55 blocks reported `expected '}'`.
+  let position: Ort | null = null;
+  if (isPunctAhead(cursor, "*")) {
+    cursor.next();
+    position = isOrtAhead(cursor) ? takeOrt(cursor) : null;
+  } else if (isOrtAhead(cursor)) {
+    position = takeOrt(cursor);
+    if (!cursor.takePunct("*")) cursor.fail("expected '*' after a letter's position");
+  }
   return { kind: "letterDraw", letter: letter.value, position };
 }
 
@@ -512,9 +581,7 @@ function operatorSpelling(token: Token | undefined): string | null {
 
 /** Whether the tokens ahead form `ort '*'`. */
 function startsWithOrt(cursor: SharedCursor): boolean {
-  if (isPunctAhead(cursor, "@")) return true;
-  const token = cursor.peek();
-  return token?.kind === "operator" && token.text === "@@";
+  return isOrtAhead(cursor);
 }
 
 /** `[x = e] code_1` — `push_code`. */
@@ -534,7 +601,7 @@ function parseScoped(cursor: SharedCursor): Stmt {
 function parseDraw(cursor: SharedCursor): Stmt {
   if (isPunctAhead(cursor, "*")) {
     cursor.next();
-    const position = isPunctAhead(cursor, "@") ? takeOrt(cursor) : null;
+    const position = isOrtAhead(cursor) ? takeOrt(cursor) : null;
     return { kind: "draw", position };
   }
   const position = takeOrt(cursor);
@@ -599,6 +666,11 @@ function parseSwitchCase(cursor: SharedCursor): SwitchCase {
 
   let otherwise: Stmt | null = null;
   if (isArrowAhead(cursor)) {
+    // The grammar's second shape is `ausdruck PFEIL code_1 ';' PFEIL code_1 ';'`, so the
+    // arrow belongs to this second body and has to be consumed *before* it. Parsing the body
+    // with the arrow still in front failed on it, and this is the shape every `switch` in
+    // the corpus ends with - `-> gemalt=0;` as the default case.
+    takeArrow(cursor);
     otherwise = parseCode1(cursor);
     cursor.expectPunct(";");
   }
