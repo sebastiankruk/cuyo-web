@@ -28,6 +28,17 @@
  * coordinate, so no gap was hidden and nothing failed; the walk was simply incomplete while
  * claiming to be complete. `sharedCall` had the same shape of problem for statements.
  *
+ * ## The census also caught the parse
+ *
+ * It was short by about a fifth, and every count in it was low: `switchCase` 852 where there
+ * are 1948, `call` 845 where there are 1039, `scoped` 395 where there are 441. The reason was
+ * upstream of this file — `parseSwitch`'s fold handed each case the *unfolded* entry, so every
+ * `switch` with three or more cases ran only its first two and the rest of the tree was never
+ * built. With that fixed, all **609** neighbour tokens in the corpus reach a parsed expression,
+ * against 302 before. That comparison — tokens against expressions, per block — is the check
+ * that says so, and it is worth keeping: a parser that silently discards code looks exactly like
+ * a runtime that never asked for it.
+ *
  * ## The safety net
  *
  * A hand-built tree with a construct that is in neither table, asserted to be reported with no
@@ -109,8 +120,13 @@ describe("the compile gate", () => {
 
   it("finds nothing: every construct in the corpus can run", () => {
     // The inverted claim, and the one 0.4.0 was waiting for. It was 1538 places in three
-    // constructs when the gate was written; 4.14 closed the 845 `call`s, 4.15 the 395 `scoped`
-    // blocks and 4.16 the 298 neighbour reads.
+    // constructs when the gate was written; 4.14 closed the `call`s, 4.15 the `scoped` blocks
+    // and 4.16 the neighbour reads.
+    //
+    // **Those counts were undercounts**, all three of them, because the parse was dropping code
+    // above: a `switch` with three or more cases ran only its first two. The real figures are
+    // 1039 `call`s, 441 `scoped` blocks and 609 neighbour reads — so the gap was larger than the
+    // gate said and closed further than it said. See the header.
     //
     // **Not the same as the levels running.** See the header.
     expect(allErrors.map(signature)).toEqual([]);
@@ -199,23 +215,23 @@ describe("the compile gate", () => {
     }
     expect(Object.fromEntries([...statementCounts.entries()].sort())).toMatchInlineSnapshot(`
       {
-        "assign": 4570,
-        "block": 2256,
+        "assign": 5436,
+        "block": 2694,
         "busy": 1,
-        "call": 845,
-        "commaSequence": 1198,
+        "call": 1039,
+        "commaSequence": 1763,
         "defaultDecl": 18,
-        "draw": 853,
-        "effect": 41,
-        "if": 1364,
-        "letterDraw": 1855,
-        "nothing": 302,
-        "number": 382,
+        "draw": 1083,
+        "effect": 56,
+        "if": 1505,
+        "letterDraw": 3029,
+        "nothing": 321,
+        "number": 514,
         "procedureDef": 835,
-        "scoped": 395,
-        "sequence": 1676,
-        "switch": 561,
-        "switchCase": 852,
+        "scoped": 441,
+        "sequence": 2032,
+        "switch": 605,
+        "switchCase": 1948,
         "varDecl": 235,
       }
     `);
@@ -228,14 +244,14 @@ describe("the compile gate", () => {
     }
     expect(Object.fromEntries([...expressionCounts.entries()].sort())).toMatchInlineSnapshot(`
       {
-        "binary": 4791,
-        "call": 124,
-        "neighbour": 302,
-        "number": 11173,
-        "positioned": 3807,
-        "range": 97,
-        "unary": 2222,
-        "variable": 8324,
+        "binary": 6780,
+        "call": 127,
+        "neighbour": 609,
+        "number": 13355,
+        "positioned": 4422,
+        "range": 135,
+        "unary": 2749,
+        "variable": 11043,
       }
     `);
   });

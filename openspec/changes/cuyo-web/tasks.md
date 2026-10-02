@@ -57,13 +57,25 @@ Group 4 has one construct left in the compile gate: `neighbour` in 298 places, w
 task 4.16 rather than 298 problems. 4.17 and 4.18 are gaps that no corpus level exercises,
 recorded because they were found rather than designed for.
 
-**4.16 closed the gate, and the gate had to be replaced rather than loosened** — it is now an
-assertion that the list is *empty*, plus a census of what the corpus contains so that an empty
-report cannot mean a walk that stopped. Replacing it found three holes in the walk itself:
-`letterDraw`'s address (3372 of them), an assignment's *target* (354 addressed ones, three
-expressions each), and `sharedCall`'s body, which 4.14 added without teaching the walk about.
-None of them hid a construct, because a coordinate cannot hold a neighbour pattern — but a gate
-claiming to reach every expression while skipping a third of them is a gate nobody can trust.
+**4.16 closed the gate, and closing it turned up a parser bug that had been shrinking the
+gate's own numbers.** `parseSwitch`'s fold gave each case the *unfolded* next entry, so the
+chain dead-ended after one link: **every `switch` in the corpus with three or more cases ran
+only its first two**, silently. `globals.ld`'s 33 variant schemas lost fourteen of
+`schema16`'s sixteen faces, and 298 of the corpus's 609 neighbour patterns sat in the cases
+that were never built — so the gate reported "298 places needing 4.16" when half its subject
+was invisible to the parse. Fixed in the same change, because 4.16's own verification could
+not be trusted while half of what it verifies was dropped before it got there. The real
+figures are 1039 `call`s, 441 `scoped` blocks and 609 neighbour reads, so **every count 4.13
+recorded was an undercount** — which is worth saying plainly, because "all 339 blocks parse"
+has meant "parse without throwing" all along and not "parse correctly".
+
+The gate also had to be replaced rather than loosened: it now asserts the list is *empty*
+and takes a census of what the corpus contains, so that an empty report cannot mean a walk
+that stopped. Replacing it found three more holes in the walk: `letterDraw`'s address (3372
+of them), an assignment's *target* (354 addressed ones, three expressions each), and
+`sharedCall`'s body, which 4.14 added without teaching the walk about. None of them hid a
+construct, because a coordinate cannot hold a neighbour pattern — but a gate claiming to
+reach every expression while skipping a third of them is a gate nobody can trust.
 -->
 
 ## 1. Project Setup and Toolchain
@@ -125,7 +137,7 @@ claiming to reach every expression while skipping a third of them is a gate nobo
 - [ ] 4.17 Recognise a procedure definition anywhere in a `<< >>`, not only where a zeile boundary falls — upstream's grammar is `code_modus: code_modus code_zeile`, so `name = body;` is a zeile wherever it appears. A `var`/`default` line leaves a boundary; a call, a second definition, or anything inside `{ .. }` does not. Found by 4.14; no corpus level does it
 - [ ] 4.18 Make a comma sequence inside a *spliced* body advance one member per step, so `cual.6`'s two ampersand examples come out frame by frame. A bare sequence advances correctly; a spliced one runs to completion in a single step. The man page's ampersand section is the only place the `&` distinction is documented, and the corpus uses the plain form 302 times and `&` zero times
 - [x] 4.15 Implement scoped blocks (`[x = expr] ...`), and verify nesting — 395 places, the second-largest gap. Upstream's whole of it is `push_code`, five lines: save the variable, set it from the expression, run the body, put the old value back, return 0. **The task text said two things the source contradicts, and both were implemented as upstream does it**: the value is evaluated *every step*, not once on entry, because `mF1->eval(b)` is inside `eval` and `eval` runs once per step per blob — so `[x = x + 1] ...` never drifts, where a cached value would climb by one per step; and the restore does *not* wait for the body to stop being busy, because the third line runs whether or not the second returned busy — so a scoped animation does not hold its value open for the frames it takes. Nesting needs nothing extra, `merk` being a local in `eval`
-- [x] 4.16 Read a neighbour pattern out of a blob's array (`1???0???` and the eight-character forms), connecting `neighbours.ts`'s patterns to a live board, and verify against the man page's worked example — 298 places; the patterns themselves are 3.10's, the read is the walker's. Two pieces: `access.ts` answers a blob's connections off a live `AccessField` (`Blop::getVerbindungen`), and `expr.ts` turns the match into 1 or 0 through a new `EvalContext.neighbour`. Three rules the man page states and the read has to keep: only a blob on a *cell* has an owner, so a falling piece and the global and semiglobal blobs answer `verbindung_solo` — the ninth bit, above all eight directions, which makes every pattern read as all zeros, and `kacheln4.ld` and `kacheln6.ld` ask a falling piece exactly that; `verbindetMit` compares the **shadow** kind on *both* sides, so the pair is snapshotted rather than the neighbours; and the mirror swap is three `TAUSCH_BITS`, so a mirrored level's "above" is the cell that was below
+- [x] 4.16 Read a neighbour pattern out of a blob's array (`1???0???` and the eight-character forms), connecting `neighbours.ts`'s patterns to a live board, and verify against the man page's worked example — 298 places as the compile gate counted them, which was **an undercount**: the real figure is 609, and the gate said 298 because the parse was dropping half of them (see the reconciliation note). The patterns themselves are 3.10's; 4.16 is the read. Two pieces: `access.ts` answers a blob's connections off a live `AccessField` (`Blop::getVerbindungen`), and `expr.ts` turns the match into 1 or 0 through a new `EvalContext.neighbour`. Three rules the man page states and the read has to keep: only a blob on a *cell* has an owner, so a falling piece and the global and semiglobal blobs answer `verbindung_solo` — the ninth bit, above all eight directions, which makes every pattern read as all zeros, and `kacheln4.ld` and `kacheln6.ld` ask a falling piece exactly that; `verbindetMit` compares the **shadow** kind on *both* sides, so the pair is snapshotted rather than the neighbours; and the mirror swap is three `TAUSCH_BITS`, so a mirrored level's "above" is the cell that was below
 
 ## 5. Game Core
 

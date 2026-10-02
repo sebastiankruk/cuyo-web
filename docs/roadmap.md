@@ -177,13 +177,25 @@ its source.
 **Groups 3 and 4 are done, and that is not the same as the runtime being done.** Task 4.13
 wired a compile pass into `make check` that names every construct in the corpus this
 runtime cannot run, by file, line and construct. It reported 1538 places in three
-constructs; 4.14 closed the 845 `call` ones, 4.15 the 395 `scoped` ones and 4.16 the 298
-neighbour reads, so it now reports **none at all**.
+constructs; 4.14 closed the `call`s, 4.15 the `scoped` ones and 4.16 the neighbour
+reads, so it now reports **none at all**.
 
 That is a claim worth being careful about, because _no unimplemented construct_ is not
 _"the levels run"_. The pass is static: it asks whether there is a case for each construct,
 with no board and no simulation, so `connectionsAt` can be implemented and still be wrong
 about a hex column. Only 12.3 and 12.7 will catch that.
+
+**Closing the gate turned up a parser bug that had been shrinking the gate's own numbers.**
+`parseSwitch` folded its case list right and gave each case the _unfolded_ next entry, so
+the chain dead-ended after one link and **every `switch` in the corpus with three or more
+cases ran only its first two** — silently, with nothing to fail. `globals.ld`'s 33 variant
+schemas lost fourteen of `schema16`'s sixteen faces, and 298 of the corpus's 609 neighbour
+patterns sat in cases that were never built, which is why the gate reported 298 places
+needing 4.16 when half of its subject was invisible to the parse. The real figures are
+**1039 `call`s, 441 `scoped` blocks and 609 neighbour reads**, so every count 4.13
+recorded was an undercount. That is worth saying plainly: _all 339 blocks parse_ has meant
+_parse without throwing_ all along and not _parse correctly_, and one token-versus-expression
+comparison per block is what finally noticed.
 
 **Replacing the gate found three holes in the gate itself** — which is the argument for it
 having been a snapshot rather than a claim. `walkExpressions` never reached a lettered
@@ -193,14 +205,6 @@ construct was hidden by any of them, because a coordinate cannot hold a neighbou
 but a gate that skips a third of a level's arithmetic cannot be trusted to say the rest is
 fine. So the gate now asserts the list is empty _and_ takes a census of what the corpus
 contains, which is what stops _"no gaps"_ from also meaning _"did not look"_.
-
-**A `switch` default branch is mis-parsed, and that is a parser bug rather than a runtime
-one.** `antarctic.ld`, `go2.ld`, `baggis.ld` and 26 other levels write `cond -> body; => default;`,
-which upstream's grammar has (`ausdruck PFEIL code_1 ';' PFEIL code_1 ';'`) and this parser
-does not: the default is dropped. 298 of the corpus's 600 neighbour patterns sit inside
-those default branches, so **half the neighbour patterns in the corpus are currently
-invisible** — the gate reports zero because it never sees them. This is the next thing
-worth doing, and it is group 3's task rather than group 4's.
 
 **Two tasks the checklist did not have**, found while reading upstream rather than while
 running the corpus: 4.17, where a procedure definition is only recognised at a `code_zeile`
