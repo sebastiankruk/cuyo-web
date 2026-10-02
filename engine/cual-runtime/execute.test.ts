@@ -208,12 +208,11 @@ describe("what this task refuses", () => {
     // A walker that answers "not busy" for an unimplemented construct makes every rule above
     // untestable: "busy while either side is busy" passes just as well against a walker that
     // is never busy.
-    // Every kind the walker still refuses, so a new one cannot be added without a task.
-    expect(() => notYet("scoped")).toThrow(/task 4\.7/);
-    // The kinds that have left the list say "?" instead. `if`, `switch` and `switchCase` were
-    // still in it until the compile gate (4.13) read it and reported 1364 `if` gaps in a corpus
-    // where every `if` runs — so these three are asserted on purpose: a table nobody reads
-    // stays plausible for a long time, and this is what noticed.
+    //
+    // **The table is empty**, which is the state 4.15 left it in, and that is worth asserting
+    // rather than leaving to the day it stops being true: a construct added to the tree without
+    // a decision about what it does would reach `notYet` and say "task ?", which reads like a
+    // known-and-forgiven gap. These four say the same thing about the kinds that have left.
     expect(() => notYet("if")).toThrow(/task \?/);
     expect(() => notYet("switch")).toThrow(/task \?/);
     expect(() => notYet("switchCase")).toThrow(/task \?/);
@@ -222,21 +221,27 @@ describe("what this task refuses", () => {
     // `call` left the list in 4.14: `linkCalls` resolves it, and an unresolved one throws from
     // the walker naming the procedure.
     expect(() => notYet("call")).toThrow(/task \?/);
+    // `scoped` left it in 4.15, which is the last entry — it was filed under 4.7, which had
+    // already been spent on addressed access. Every statement the corpus uses can now run.
+    expect(() => notYet("scoped")).toThrow(/task \?/);
   });
 
   it("refuses them when they turn up in a tree, rather than skipping them", () => {
     const slices = new TimeSlices();
     // `evaluate` returns 1 so the `if` branch is *taken*. With 0 the condition would be false
-    // and the refused construct inside it never reached, so the third case would pass for the
+    // and the refused construct inside it never reached, so the second case would pass for the
     // wrong reason - a refusal test that does not refuse.
     //
-    // The draw statements were in this list until 4.9 and are not any more, so they are not
-    // here. Their refusal moved to `draw.test.ts`, where it is by name ("a draw needs a
-    // context with a board") rather than by task number.
-    // `tor_1;` is a call to an undefined procedure, which is the still-refused `call`
-    // statement; `{ 5, 7; 8; }` puts one in the *then* branch of a taken `if`, so the test
+    // **No construct is refused by task number any more**, which is what 4.15 left; so what
+    // this asserts now is the other half of the same claim. A walker that skipped a construct
+    // it cannot run would leave it unrun rather than complaining, and every rule above would
+    // still pass — because none of them needs a draw. The refusal is by name instead, and each
+    // name has its own test: the draws in `draw.test.ts`, the scoped block in `scoped.test.ts`,
+    // an unresolved `call` in `link.test.ts`.
+    //
+    // `{ 5; if 1 -> { *; } }` puts the draw in the *then* branch of a taken `if`, so the test
     // proves the walker reaches a refused construct rather than skipping over it.
-    for (const source of ["{ [xx = 1] *; }", "{ 5; if 1 -> { [xx = 1] *; } }"]) {
+    for (const source of ["*", "{ 5; if 1 -> { *; } }"]) {
       const statements = parseCode(lex(source));
       const allocation = allocateSlots(statements);
       const ctx: ExecutionContext = {
@@ -244,7 +249,7 @@ describe("what this task refuses", () => {
         busySlots: allocation.busySlots,
         evaluate: () => 1,
       };
-      expect(() => runCode(statements, ctx), source).toThrow(/task/);
+      expect(() => runCode(statements, ctx), source).toThrow(/a draw needs a context/);
     }
   });
 

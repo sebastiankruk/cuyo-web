@@ -125,19 +125,21 @@ describe("the compile gate", () => {
   });
 
   it("finds expressions nested inside a refused statement", () => {
-    // A `switch` is refused, but its condition is still walked — so a level whose gap is a
-    // `neighbour` inside a `switch` is reported for both, rather than the refusal hiding the
-    // second gap behind it. That is why the statement walk does not stop descending.
+    // A refused statement's own expressions are still walked — so a level whose gap is a
+    // `neighbour` inside one is reported for both, rather than the refusal hiding the second
+    // gap behind it. That is why the statement walk does not stop descending.
     // A neighbour pattern is the six-or-eight-character token itself, `1???0???` — not the word
     // `verbindetMit`, which is an ordinary variable name.
+    //
+    // Nested in a `[x = e]` block, which used to be refused *and* to hide the expression behind
+    // it. It is not refused any more (4.15), so the neighbour comes out on its own — and the
+    // wrapper stays, because "the refusal does not hide a second gap" is still the claim and
+    // `neighbour` is the only construct left to test it with.
     const tokens = tokenize("{ [xx = 1???0???] *; }", "s").filter(
       (t) => t.kind !== "beginCode" && t.kind !== "endCode",
     );
     const errors = compileStatements(parseCode(tokens), { file: "synthetic.ld", line: 1 });
-    // `scoped` is refused and the neighbour is found inside it, so the refusal does not hide
-    // the second gap. A report that stopped descending at the first refusal would list only
-    // `scoped` and leave a level author with one error at a time.
-    expect(errors.map((e) => e.construct).sort()).toEqual(["neighbour", "scoped"]);
+    expect(errors.map((e) => e.construct)).toEqual(["neighbour"]);
     // And the pattern is reported, so a level using six of them says which six.
     expect(errors.find((e) => e.construct === "neighbour")?.detail).toBe("1???0???");
   });
@@ -146,32 +148,36 @@ describe("the compile gate", () => {
     // The snapshot. 4.13's deliverable is that this list is *checked*, so a new construct
     // nobody can run fails the build and a closed gap fails it too.
     //
-    // Read as: `call` is a procedure call — one missing feature, 845 places. `scoped` is the
-    // `[x = e]` block. `neighbour` is a `1???0???` pattern, whose *patterns* are done (task
-    // 3.10) but whose array read is the walker's job and needs a board this pass deliberately
-    // does not have. So the three are one task each, not 1538 problems.
+    // **One construct is left.** The list began as 1538 places in three — `call` 845,
+    // `scoped` 395, `neighbour` 298 — and 4.14 closed the calls and 4.15 the scoped blocks.
+    // `neighbour` is a `1???0???` pattern read out of a blob's array: the *patterns* are done
+    // (task 3.10) but the read is the walker's job and needs a live board, which is 4.16. So
+    // 298 places is one task, not 298 problems.
     const counts = new Map<string, number>();
     for (const error of allErrors) counts.set(error.construct, (counts.get(error.construct) ?? 0) + 1);
     expect(Object.fromEntries([...counts.entries()].sort())).toMatchInlineSnapshot(`
       {
         "neighbour": 298,
-        "scoped": 395,
       }
     `);
   });
 
   it("finds every one of them by file and line, so a level author can go and look", () => {
-    // The whole point of the gate, and the reason it is an *external* snapshot: 1538 entries of
+    // The whole point of the gate, and the reason it is an *external* snapshot: 298 entries of
     // `file:line: construct` is a document, not an assertion. It lives in
     // `__snapshots__/compile-corpus.test.ts.snap` so that a change to it shows up as a diff in
     // a file nobody has to scroll past, and so that a level author can read it to find out what
     // is still missing.
+    //
+    // It was 1538 entries in three constructs until 4.14 and 4.15; the size is a measure of how
+    // much of group 4 is left, which is why the file is worth regenerating rather than trimming.
     expect(allErrors.map(signature).sort()).toMatchSnapshot();
   });
 
   it("groups the listing by level, so the worst offenders are visible", () => {
-    // The other question someone asks: which levels are furthest from running? `call` is the
-    // big one — 845 procedure calls, which is a single missing feature, not 845 bugs.
+    // The other question someone asks: which levels are furthest from running? Every line is a
+    // `1???0???` read, and 298 of them across 79 levels is one missing feature — so a count per
+    // file says how much of a level is written in it rather than how many bugs a level has.
     const perFile = new Map<string, number>();
     for (const error of allErrors) perFile.set(error.file, (perFile.get(error.file) ?? 0) + 1);
     const worst = [...perFile.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -179,23 +185,23 @@ describe("the compile gate", () => {
       [
         [
           "globals.ld",
-          98,
+          66,
         ],
         [
-          "doors.ld",
-          60,
+          "kacheln5.ld",
+          28,
         ],
         [
-          "schach.ld",
-          48,
+          "ebene.ld",
+          21,
         ],
         [
-          "wuerfel.ld",
-          42,
+          "kacheln4.ld",
+          20,
         ],
         [
-          "springer.ld",
-          40,
+          "bonimali.ld",
+          16,
         ],
       ]
     `);
@@ -206,7 +212,17 @@ describe("the compile gate", () => {
     // the assertion that would catch it — it is the same comparison the snapshot above makes,
     // asserted to be non-trivial by counting the gaps, so a snapshot that accidentally captured
     // an empty list cannot pass.
+    //
+    // **Down to one construct**, so this used to assert that more than one kind of gap was
+    // found and cannot any more: there genuinely is only `neighbour` left. What still catches an
+    // empty capture is the count itself, which is why it is the length rather than the number
+    // of constructs that is asserted non-zero here.
+    //
+    // And when 4.16 closes this one the list really will be empty, at which point the snapshot
+    // has nothing to be a snapshot *of* and this gate wants replacing rather than loosening:
+    // an empty list is the success condition 0.4.0 is waiting for, and it should be asserted as
+    // one rather than guarded against.
     expect(allErrors.length).toBeGreaterThan(0);
-    expect(new Set(allErrors.map((e) => e.construct)).size).toBeGreaterThan(1);
+    expect(new Set(allErrors.map((e) => e.construct)).size).toBeGreaterThan(0);
   });
 });

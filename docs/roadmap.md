@@ -177,16 +177,25 @@ its source.
 **Groups 3 and 4 are done, and that is not the same as the runtime being done.** Task 4.13
 wired a compile pass into `make check` that names every construct in the corpus this
 runtime cannot run, by file, line and construct. It reported 1538 places in three
-constructs; 4.14 closed the 845 `call` ones and it now reports **693 in two**. The rest are tasks
-4.15, 4.16 and — found along the way — 4.17 and 4.18:
+constructs; 4.14 closed the 845 `call` ones and 4.15 the 395 `scoped` ones, so it now
+reports **298 in one**:
 
 | construct    | places | what is missing                                       |
 | ------------ | -----: | ----------------------------------------------------- |
-| `scoped`     |    395 | `[x = expr]` blocks                                   |
 | `neighbour`  |    298 | reading a pattern out of a blob's array               |
 
-Three features rather than 1538 problems, and the gate is a checked snapshot rather than a
-claim that the list is empty — so 0.4.0 is not cut while these are open.
+One feature rather than 298 problems, and the gate is a checked snapshot rather than a
+claim that the list is empty — so 0.4.0 is not cut while this is open. When 4.16 closes it
+the list really will be empty, and the gate wants replacing rather than loosening: an empty
+list is the success condition, and it should be asserted as one rather than guarded against.
+
+**Two tasks the checklist did not have**, found while reading upstream rather than while
+running the corpus: 4.17, where a procedure definition is only recognised at a `code_zeile`
+boundary, and 4.18, where a comma sequence inside a spliced body runs to completion instead
+of advancing a frame. No level in the corpus does either, so neither is on the critical
+path — but 4.18 is why `cual.6`'s two ampersand examples are structurally right and
+arithmetically wrong, and that is the sort of thing that is much cheaper to record now than
+to rediscover.
 
 ### 5. Menus, pause, settings (group 9) — _0.5.0_
 
