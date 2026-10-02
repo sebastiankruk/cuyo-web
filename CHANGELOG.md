@@ -24,6 +24,12 @@ something a player can tell.
   software under the AGPL, that there is no warranty, where to read the licence, and a
   link to the source. That last one is also how this project honours section 13 for
   itself.
+- **"How to play" is now a dialog that pauses the game.** It was a dropdown that did not
+  stop anything, so reading the rules mid-fall was a way to lose a piece you were watching
+  - which is exactly when you want to check them. It closes on Escape, on the backdrop, or
+  on a button; it keeps keyboard focus inside itself and gives focus back when it closes;
+  and it is set in a slightly smaller face than the bar above it, because a dialog is a
+  distraction from the board and should not read as part of it.
 - **Every level in a board now has its own colour, chosen so that no two kinds in a level
   look the same.** Colours used to be derived from each picture's name, independently,
   which meant two kinds in one level could come out nearly identical — across the 79

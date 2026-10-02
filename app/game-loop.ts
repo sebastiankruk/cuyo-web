@@ -10,6 +10,32 @@ import type { Simulation } from "../engine/game-core/simulation.ts";
 
 export type GameListener = (sim: Simulation) => void;
 
+/**
+ * The frame clock, injected rather than taken from the global.
+ *
+ * `requestAnimationFrame` does not exist in Node, so a loop that reads it directly cannot
+ * be tested at all - which is why the pause had no test until this. The alternative is a
+ * test-only global shim, and a shim is a claim about the environment that stops being true
+ * the moment the code changes shape.
+ *
+ * Defaults to the browser's own, so nothing at the call site changes.
+ */
+export interface FrameClock {
+  /** Schedule `fn` for the next frame; returns a handle for cancelling. */
+  request(fn: (now: number) => void): number;
+  /** Cancel a frame scheduled by {@link request}. */
+  cancel(handle: number): void;
+  /** The current time in milliseconds. */
+  now(): number;
+}
+
+/** The browser's own clock. */
+export const BROWSER_CLOCK: FrameClock = {
+  request: (fn) => requestAnimationFrame(fn),
+  cancel: (handle) => cancelAnimationFrame(handle),
+  now: () => performance.now(),
+};
+
 export class GameLoop {
   private raf = 0;
   private last = 0;
@@ -21,17 +47,20 @@ export class GameLoop {
   frameMs = 0;
   paused = false;
 
-  constructor(private readonly sim: Simulation) {}
+  constructor(
+    private readonly sim: Simulation,
+    private readonly clock: FrameClock = BROWSER_CLOCK,
+  ) {}
 
   start(): void {
     if (this.raf !== 0) return;
-    this.last = performance.now();
-    this.raf = requestAnimationFrame(this.tick);
+    this.last = this.clock.now();
+    this.raf = this.clock.request(this.tick);
   }
 
   stop(): void {
     if (this.raf === 0) return;
-    cancelAnimationFrame(this.raf);
+    this.clock.cancel(this.raf);
     this.raf = 0;
   }
 
@@ -41,7 +70,7 @@ export class GameLoop {
   }
 
   private tick = (now: number): void => {
-    this.raf = requestAnimationFrame(this.tick);
+    this.raf = this.clock.request(this.tick);
     const delta = now - this.last;
     this.last = now;
     this.frameMs = delta;

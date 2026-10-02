@@ -226,7 +226,27 @@ long enough that scrolling to the bottom is the only way to see what exists.
 - [ ] 9.5 Implement the pause menu offering resume, restart and abandon, and verify resuming continues the same board
 - [ ] 9.6 Implement the settings screen for audio, reduced motion, portrait lock and left-handed layout, and verify each takes effect
 - [ ] 9.7 Add a development overlay showing step count, frame time and blob count, and verify it can be toggled
-- [ ] 9.8 Replace the rules `<details>` dropdown with a centred modal dialog that pauses the game while open, dismissible by backdrop click, Escape and a close button, focus-trapped and restored on close, and rendered in a smaller face distinct from the HUD's
+- [x] 9.8 Replace the rules `<details>` dropdown with a centred modal dialog that pauses the game while open, dismissible by backdrop click, Escape and a close button, focus-trapped and restored on close, and rendered in a smaller face distinct from the HUD's
+
+  Done as `app/RulesDialog.tsx` on a `<dialog>` with `showModal()`, which supplies the
+  top layer, the backdrop, Escape and page inertness for free; the focus trap and the
+  restore are applied from `app/dialog.ts`, because those are decisions rather than
+  mechanics. Pause is `GameLoop.paused`, set from PlayScreen — the loop lives outside React,
+  so routing it through state would make closing the dialog and resuming two updates that
+  could disagree for a frame.
+
+  Two things came out of it that were not in the task:
+
+  - **The loop had no test at all**, because `requestAnimationFrame` does not exist in
+    Node. It now takes an injected `FrameClock` (`app/testing/manual-clock.ts`), which is
+    10 tests covering the pause, the resume, and — the one that matters — that the
+    accumulator does not fast-forward the backlog accrued during a pause. Without that last
+    one, opening the rules would have been what killed the piece the modal was meant to
+    protect. Task 13.4 asked for this; the pause made it worth doing now.
+  - **`app/hud.test.ts` had to move**, since its subject no longer exists. Its five
+    assertions about the dropdown's positioning are now about the dialog, and the CSS test
+    reads markup with comments stripped — otherwise the `not.toContain("<details")`
+    matched my own explanatory comment and passed a regression.
 
 ## 10. Mobile Experience
 
