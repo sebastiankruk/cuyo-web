@@ -13,7 +13,8 @@
 
 import { BITS_PER_SLOT, getBool, setBool } from "./slots.ts";
 import { divv, modd } from "./divmod.ts";
-import type { AssignOperator } from "./code.ts";
+import type { AssignOperator, Stmt } from "./code.ts";
+import { BLOPART_MIN_CUAL } from "./const-tables.ts";
 
 /**
  * The simulation's time-slice counter: `Blop::gAktuelleZeitNummerDatenAlt`.
@@ -284,6 +285,28 @@ export function specialVariableSlot(name: string): number {
 }
 
 /**
+ * What a kind change needs to know, which the store cannot know on its own.
+ *
+ * The defaults are the new kind's *own* — a kind's variables are declared per kind, so this
+ * is level data and belongs with the level.
+ */
+export interface KindChange {
+  /** `ld->mAnzFarben`: the exclusive upper bound on a `kind`. */
+  readonly colourCount: number;
+  /**
+   * The kind's `da_kind` slots — the ones `var x = 4 : reapply` declares.
+   *
+   * Not all of its defaults: `setKindIntern` re-applies `da_kind` and nothing else, so
+   * `da_init` and `da_event` slots survive a kind change untouched.
+   */
+  kindDefaults(kind: number): readonly { readonly slot: number; readonly value: number }[];
+  /** `getEventCode(event_draw)` for a kind, or null when it has none. */
+  drawCodeOf(kind: number): readonly Stmt[] | null;
+  /** `Code::busyReset` over a kind's draw code, used when a kind change interrupts it. */
+  resetBusyOf(kind: number): void;
+}
+
+/**
  * One blob's variables: a single `Int32Array`, plus nothing.
  *
  * The class exists to give the array a name, the fourteen special slots their names, and the
@@ -392,6 +415,65 @@ export class BlobStore {
     const slot = SYSTEM_VARIABLE_SLOTS[name];
     if (slot === undefined) throw new Error(`Cual: no system variable named '${name}'`);
     this.set(slot, value);
+  }
+
+  /**
+   * `setVariableIntern`'s `spezvar_kind` case: range-check, then `setKindIntern` on a change.
+   *
+   * `setKindIntern` is `mDaten[spezvar_kind] = wert;` and then a walk over *every* slot
+   * re-applying the ones whose default kind is `da_kind`. That is the whole of "reapply": the
+   * variable's value follows the kind it belongs to, so a blob that becomes a different kind
+   * starts that kind's default rather than keeping the old kind's.
+   *
+   * The range check is upstream's: `if (mDaten[vnr] < blopart_min_cual || mDaten[vnr] >=
+   * ld->mAnzFarben) throw Fehler("Value %d for kind out of range (allowed: %d - %d)")`. So
+   * `blopart_min_cual` (-1) is assignable and `blopart_ausserhalb` (-5) is not — which is what
+   * "the last kind Cual may name" means.
+   *
+   * @returns whether the kind actually changed, which is what the draw bookkeeping keys on.
+   */
+  setKind(value: number, change: KindChange): boolean {
+    if (value < BLOPART_MIN_CUAL || value >= change.colourCount) {
+      throw new Error(
+        `Cual: value ${value} for kind is out of range (allowed: ${BLOPART_MIN_CUAL} to ${change.colourCount - 1})`,
+      );
+    }
+    const previous = this.data[2];
+    if (previous === value) return false;
+    // Direct, not through `set`, so no shadow is taken: `setVariableIntern` is the low-level
+    // entry, and upstream's comment on it says it deliberately skips `merkeAlteVarWerte`.
+    this.data[2] = value;
+    for (const entry of change.kindDefaults(value)) {
+      this.data[entry.slot] = entry.value;
+    }
+    return true;
+  }
+
+  /**
+   * The draw bookkeeping at the top of a step, before the new kind's draw code runs.
+   *
+   *     if (mDaten[spezvar_kind] != mDaten[spezvar_kind_beim_letzten_draw_aufruf]
+   *         && mDaten[spezvar_kind_beim_letzten_draw_aufruf] != -1) {
+   *       Code * alt_co = (that == blopart_ausserhalb ? 0
+   *         : ld->mSorten[that]->getEventCode(event_draw));
+   *       if (alt_co) alt_co->busyReset(*this);
+   *     }
+   *     mDaten[spezvar_kind_beim_letzten_draw_aufruf] = mDaten[spezvar_kind];
+   *
+   * So a kind change interrupts the *old* kind's animation: its draw code is busy-reset, or a
+   * blob that changed kind mid-sequence would resume the old animation where it left off. The
+   * `-1` guard means a blob that has never been drawn has nothing to interrupt, and
+   * `blopart_ausserhalb` has no draw code at all.
+   *
+   * Slot 7 is then set to the current kind, so this runs at most once per actual change.
+   */
+  beginDraw(change: KindChange): void {
+    const lastDrawn = this.data[7];
+    const current = this.data[2];
+    if (current !== lastDrawn && lastDrawn !== -1) {
+      if (change.drawCodeOf(lastDrawn) !== null) change.resetBusyOf(lastDrawn);
+    }
+    this.data[7] = current;
   }
 
   /** `Blop::getVariable`. */
