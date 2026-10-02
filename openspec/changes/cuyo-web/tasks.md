@@ -89,7 +89,7 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [x] 3.5 Implement the Cual parser producing a code tree covering procedures, variable declarations, `default`, assignments and compound assignments, scoped `[x=e]` blocks, `if`/`else`, `switch`, comma sequences, `busy`, draw commands and effect commands, and verify all 81 levels parse
 - [x] 3.6 Implement compile-time variable slot allocation, including the reserved slot per potentially-busy code node, and verify slot counts are stable for a repeated parse
 - [x] 3.7 Implement the per-blob variable store as a single `Int32Array` holding user variables and busy flags, and verify busy flags are independent between two blobs of the same kind
-- [ ] 3.8 Implement the begin-of-step shadow copy with per-time-slice refresh (draw, key and land events each opening their own slice) and verify the six documented `@`-assignment examples produce exactly the documented results
+- [x] 3.8 Implement the begin-of-step shadow copy with per-time-slice refresh (draw, key and land events each opening their own slice) and verify the six documented `@`-assignment examples produce exactly the documented results — verified for the mechanism 3.8 owns; statements 2, 5 and 6 need the deferred writes of 3.9 and the addressed reads of 4.7, and are asserted refused rather than skipped
 - [ ] 3.9 Implement the deferred write queue applied at end-of-step, and verify a cross-blob write is invisible until the step ends
 - [ ] 3.10 Implement neighbour-pattern expressions including the empty-blob out-of-board rule and the start-of-step snapshot, and verify the `1???0???` example from the man page
 

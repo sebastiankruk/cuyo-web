@@ -13,6 +13,50 @@
 
 import { BITS_PER_SLOT, getBool, setBool } from "./slots.ts";
 
+/**
+ * The simulation's time-slice counter: `Blop::gAktuelleZeitNummerDatenAlt`.
+ *
+ * A "slice" is one `beginGleichzeitig()` … `endGleichzeitig()` window. The step itself is
+ * one slice, and so is each of the draw, key and land events - which is why a `@` read
+ * during a draw does not see what a `@` read during the step saw, even though both are
+ * "this frame".
+ *
+ * Not a module-level mutable global, though upstream's is a `static` on `Blop`. Injected
+ * rather than imported because a global counter is untestable in the way that matters here:
+ * every test would have to leave it in a known state, and one that forgot would produce a
+ * passing suite and a wrong store.
+ */
+export class TimeSlices {
+  #current = 0;
+
+  /** `gAktuelleZeitNummerDatenAlt`. */
+  get current(): number {
+    return this.#current;
+  }
+
+  /**
+   * `Blop::beginGleichzeitig`: open a new slice and return its number.
+   *
+   * Upstream increments here and clears the deferred-write queue in the same breath; the
+   * queue is task 3.9 and `close` is where it gets applied.
+   */
+  open(): number {
+    this.#current += 1;
+    return this.#current;
+  }
+
+  /**
+   * `Blop::endGleichzeitig`.
+   *
+   * Deliberately does nothing yet. Statements 2, 5 and 6 of `cual.6`'s six examples need
+   * the queue this applies, so they are verified in task 3.9 rather than here - see
+   * `store.test.ts`, which asserts they are refused rather than quietly wrong.
+   */
+  close(): void {
+    // 3.9 applies the deferred writes here.
+  }
+}
+
 /** `blopart_ausserhalb` in `sorte.h`. "Off the board", so a piece nobody has placed yet. */
 export const BLOBART_AUSSERHALB = -5;
 
@@ -120,6 +164,15 @@ export class BlobStore {
   /** `Blop::mDaten`. */
   readonly data: Int32Array;
 
+  /** The shared slice counter; see {@link TimeSlices}. */
+  readonly #slices: TimeSlices;
+
+  /** `Blop::mDatenAlt`, allocated on first use rather than up front. */
+  #alt: Int32Array | null = null;
+
+  /** `Blop::mZeitNummerDatenAlt`: the slice `#alt` was taken in, or -1 if never. */
+  #altSlice = -1;
+
   /**
    * @param slotCount `DefKnoten::getDatenLaenge` — the length of `mDaten`.
    * @param rows the level's row count, for `falling_fast_speed`'s `gric` default.
@@ -128,9 +181,11 @@ export class BlobStore {
   constructor(
     slotCount: number,
     rows: number,
+    slices: TimeSlices,
     defaults?: readonly { readonly slot: number; readonly value: number }[],
   ) {
     this.data = new Int32Array(slotCount);
+    this.#slices = slices;
     this.reset(rows, defaults);
   }
 
@@ -146,6 +201,10 @@ export class BlobStore {
     defaults?: readonly { readonly slot: number; readonly value: number }[],
   ): void {
     this.data.fill(0);
+    // A respawned blob has no history, so any shadow left from before the respawn would
+    // report the dead blob's values as this slice's past.
+    this.#alt = null;
+    this.#altSlice = -1;
     SPECIAL_VARIABLES.forEach((variable, slot) => {
       // `da_nie` and `da_keinblob` are the two that stay zero. See `DefaultKind`.
       if (variable.defaultKind === "never" || variable.defaultKind === "noBlob") return;
@@ -169,8 +228,66 @@ export class BlobStore {
     return this.data[slot];
   }
 
-  /** `Blop::setVariable`. */
+  /**
+   * `Blop::merkeAlteVarWerte`: take the shadow copy, if this slice has not already done so.
+   *
+   * Called by every write, before the write. **Lazy on purpose** - upstream does not copy
+   * when a slice opens, it copies on a blob's first write in that slice. The difference is
+   * invisible in the documented examples and free of consequence everywhere else, but it is
+   * what upstream does, and copying eagerly would mean allocating a second `Int32Array` for
+   * every blob on the board on every slice whether or not anything ever reads it.
+   */
+  preserve(): void {
+    const slice = this.#slices.current;
+    if (this.#altSlice >= slice) return;
+    if (this.#alt === null) this.#alt = new Int32Array(this.data.length);
+    this.#alt.set(this.data);
+    this.#altSlice = slice;
+  }
+
+  /**
+   * `Blop::getVariableAlt`: the value as of the beginning of this slice.
+   *
+   * Reads the shadow only when it was taken in *this* slice. A stale shadow is a blob's
+   * history, not this slice's past, and `getVariableAlt` says the same thing by falling
+   * through to the live array - which is correct, because nothing has written since.
+   */
+  getAlt(slot: number): number {
+    const slice = this.#slices.current;
+    return this.#alt !== null && this.#altSlice === slice ? this.#alt[slot] : this.data[slot];
+  }
+
+  /** `Blop::getBoolVariableAlt`, over a bit number rather than a slot. */
+  busyGetAlt(bit: number): boolean {
+    const slot = Math.floor(bit / BITS_PER_SLOT);
+    const slice = this.#slices.current;
+    return this.#alt !== null && this.#altSlice === slice
+      ? getBool(this.#alt[slot], bit)
+      : getBool(this.data[slot], bit);
+  }
+
+  /** Whether this blob's shadow has been taken in the current slice. */
+  get hasShadow(): boolean {
+    return this.#alt !== null && this.#altSlice === this.#slices.current;
+  }
+
+  /** `Blop::setVariable`, which preserves the old value first. */
   set(slot: number, value: number): void {
+    this.preserve();
+    this.data[slot] = value;
+  }
+
+  /**
+   * `Blop::setVariableIntern`: a write that must *not* preserve.
+   *
+   * Upstream's deferred writes are applied by `endGleichzeitig` through this, and they have
+   * to skip the preserve: by then the slice is over and the shadow is nobody's past. A
+   * write that preserved here would overwrite the beginning-of-step values that the next
+   * slice's `@` reads are supposed to be relative to.
+   *
+   * Task 3.9 uses this. Nothing else should.
+   */
+  setInternal(slot: number, value: number): void {
     this.data[slot] = value;
   }
 
@@ -179,8 +296,20 @@ export class BlobStore {
     return getBool(this.data[Math.floor(bit / BITS_PER_SLOT)], bit);
   }
 
-  /** `Blop::setBoolVariable`. */
+  /**
+   * `Blop::setBoolVariable`, which preserves the old value first.
+   *
+   * Upstream preserves for the flag too: `set[Bool]Variable` calls `merkeAlteVarWerte`
+   * before changing anything, and the flag is a variable like any other.
+   */
   busySet(bit: number, on: boolean): void {
+    this.preserve();
+    const slot = Math.floor(bit / BITS_PER_SLOT);
+    this.data[slot] = setBool(this.data[slot], bit, on);
+  }
+
+  /** `setBoolVariableIntern`, for the same reason as {@link setInternal}. */
+  busySetInternal(bit: number, on: boolean): void {
     const slot = Math.floor(bit / BITS_PER_SLOT);
     this.data[slot] = setBool(this.data[slot], bit, on);
   }
@@ -197,17 +326,6 @@ export class BlobStore {
     const slot = specialVariableSlot(name);
     if (slot < 0) throw new Error(`Cual: no special variable named '${name}'`);
     this.data[slot] = value;
-  }
-
-  /**
-   * The shadow copy `Blop` keeps in `mDatenAlt`.
-   *
-   * Returned rather than stored: 3.8 owns when the copy is made and refreshed, and a store
-   * that owned the timing would have it wrong before 3.8 exists. See `docs/cual.6` for the
-   * six `@`-assignment examples this has to reproduce.
-   */
-  snapshot(): Int32Array {
-    return this.data.slice();
   }
 
   /** Whether `bit` names a bit inside this array at all. */
