@@ -12,6 +12,8 @@
  */
 
 import { BITS_PER_SLOT, getBool, setBool } from "./slots.ts";
+import { divv, modd } from "./divmod.ts";
+import type { AssignOperator } from "./code.ts";
 
 /**
  * The simulation's time-slice counter: `Blop::gAktuelleZeitNummerDatenAlt`.
@@ -29,6 +31,12 @@ import { BITS_PER_SLOT, getBool, setBool } from "./slots.ts";
 export class TimeSlices {
   #current = 0;
 
+  /** `Blop::gZZ`: the deferred writes for this window. */
+  #queue: DeferredWrite[] = [];
+
+  /** `Blop::gGleichZeit`. */
+  #open = false;
+
   /** `gAktuelleZeitNummerDatenAlt`. */
   get current(): number {
     return this.#current;
@@ -42,18 +50,118 @@ export class TimeSlices {
    */
   open(): number {
     this.#current += 1;
+    this.#queue.length = 0;
+    this.#open = true;
     return this.#current;
   }
 
   /**
-   * `Blop::endGleichzeitig`.
+   * `Blop::endGleichzeitig`: apply every queued write, in the order they were queued.
    *
-   * Deliberately does nothing yet. Statements 2, 5 and 6 of `cual.6`'s six examples need
-   * the queue this applies, so they are verified in task 3.9 rather than here - see
-   * `store.test.ts`, which asserts they are refused rather than quietly wrong.
+   * Applied through {@link BlobStore.setInternal}, which does not preserve - by now the slice
+   * is over, and a preserve would replace the beginning-of-slice values the *next* slice's
+   * `@` reads are measured against.
+   *
+   * The queue is **not** emptied here. Upstream clears it in `beginGleichzeitig`
+   * (`gZZAnz = 0`) and leaves `gZZAnz` alone in `endGleichzeitig`, so {@link pending} still
+   * counts the entries after a close. Faithful rather than tidy: an emptied queue would make
+   * `pending` mean "writes this slice" where upstream means "writes not yet superseded".
    */
   close(): void {
-    // 3.9 applies the deferred writes here.
+    if (!this.#open) throw new Error("Cual: endGleichzeitig without beginGleichzeitig");
+    for (const write of this.#queue) applyOperation(write);
+    this.#open = false;
+  }
+
+  /**
+   * `Blop::abbruchGleichzeitig`: abandon the window.
+   *
+   * Called from the constructor of upstream's error type, so an exception mid-step discards
+   * the queue rather than applying half of it. Without this a failed step would still apply
+   * whatever had been queued before the failure, which is the one outcome worse than not
+   * applying the queue at all.
+   */
+  abort(): void {
+    this.#queue.length = 0;
+    this.#open = false;
+  }
+
+  /**
+   * `Blop::setVariableZukunft`: queue a write for the end of the window.
+   *
+   * `value` is the **right-hand side, already evaluated**. Cual computes it instantaneously
+   * even when the write itself is deferred - `cual.6` says so in as many words - which is
+   * what makes statements 5 and 6 of the six examples differ from each other.
+   */
+  defer(blob: BlobStore, slot: number, value: number, operation: AssignOperator): void {
+    if (!this.#open) throw new Error("Cual: setVariableZukunft outside a Gleichzeitig window");
+    this.#queue.push({ blob, slot, value, operation });
+  }
+
+  /** `gZZAnz`. Counts entries not yet superseded by the next `open`. */
+  get pending(): number {
+    return this.#queue.length;
+  }
+
+  /** Whether a window is open, i.e. `gGleichZeit`. */
+  get isOpen(): boolean {
+    return this.#open;
+  }
+}
+
+/** One queued write: `Blop::tZZ`. */
+interface DeferredWrite {
+  readonly blob: BlobStore;
+  readonly slot: number;
+  readonly value: number;
+  readonly operation: AssignOperator;
+}
+
+/**
+ * `Blop::setVariableIntern`'s switch over the operation.
+ *
+ * `add` and friends read the **live** value, not the shadow. That is what makes statement 2
+ * of the six examples come out as "one more than the value of X just before the change": the
+ * `+=` is applied at the end of the step to whatever X is then.
+ *
+ * Not transcribed, and deliberately so: the range check on `spezvar_kind` and the
+ * `setKindIntern` call that follows a change of kind. Both live in `setVariableIntern` too,
+ * and implementing the check without the cache invalidation would leave a kind write that
+ * validates and then does nothing.
+ */
+function applyOperation(write: DeferredWrite): void {
+  const { blob, slot, value, operation } = write;
+  const current = blob.get(slot);
+  switch (operation) {
+    case "=":
+      blob.setInternal(slot, value);
+      return;
+    case "+=":
+      blob.setInternal(slot, current + value);
+      return;
+    case "-=":
+      blob.setInternal(slot, current - value);
+      return;
+    case "*=":
+      blob.setInternal(slot, current * value);
+      return;
+    case "/=":
+      blob.setInternal(slot, divv(current, value));
+      return;
+    case "%=":
+      blob.setInternal(slot, modd(current, value));
+      return;
+    case ".+=":
+      blob.setInternal(slot, current | value);
+      return;
+    case ".-=":
+      // `& (-1 - wert)`, as upstream writes it: the complement of the mask.
+      blob.setInternal(slot, current & ~value);
+      return;
+    default: {
+      const impossible: never = operation;
+      throw new Error(`Cual: unknown assignment operator '${String(impossible)}'`);
+    }
   }
 }
 
