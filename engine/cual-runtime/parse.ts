@@ -47,8 +47,14 @@ export class CualSyntaxError extends Error {
   }
 }
 
-/** A cursor over a token list, with the lookahead the grammar needs. */
-class Cursor {
+/**
+ * A cursor over a token list, with the lookahead the grammar needs.
+ *
+ * Exported because `code.ts` drives the same cursor for the statement layer: an expression
+ * has to be able to stop at `;` or `,` and hand control back, and a second cursor over the
+ * same array would either lose the position or need the caller to thread it through.
+ */
+export class Cursor {
   private at = 0;
 
   constructor(private readonly tokens: readonly Token[]) {}
@@ -74,6 +80,23 @@ class Cursor {
 
   atEnd(): boolean {
     return this.at >= this.tokens.length;
+  }
+
+  /** The current position, so a speculative parse can be undone. */
+  mark(): number {
+    return this.at;
+  }
+
+  /**
+   * Rewinds to a {@link mark}.
+   *
+   * Used where the grammar is genuinely ambiguous without more lookahead: `name x = 1` is a
+   * procedure definition and `name` on its own is a call, and only trying one and rewinding
+   * distinguishes them. Bison gets this from its tables; a hand-written parser backtracks,
+   * which is safe here because parsing has no side effects.
+   */
+  reset(to: number): void {
+    this.at = to;
   }
 
   fail(message: string, token: Token | undefined = this.peek()): never {
@@ -118,6 +141,22 @@ const LEVEL_OF_RANGE =
   PRECEDENCE.find((l) => l.ops.includes("==.."))?.level ?? LEVEL_OF_EQ;
 
 /**
+ * The level of the probabilistic operator `:`.
+ *
+ * Needed wherever a `:` is *not* that operator - notably `default x = 0 : reapply`, where
+ * the colon introduces a keyword. An expression parsed at the loosest level sees `:` as an
+ * infix operator and tries to parse `reapply` as an operand, which fails with a message about
+ * a keyword where the reader expected a declaration.
+ */
+export const LEVEL_OF_COLON =
+  PRECEDENCE.find((l) => l.ops.includes(":"))?.level ?? LEVEL_OF_RANGE;
+
+/** One expression, stopping before anything binding looser than `:`. */
+export function parseExpressionBeforeColon(cursor: Cursor): Expr {
+  return parseExpr(cursor, LEVEL_OF_COLON + 1);
+}
+
+/**
  * The text an operator token carries, or null if it is not one.
  *
  * Both `operator` and `punct` can hold one, and this is the kind of thing that is easy to
@@ -157,10 +196,11 @@ function prefixFor(token: Token | undefined): UnaryOperator | undefined {
 }
 
 /**
- * Parse a whole expression.
+ * Parse a whole expression from a token list, and require the list to be consumed.
  *
  * Trailing tokens are an error rather than ignored, so a caller cannot mistake "parsed the
- * first thing it saw" for "parsed the program".
+ * first thing it saw" for "parsed the program". The statement layer cannot use this - it has
+ * to let the expression stop at `;` - so it uses {@link parseExpressionFrom} instead.
  */
 export function parseExpression(tokens: readonly Token[]): Expr {
   const cursor = new Cursor(tokens);
@@ -171,6 +211,33 @@ export function parseExpression(tokens: readonly Token[]): Expr {
     cursor.fail(`unexpected ${text} after a complete expression`, token);
   }
   return expr;
+}
+
+/**
+ * Parse one expression from a shared cursor, stopping wherever the next token is not an
+ * operator that can continue it.
+ *
+ * This is what the statement layer calls: it owns the cursor so it can see the `;`, `,` or
+ * `}` that ended the expression.
+ */
+export function parseExpressionFrom(cursor: Cursor): Expr {
+  return parseExpr(cursor, 1);
+}
+
+/** A cursor over `tokens`, for a caller that owns the whole block. */
+export function makeCursor(tokens: readonly Token[]): Cursor {
+  return new Cursor(tokens);
+}
+
+/** `@(x,y)` or `@@(x,y)` at a use site, from a shared cursor. */
+export function parseOrtFor(cursor: Cursor): Ort {
+  const token = cursor.peek();
+  const foreign = token?.kind === "operator" && token.text === "@@";
+  if (!foreign && !(token?.kind === "punct" && token.text === "@")) {
+    cursor.fail("expected '@' or '@@'", token);
+  }
+  cursor.next();
+  return parseOrt(cursor, foreign);
 }
 
 /**
@@ -386,18 +453,49 @@ function parseWordOrAddressed(cursor: Cursor, name: string): Expr {
   return { kind: "positioned", name, position: parseOrt(cursor, isForeign) };
 }
 
+/**
+ * Whether a token could begin a primary expression.
+ *
+ * Used to decide whether a bare `@` carries an address or stands alone - the only way to tell
+ * `@ 5 *` from `@*`. Listed explicitly rather than "is not an operator", because `!` and `-`
+ * are operators that also begin an expression.
+ */
+export function canStartExpression(token: Token | undefined): boolean {
+  switch (token?.kind) {
+    case "number":
+    case "zeroOne":
+    case "halfNumber":
+    case "word":
+    case "string":
+    case "neighbour":
+      return true;
+    case "punct":
+      return token.text === "(" || token.text === "-";
+    case "operator":
+      return token.text === "!";
+    default:
+      return false;
+  }
+}
+
 /** `parser.yy`'s `relort` and `absort`, which differ only in their empty case. */
 function parseOrt(cursor: Cursor, foreign: boolean): Ort {
   const open = cursor.peek();
   const parenthesised = open?.kind === "punct" && open.text === "(";
   if (!parenthesised) {
-    // `_klammerfrei`: an empty address, `0`/`1` selecting a falling piece, or an expression.
-    if (foreign) {
-      const zeroOne = cursor.peek();
-      if (zeroOne?.kind === "zeroOne") {
-        cursor.next();
-        return { kind: "fall", which: { kind: "number", value: zeroOne.value } };
-      }
+    // `relort_klammerfrei` / `absort_klammerfrei` are empty, a bare `0`/`1`, or a bare
+    // expression. All three occur: `pos = drehpos@;` in baelle.ld writes the address with no
+    // parentheses at all, and the empty form is how a global is named.
+    //
+    // `Ort::Ort(Code*)` is `ortart_relativ_fall` in ort.cpp, so a one-argument address is a
+    // falling piece whichever spelling produced it - `@0`, `@expr`, `@@expr` are all the
+    // same kind of thing.
+    if (open?.kind === "zeroOne") {
+      cursor.next();
+      return { kind: "fall", which: { kind: "number", value: open.value } };
+    }
+    if (canStartExpression(open)) {
+      return { kind: "fall", which: parseExpr(cursor, 1) };
     }
     return foreign ? { kind: "semiglobal" } : { kind: "global" };
   }
