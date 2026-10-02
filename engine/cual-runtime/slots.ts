@@ -36,6 +36,7 @@
  */
 
 import type { Stmt } from "./code.ts";
+import { SPECIAL_VARIABLE_COUNT } from "./store.ts";
 
 /**
  * `bits_pro_int` in `blop.h`: `(8*sizeof(int))`, and `sizeof(int)` is 4 wherever Cuyo runs.
@@ -104,7 +105,15 @@ export interface Allocation {
  * should do, and is checked as an invariant rather than left to the arithmetic here.
  */
 export class SlotAllocator {
-  #nextSlot = 0;
+  // Starts at `spezvar_anz`, not zero. `speicherGlobaleVordefinierte` defines the fourteen
+  // special variables before anything else is parsed - `CASSERT(mVarNrBei == 0)` immediately
+  // above the loop is there to say so - so `file` is slot 0 and the first `var` is slot 14.
+  //
+  // Task 3.6 got this wrong: it started at 0, so every slot number it produced was 14 too
+  // low. The *relative* order and the bit packing were right, which is why the corpus
+  // assertions and the interleaving invariant did not catch it - nothing in them looks at an
+  // absolute slot. `out1` would have been `file`.
+  #nextSlot = SPECIAL_VARIABLE_COUNT;
   #nextBool = -1;
   #boolCount = 0;
   #declaredCount = 0;
@@ -139,6 +148,12 @@ export class SlotAllocator {
     return bit;
   }
 
+  /**
+   * `getDatenLaenge`: the length of `mDaten`, special variables included.
+   *
+   * They are counted because they are real slots — `Blop` writes `mDaten[spezvar_kind]` and
+   * a kind's defaults are read back out of the same array — not because they are free.
+   */
   get slotCount(): number {
     return this.#nextSlot;
   }
