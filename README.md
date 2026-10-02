@@ -53,41 +53,64 @@ the original spritesheets are not shipped.
 there is exactly one copy of each skill, workflow and rule. Do not add a second
 copy.
 
-### `.context` and the upstream source
+### Levels, and where they come from
 
-The original Cuyo tree lives in `.context/upstream-cuyo/` and is **not** committed
-(it is 11 MB of GPL content, 6 MB of which is artwork this project deliberately
-does not ship). The level corpus tests read it, and the build will need it, so on
-a fresh clone:
+Upstream's 79 levels are **committed**, in `levels/upstream/`, byte-identical to
+upstream's own copies. So a fresh clone builds, tests and plays with no fetch step at
+all:
 
 ```sh
 git clone git@github.com:sebastiankruk/cuyo-web.git
 cd cuyo-web
 npm install
-make corpus          # fetches and checksum-verifies upstream 2.1.0
+make check
 ```
 
-`make corpus` is not a `git clone` because there is no git to clone. Cuyo's
-canonical home is [GNU Savannah](https://savannah.gnu.org/projects/cuyo/) — group
-857, registered 2001 by Immanuel Halupczok — and its official site is
-[karimmi.de/cuyo](https://www.karimmi.de/cuyo/). But Savannah's download area
-redirects the tarball to a generic releases index rather than serving it, and the
-project is in CVS with no public git mirror.
+That is 660 kB of GPL text, which is the whole reason it is affordable. Upstream's
+artwork is 6 MB and stays out — see below.
 
-Debian has packaged whose 2.1.0, and its _original_ tarball sits in the archive
-pool at a URL Debian does not move: `scripts/fetch-cuyo.sh` fetches that, checks
-the size and the SHA-256 from Debian's own `cuyo_2.1.0-2.1.dsc`, and unpacks it.
+| Directory          | What it is                                                 |
+| ------------------ | ---------------------------------------------------------- |
+| `levels/upstream/` | Upstream's 79 levels, verbatim. Committed.                 |
+| `levels/`          | Contributed levels, and any that _replace_ a vendored one. |
 
-That this is upstream's own 2.1.0 is verified rather than assumed. All 1233 files
-of the Debian tarball were compared against the tree checked out here with
-`diff -rq` and are byte-identical — `data/`, `src/` and `docs/` included — and
-being an `.orig.tar.gz` the comparison is against upstream's output rather than
-Debian's patched build. That is the whole basis for calling the transcriptions
-faithful. See [ATTRIBUTION.md](ATTRIBUTION.md) for the full provenance.
+A contributed file of the same name shadows the vendored one, so a level can be
+patched without forking it under a new name — and because they are in different
+directories, `git log` shows the patch separately from the original. See
+[levels/upstream/README.md](levels/upstream/README.md).
 
-Set `CUYO_DATA_DIR` to point elsewhere. The corpus tests fail loudly when the
-upstream tree is absent rather than skipping, because "the parser handles every
-real level" is the assertion and cannot be evaluated without it.
+**Upstream's tree itself is not committed.** It is 11 MB, 6 MB of which is artwork
+this project deliberately does not ship, and nothing needs it any more. It is worth
+fetching for one reason — to prove the vendored levels are still upstream's:
+
+```sh
+make fetch-corpus          # fetches and checksum-verifies upstream 2.1.0
+make check-levels-upstream  # diffs levels/upstream/ against it, both ways
+```
+
+`check-levels-upstream` is deliberately **not** in `make check`: CI has no upstream
+tree, so a gate that can only ever skip in CI gives false confidence. It skips with a
+message when there is nothing to compare against.
+
+`fetch-cuyo` is not a `git clone` because there is no git to clone. Cuyo's canonical
+home is [GNU Savannah](https://savannah.gnu.org/projects/cuyo/) — group 857, registered
+2001 by Immanuel Halupczok — and its official site is
+[karimmi.de/cuyo](https://www.karimmi.de/cuyo/). But Savannah's download area redirects
+the tarball to a generic releases index rather than serving it, and the project is in CVS
+with no public git mirror.
+
+Debian has packaged whose 2.1.0, and its _original_ tarball sits in the archive pool at
+a URL Debian does not move: `scripts/fetch-cuyo.sh` fetches that, checks the size and
+the SHA-256 from Debian's own `cuyo_2.1.0-2.1.dsc`, and unpacks it.
+
+That this is upstream's own 2.1.0 is verified rather than assumed. All 1233 files of the
+Debian tarball were compared against the tree checked out here with `diff -rq` and are
+byte-identical — `data/`, `src/` and `docs/` included — and being an `.orig.tar.gz` the
+comparison is against upstream's output rather than Debian's patched build. That is the
+whole basis for calling the transcriptions faithful. See
+[ATTRIBUTION.md](ATTRIBUTION.md) for the full provenance.
+
+Set `CUYO_DATA_DIR` to point the fetch and the comparison at a tree you already have.
 
 | Artifact                  | Contents                              |
 | ------------------------- | ------------------------------------- |
@@ -119,12 +142,13 @@ Under construction. The plan lives in [`openspec/changes/cuyo-web`](openspec/cha
 
 ## Contributing a level
 
-Upstream Cuyo's own 79 levels are not committed here — they are GPL-2.0 content in a
-local-only checkout fetched by `make corpus`. **Levels written for this project go in
-[`levels/`](levels/), tracked in git**, in the same `.ld` format upstream uses.
+Upstream Cuyo's own 79 levels **are** committed, in
+[`levels/upstream/`](levels/upstream/). **New levels go in [`levels/`](levels/)**, in the
+same `.ld` format, and a file there shadows a vendored one of the same name — so you can
+also correct an upstream level in place.
 
 ```text
-levels/MyLevel.ld      the level
+levels/MyLevel.ld      your level
 levels/summary.ld      indexes it: a section, and a level[track] entry
 ```
 
@@ -142,7 +166,6 @@ one would load and then quietly play by the ordinary rules.
 
 ```sh
 make init          # npm install
-make corpus        # fetch the upstream tree (once; see above)
 make dev           # dev server on 5173, this machine only
 make dev-lan       # dev server on 5173, reachable from a phone
 make preview       # serve dist/ on 4173, as it would be deployed

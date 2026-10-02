@@ -1,16 +1,16 @@
 # Copyright (C) 2026 Sebastian Ryszard Kruk (dev@kruk.me)
 #
 # This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published
+# it under the terms of the GNU General Public License as published
 # by the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
+# GNU General Public License for more details.
 #
-# You should have received a copy of the GNU Affero General Public License
+# You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # Thin wrapper over the npm scripts. Every target here runs exactly one command,
@@ -19,7 +19,8 @@
 #
 # See the "AiOps Environment Mode Directive" in .agents/rules/cuyo-standards.md.
 .PHONY: help init dev dev-lan check lint lint-code lint-types lint-docs \
-        lint-specs lint-shell check-art corpus test test-engine build \
+        lint-specs lint-shell check-art check-levels-upstream fetch-corpus \
+        test test-engine build \
         preview preview-host clean distclean
 
 SHELL := /bin/bash
@@ -101,7 +102,8 @@ help:
 	@echo "  make lint-specs   - openspec validate --strict over the change"
 	@echo "  make lint-shell   - shellcheck over scripts/"
 	@echo "  make check-art    - Assert no upstream artwork reached dist/"
-	@echo "  make corpus       - Fetch the upstream Cuyo tree the corpus tests read"
+	@echo "  make art-digests  - Regenerate the committed upstream-artwork digests"
+	@echo "  make fetch-corpus - Fetch upstream Cuyo, to compare the vendored levels"
 	@echo ""
 	@echo "Testing and building:"
 	@echo "  make test         - Vitest suite"
@@ -115,8 +117,9 @@ help:
 	@echo "  npm preamble or vite build chatter. It does not touch the vitest"
 	@echo "  reporter: forcing a terser one costs more output, not less."
 	@echo ""
-	@echo "The corpus tests read .context/upstream-cuyo and fail loudly if it is"
-	@echo "absent. Run 'make corpus' on a fresh clone."
+	@echo "The level files are committed, so a fresh clone builds and tests without"
+	@echo "fetching anything. 'make fetch-corpus' is only for comparing them against"
+	@echo "upstream, which 'make check-levels-upstream' does when the tree is there."
 
 init:
 	@if [ ! -d node_modules ]; then $(AI_ECHO) "Installing dependencies..."; fi
@@ -138,11 +141,20 @@ dev: level-data
 dev-lan:
 	@$(NPM) $(NPM_RUN) run dev:lan -- --port $(PORT) --strictPort
 
-# The corpus tests read .context/upstream-cuyo and fail loudly without it, so
-# `make corpus` is something a fresh clone needs rather than something to
-# remember. It is idempotent and cheap when the tree is already there.
-corpus:
+# Upstream's tree, for comparison only.
+#
+# Nothing needs this: the level files are committed, so a fresh clone builds, tests
+# and runs without it. It is here to answer one question - "are the files in
+# levels/upstream/ still upstream's, unaltered?" - which needs upstream's own copy to
+# compare against, and which is worth asking whenever a level is patched.
+fetch-corpus:
 	@bash scripts/fetch-cuyo.sh
+
+# Skipped, with a loud line saying so, when there is no checkout to compare against.
+# Deliberately not in `check`: CI has no upstream tree, so a gate that can only ever
+# skip in CI is a gate that gives false confidence.
+check-levels-upstream:
+	@bash scripts/check-levels-upstream.sh
 
 # shellcheck is a system package, so `npm ci` does not install it and a developer
 # may not have it. CI installs a pinned version; locally the target says so rather
@@ -159,6 +171,11 @@ lint-shell:
 
 # Needs a built bundle, so it is not part of `lint` - it is its own target, and
 # CI runs it in the build job. `make check` runs it after the build.
+# Needs a fetched upstream tree, so deliberately not in `check`: CI has no tree, and
+# that is the reason the digests are committed. Run it when the upstream version moves.
+art-digests:
+	@bash scripts/emit-art-digests.sh
+
 check-art:
 	@bash scripts/check-no-upstream-art.sh
 

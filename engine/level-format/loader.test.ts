@@ -10,7 +10,7 @@
  * claim than counting calls.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LevelLoader, LevelLoadError, versionFor } from "./loader.ts";
@@ -19,11 +19,18 @@ import { ScriptedPrng } from "../testing/prng-stub.ts";
 import { LEVEL_INDEX } from "../../levels-src/generated/level-index.ts";
 import type { Track } from "./index-data.ts";
 
-const DATA_DIR =
-  process.env["CUYO_DATA_DIR"] ??
-  resolve(import.meta.dirname, "../../.context/upstream-cuyo/data");
+/**
+ * The committed level files.
+ *
+ * These tests used to read a local-only upstream checkout and skip themselves when it
+ * was absent, which meant the only tests that load a *real* level through the *real*
+ * loader quietly did not exist for a fresh clone. The files are committed now, so
+ * there is no condition left to guard: if a file is missing, `readFileSync` throws and
+ * the test says which file.
+ */
+const DATA_DIR = resolve(import.meta.dirname, "../../levels/upstream");
 
-const HAVE_CORPUS = existsSync(resolve(DATA_DIR, "globals.ld"));
+const GLOBALS = readFileSync(resolve(DATA_DIR, "globals.ld"), "latin1");
 
 /** A fetcher that counts, so "did this hit the network" is a number. */
 function countingFetcher(files: Record<string, string> = {}) {
@@ -31,7 +38,6 @@ function countingFetcher(files: Record<string, string> = {}) {
   const fetchLevel = async (filename: string): Promise<string> => {
     calls.push(filename);
     if (files[filename] !== undefined) return files[filename];
-    if (!HAVE_CORPUS) throw new Error(`no corpus at ${DATA_DIR}`);
     return readFileSync(resolve(DATA_DIR, filename), "latin1");
   };
   return { calls, fetchLevel };
@@ -52,9 +58,7 @@ function loaderWith(seed = 1) {
   const loader = new LevelLoader({
     fetchLevel,
     art: ART_MANIFEST,
-    globalsSource: HAVE_CORPUS
-      ? readFileSync(resolve(DATA_DIR, "globals.ld"), "latin1")
-      : "",
+    globalsSource: GLOBALS,
     random: prng(seed),
   });
   return { loader, calls };
@@ -97,7 +101,6 @@ describe("versionFor", () => {
 
 describe("LevelLoader: the cache", () => {
   it("fetches a level once and serves the second request from the cache", () => {
-    expect(HAVE_CORPUS, "upstream corpus missing").toBe(true);
     const { loader, calls } = loaderWith();
     const entry = LEVEL_INDEX.byId.get("Nasenkugeln");
     expect(entry).toBeDefined();
@@ -123,7 +126,6 @@ describe("LevelLoader: the cache", () => {
     // The level matters: this originally used `Nasenkugeln`, which offers only `easy`
     // and `normal`. Both loads fell back to `normal`, produced the same version, and
     // the test passed without ever comparing two different things.
-    expect(HAVE_CORPUS).toBe(true);
     const { loader } = loaderWith();
     // Asked for at the track the catalogue recorded, which is not always the track the
     // difficulty is named after: a level on both `main` and `weird` that offers `hard`
@@ -155,7 +157,6 @@ describe("LevelLoader: the cache", () => {
     // Every level resolves its names against globals.ld, so parsing it 79 times would
     // be 79 identical parses - and this is the case that actually occurs, unlike the
     // multi-level file the test above was originally written for.
-    expect(HAVE_CORPUS).toBe(true);
     const { loader, calls } = loaderWith();
     const first = LEVEL_INDEX.levels.slice(0, 6);
     return Promise.all(
@@ -218,7 +219,6 @@ describe("LevelLoader: the cache", () => {
   });
 
   it("clears loaded levels but keeps the parsed files", () => {
-    expect(HAVE_CORPUS).toBe(true);
     const { loader, calls } = loaderWith();
     const entry = LEVEL_INDEX.byId.get("Nasenkugeln")!;
     return loader
@@ -236,7 +236,6 @@ describe("LevelLoader: the cache", () => {
   });
 
   it("reset drops the parsed files too", () => {
-    expect(HAVE_CORPUS).toBe(true);
     const { loader, calls } = loaderWith();
     const entry = LEVEL_INDEX.byId.get("Nasenkugeln")!;
     return loader
@@ -253,7 +252,6 @@ describe("LevelLoader: the cache", () => {
 
 describe("LevelLoader: what it produces", () => {
   it("builds a board the simulation can start from", async () => {
-    expect(HAVE_CORPUS).toBe(true);
     const { loader } = loaderWith();
     const entry = LEVEL_INDEX.byId.get("Nasenkugeln")!;
     const { level } = await loader.load(entry.filename, entry.id, "main");
@@ -281,7 +279,6 @@ describe("LevelLoader: what it produces", () => {
     // The test that matters most: a real level, loaded through the real pipeline, put
     // into a real `Simulation` and stepped. Every previous check in this project has
     // been about the parts; this is the first that plays one.
-    expect(HAVE_CORPUS).toBe(true);
     const { Simulation } = await import("../game-core/simulation.ts");
     const { loader } = loaderWith();
     const entry = LEVEL_INDEX.byId.get("Nasenkugeln")!;
@@ -297,7 +294,6 @@ describe("LevelLoader: what it produces", () => {
   });
 
   it("resolves the level's goal art keys through the manifest", async () => {
-    expect(HAVE_CORPUS).toBe(true);
     const { loader } = loaderWith();
     const entry = LEVEL_INDEX.byId.get("Nasenkugeln")!;
     const loaded = await loader.load(entry.filename, entry.id, "main");
@@ -313,7 +309,6 @@ describe("LevelLoader: what it produces", () => {
   it("loads a level whose colours the level sets", async () => {
     // Hormones is the dark one; if its background came back white the blobs would be
     // drawn on the wrong ground, which is a bug this project has already had.
-    expect(HAVE_CORPUS).toBe(true);
     const { loader } = loaderWith();
     const entry = LEVEL_INDEX.byId.get("Hormone")!;
     const { level } = await loader.load(entry.filename, entry.id, "main");
@@ -331,7 +326,6 @@ describe("LevelLoader: what it produces", () => {
   it("names the sections a file does define when the level is not in it", async () => {
     // A diagnostic someone can act on: the file was found, but this level is not in
     // it, and here is what is.
-    expect(HAVE_CORPUS).toBe(true);
     const { loader } = loaderWith();
     let thrown: unknown;
     try {
@@ -389,7 +383,6 @@ describe("LevelLoader: every level in the catalogue", () => {
   it("loads all 79, at normal difficulty", async () => {
     // The catalogue claims these are playable. This is where that claim is checked, and
     // it is the first time a real level has been put into a real `Simulation`.
-    expect(HAVE_CORPUS, "upstream corpus missing").toBe(true);
     const { loader } = loaderWith(11);
     const failures: string[] = [];
     for (const entry of LEVEL_INDEX.levels) {

@@ -16,8 +16,6 @@
  * product.
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { parseLd } from "../engine/level-format/parser.ts";
 import { Version } from "../engine/level-format/version.ts";
 import { DefinitionScope, rootScope } from "../engine/level-format/scope.ts";
@@ -44,7 +42,7 @@ import type {
 } from "../engine/level-format/diagnostics.ts";
 import { ScriptedPrng } from "../engine/testing/prng-stub.ts";
 import {
-  UPSTREAM_DIR,
+  readVendoredSummary,
   contribSummary,
   readGlobals,
   readLevelFile,
@@ -77,15 +75,8 @@ function indexedLevels(): string[] {
   // not in either would never be validated, which is the quietest way for a gate to
   // stop meaning anything.
   const sources: { text: string; label: string }[] = [];
-  const upstreamSummary = resolve(UPSTREAM_DIR, "summary.ld");
-  if (!existsSync(upstreamSummary)) {
-    throw new Error(
-      `No summary.ld at ${UPSTREAM_DIR}. Run "make fetch:corpus" first, or set ` +
-        `CUYO_DATA_DIR.`,
-    );
-  }
   sources.push({
-    text: readFileSync(upstreamSummary, "latin1"),
+    text: readVendoredSummary(),
     label: "summary.ld",
   });
   const contributed = contribSummary();

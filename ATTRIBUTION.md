@@ -2,17 +2,19 @@
 
 Cuyo was written by **Immanuel Halupczok** and maintained by the **Cuyo
 developers**. The upstream release this project is a port of is version **2.1.0**,
-whose complete source is present, unmodified, in `.context/upstream-cuyo/`.
+whose level files are committed verbatim in
+[`levels/upstream/`](levels/upstream/) and whose complete source can be fetched,
+unmodified, into `.context/upstream-cuyo/`.
 
 ## Where upstream lives
 
-| | |
-| --- | --- |
-| Project home | <https://savannah.gnu.org/projects/cuyo/> — GNU Savannah, group 857, registered 5 December 2001, non-GNU software and documentation |
-| Official site | <https://www.karimmi.de/cuyo/> |
-| Version control | CVS, hosted on Savannah. There is no git repository and no public mirror of one. |
-| Mailing list | `cuyo@karimmi.de` |
-| Licence | GNU General Public License v2 or later, per the Savannah registration |
+|                 |                                                                                                                                     |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Project home    | <https://savannah.gnu.org/projects/cuyo/> — GNU Savannah, group 857, registered 5 December 2001, non-GNU software and documentation |
+| Official site   | <https://www.karimmi.de/cuyo/>                                                                                                      |
+| Version control | CVS, hosted on Savannah. There is no git repository and no public mirror of one.                                                    |
+| Mailing list    | `cuyo@karimmi.de`                                                                                                                   |
+| Licence         | GNU General Public License v2 or later, per the Savannah registration                                                               |
 
 The Debian package `cuyo` (`2.1.0-2.1`, maintainer Emmanuel Arias) is the
 provenance actually used here, because the tarball is the one artifact that can
@@ -34,11 +36,18 @@ addresses.
 
 ## What is reused
 
-| Asset | Origin | Licence |
-| --- | --- | --- |
-| Level description files (`*.ld`) | Cuyo 2.1.0, `data/` | GPL-2.0-or-later; per-file copyright headers in `AUTHORS` |
-| Game rules and mechanics | Cuyo 2.1.0, `src/` | GPL-2.0-or-later |
-| `docs/cual.6`, `docs/cuyo.6` | Cuyo 2.1.0 | GPL-2.0-or-later |
+| Asset                            | Origin              | Licence                                                   | Where it is here                               |
+| -------------------------------- | ------------------- | --------------------------------------------------------- | ---------------------------------------------- |
+| Level description files (`*.ld`) | Cuyo 2.1.0, `data/` | GPL-2.0-or-later; per-file copyright headers in `AUTHORS` | `levels/upstream/`, committed verbatim         |
+| Game rules and mechanics         | Cuyo 2.1.0, `src/`  | GPL-2.0-or-later                                          | Reimplemented, not copied                      |
+| `docs/cual.6`, `docs/cuyo.6`     | Cuyo 2.1.0          | GPL-2.0-or-later                                          | Fetched with the source tree; read, not copied |
+
+The level files are committed rather than fetched because they are
+GPL-2.0-or-later and this project is too: 660 kB of text, against a build that
+otherwise needs an archive-pool fetch before it can do anything.
+`make check-levels-upstream` diffs the committed copy against a fetched upstream
+tree in both directions, so "byte-identical to upstream" is a checked claim rather
+than a remembered one.
 
 The level data carries its own authorship: `AUTHORS` credits Immanuel Halupczok
 for the artwork and the Cual code, and the developers named in the `ChangeLog`
@@ -50,10 +59,26 @@ The **912** XPM spritesheets in `data/pics/`, the `.it` music module, and the
 original bitmap font are **not** part of this project. All artwork here is new
 work authored for it.
 
-A build assertion enforces that: `scripts/check-no-upstream-art.sh` compares a
+This is a choice, not a legal necessity: upstream's artwork is GPL-2.0-or-later
+and copying it would be permitted, exactly as copying the level files is. What it
+would cost is 6 MB of someone else's pixels, and the thing that makes this project
+worth having — that it is an independent reimplementation rather than a
+repackaging. So the line drawn is between *the game's own text, which is the game*,
+and *upstream's rendering of it, which this port replaces*.
+
+A build assertion enforces it: `scripts/check-no-upstream-art.sh` compares a
 SHA-256 of every bundled file against a SHA-256 of every upstream sprite —
 decompressed as well as compressed — so renaming or re-compressing a sprite does
-not get it past, and a new upstream sprite is covered the day it is added.
+not get it past. Those 1749 digests are committed in
+[`scripts/upstream-art-digests.sha256`](scripts/upstream-art-digests.sha256),
+110 kB, so the check runs in CI.
+
+They were originally computed from a fetched upstream tree instead, on the argument
+that this way there was "no list to keep in step with upstream". That was wrong, and
+worth recording: **CI has no upstream tree, so the content check never ran there.** The
+gate reported *clean* with an upstream sprite sitting in `dist/`, in exactly the
+configuration CI runs in. A digest list can go stale; a check that cannot run is not a
+check.
 
 ## Documentation used as the specification
 

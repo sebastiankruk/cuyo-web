@@ -22,6 +22,17 @@ Everything else is untouched: 3 and 4 (the Cual runtime), 6 (catalogue), 7
 **0.2.0 is cut and playable.** All 79 levels, real rules, playable on a phone. That is
 the honest description of where this is: not a game yet, but the game underneath one.
 
+**0.3.0 is in progress.** Colours are now assigned per level rather than hashed per
+picture name, so two kinds can no longer come out the same colour — the palette work
+below, which was the one thing making the board hard to read. Still to come in 0.3.0:
+the rules dialog as a pausing modal, and progress and unlocking.
+
+**The level files are committed.** All 79, verbatim, in `levels/upstream/`. A fresh clone
+builds, tests and plays with no fetch step, and five test files that used to skip
+themselves on a fresh clone now run. The artwork stays generated, and the check that
+enforces that now runs in CI too — it did not before, and the way that was found is
+written up in `ATTRIBUTION.md`.
+
 ## What decides the order
 
 Two questions, asked of every candidate piece of work:

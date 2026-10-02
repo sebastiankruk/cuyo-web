@@ -141,6 +141,23 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [ ] 6.5 Implement per-level, per-difficulty progress records (completed flag, best score) with first-completion unlocking the next level in the track, and verify unlock and record-retention behaviour
 - [ ] 6.6 Implement the level introduction screen data (name, author, description) and the seen-level skip option, and verify both
 
+### Catalogue navigation, from playing it
+
+Recorded from a play session, not designed in advance. The seven tracks do not scale to
+79 levels: a player cannot find a level they half-remember the name of, and the list is
+long enough that scrolling to the bottom is the only way to see what exists.
+
+- [ ] 6.7 Give every level card a small rendered tile — a miniature of its actual board,
+  background and kinds — so the catalogue is scannable by eye rather than by name, and verify a tile matches the level it opens
+- [ ] 6.8 Group the catalogue into collapsible sections within a track, so a track of 20 is
+  navigable, and remember which sections were open
+- [ ] 6.9 Add a name search, so a level that is half-remembered can be found
+- [ ] 6.10 Add a filter by author, since the levels are not all by one person
+- [ ] 6.11 Offer a choice of collection views — by track, by author, by completion, recently
+  played — and remember the choice
+- [ ] 6.12 Long-press a level card to show the whole track's progress inline, so the
+  catalogue can answer "how far through am I" without leaving it
+
 ## 7. Presentation
 
 - [ ] 7.1 Implement the canvas board layout that fits the largest centred 1:2 rectangle in the available area and disables image smoothing, and verify on phone and tablet viewport sizes
@@ -230,6 +247,17 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [ ] 12.5 Measure frame time with the development overlay on a mid-range device profile and verify the board stays within budget with a full board and active animations
 - [ ] 12.6 Verify the Standard track is playable end to end on a real phone, including touch controls, orientation change and offline start
 - [ ] 12.7 Verify every track loads and each level reaches a running state without a runtime error in its first steps
+- [ ] 12.8 Delete the last corpus-absence skip, in `render/palette.test.ts`
+
+  The suite reads the level files and returns early when they are missing, which reads
+  exactly like a pass. The level files are committed as of the `levels-in-tree` work, so
+  there is nothing left to guard against and the skip can go.
+
+  It could not be done in that same change: the palette suite and the vendored levels
+  arrived on separate branches, and the test can only point at `levels/upstream/` from a
+  branch that has it. It is recorded here rather than forced into either, because a test
+  that silently checks nothing is a small thing that hides a large one — the whole point
+  of the property is that two kinds in one level are never the same colour.
 
 ## 13. Coverage
 
