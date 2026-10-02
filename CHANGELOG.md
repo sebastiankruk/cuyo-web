@@ -12,6 +12,18 @@ something a player can tell.
 
 ### Changed
 
+- **The licence is now AGPL-3.0-or-later**, was GPL-2.0-or-later. The AGPL is GPL plus
+  one clause: a modified version of this program that you let other people use over a
+  network has to offer them its source. Copies already released under GPL-2.0-or-later
+  keep that grant permanently - it cannot be withdrawn - so this applies from the next
+  version onwards. It is permitted because Cuyo is GPL-2.0-**or-later**; it would not be
+  permitted against GPL-2.0-**only** material, so a patch offered under v2-only cannot be
+  accepted. See [LICENSING.md](LICENSING.md).
+- **The catalogue screen now carries a licence notice**, because AGPL section 5(d)
+  requires one and plain GPL-2 did not: who holds the copyright, that the work is free
+  software under the AGPL, that there is no warranty, where to read the licence, and a
+  link to the source. That last one is also how this project honours section 13 for
+  itself.
 - **Every level in a board now has its own colour, chosen so that no two kinds in a level
   look the same.** Colours used to be derived from each picture's name, independently,
   which meant two kinds in one level could come out nearly identical — across the 79

@@ -182,6 +182,29 @@ function Catalogue({
           Keys: ← → move · ↑ or X rotate · ↓ or Space fast fall · R restart ·
           Esc back. On a phone: drag to steer, tap to rotate, drag down to drop.
         </p>
+        {/*
+          The interface notice AGPL section 5(d) requires.
+
+          Not housekeeping: plain GPL-2 imposed no such requirement, so this is an
+          obligation the upgrade created. Section 0 defines "Appropriate Legal Notices" as
+          a prominently visible feature displaying a copyright notice, a statement that
+          there is no warranty, that the work may be conveyed under this licence, and
+          where to read it - so all four are here rather than only the first.
+
+          The repository link is section 13's half. This is a static site, so "let people
+          interact with it over a network" is simply true of it, and a modified version
+          hosted elsewhere has to offer its source the same way. Pointing at ours is the
+          version of that we can honour.
+        */}
+        <p className="shell__licence">
+          Cuyo-web © 2026 Sebastian Ryszard Kruk ·{" "}
+          <a href="https://github.com/sebastiankruk/cuyo-web">source</a> · free
+          software under the{" "}
+          <a href="https://www.gnu.org/licenses/agpl-3.0.html">
+            GNU Affero General Public License v3 or later
+          </a>
+          , no warranty
+        </p>
       </footer>
     </main>
   );

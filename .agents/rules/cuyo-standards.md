@@ -8,9 +8,12 @@ The upstream C++ source is the reference for the rules; it is not modified.
 
 ## Licence
 
-GPL-2.0-or-later, inherited from upstream. This project reproduces Cuyo's game
-mechanics and reuses its `.ld` level files, so the same licence and attribution
-apply. See `LICENSE-OR-LATER.md` and `ATTRIBUTION.md`.
+**AGPL-3.0-or-later**, chosen by the project owner. Upstream Cuyo is
+GPL-2.0-**or-later**, which is what makes combining them legal; it is not
+compatible with GPL-2.0-**only**, so do not copy a v2-only notice into anything
+here. This project reproduces Cuyo's game mechanics and reuses its `.ld` level
+files, so upstream's attribution still applies. See `LICENSING.md` and
+`ATTRIBUTION.md`.
 
 The original spritesheets are **not** used. Artwork here is new. A build
 assertion enforces that nothing from `.context/upstream-cuyo/data/pics` reaches

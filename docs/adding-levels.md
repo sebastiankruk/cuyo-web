@@ -190,12 +190,24 @@ bug in this port, not in your level — please report it.
 ## Licence
 
 Contributed levels are part of this repository and are covered by
-[GPL-2.0-or-later](../LICENSE-OR-LATER.md), the same as everything else here. By opening
+[AGPL-3.0-or-later](../LICENSING.md), the same as everything else here. By opening
 a pull request you are agreeing to that.
 
 If your level is derived from an upstream level, say so in the pull request and name it.
-Upstream is GPL-2.0-or-later by Immanuel Halupczok, so derivation is fine — it just has
+Upstream is GPL-2.0-**or-later** by Immanuel Halupczok, so derivation is fine — it just has
 to be recorded in [ATTRIBUTION.md](../ATTRIBUTION.md).
+
+### The one thing that will bite
+
+The AGPL is **not** compatible with GPL-2.0-**only** material. That is fine for anything
+derived from Cuyo, because of the "or later" clause above.
+
+It is not fine for a level, snippet or data file copied from a project whose licence says
+"version 2" with no "or any later version" — the combined work could not be distributed
+under the AGPL. Say so in the pull request and it can be worked around; ship it silently
+and it will be found at review.
+
+Nothing in the 79 vendored levels is affected. See [LICENSING.md](../LICENSING.md).
 
 ## Checklist
 
@@ -210,4 +222,4 @@ make dev            # play it
 - [ ] `description` explains anything unusual about it
 - [ ] `author` filled in
 - [ ] No Cual block
-- [ ] Licence is GPL-2.0-or-later, or derivation from an upstream level is declared
+- [ ] Licence is AGPL-3.0-or-later, or derivation from an upstream level is declared

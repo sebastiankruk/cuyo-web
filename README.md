@@ -2,7 +2,7 @@
 
 [![Latest Release](https://img.shields.io/github/v/release/sebastiankruk/cuyo-web?color=blue&label=version)](https://github.com/sebastiankruk/cuyo-web/releases)
 [![CI Quality](https://github.com/sebastiankruk/cuyo-web/actions/workflows/quality.yml/badge.svg)](https://github.com/sebastiankruk/cuyo-web/actions/workflows/quality.yml)
-[![License: GPL v2](https://img.shields.io/badge/License-GPL_v2-red.svg)](LICENSE-OR-LATER.md)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSING.md)
 [![Node Version](https://img.shields.io/badge/Node-22%2B-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![TypeScript Version](https://img.shields.io/badge/TypeScript-6-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite Version](https://img.shields.io/badge/Vite-8-646CFF.svg?logo=vite&logoColor=white)](https://vite.dev/)
@@ -17,9 +17,13 @@ Cuyo 2.1.0 (2014) needs SDL 1.2 and a 2014-era autotools toolchain, so it no
 longer runs on current systems. This port reproduces the original rules and
 levels with a modern, mobile-first interface.
 
-**Licence:** GPL-2.0-or-later. This reuses Cuyo's game mechanics and its `.ld`
-level files, so the same licence applies. See
-[LICENSE-OR-LATER.md](LICENSE-OR-LATER.md) and [ATTRIBUTION.md](ATTRIBUTION.md).
+**Licence:** AGPL-3.0-or-later. Cuyo is GPL-2.0-or-later, so its mechanics and
+its `.ld` level files can be combined into an AGPL work — but only because of the
+"or later" clause, and AGPL-3.0 is _not_ compatible with GPL-2.0-**only** code.
+The AGPL's one addition over GPL is the requirement that a modified version
+hosted for others to use must offer its source. See [LICENSING.md](LICENSING.md)
+for why, and [ATTRIBUTION.md](ATTRIBUTION.md) for the provenance of everything
+reused.
 
 ## Layout
 
