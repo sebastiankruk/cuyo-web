@@ -49,10 +49,15 @@ sequences, the drawing commands, `bonus`, `message`, `explode`, `lose` and
 ### Requirement: Expressions and operators
 
 Cual expressions SHALL evaluate to integers and support, in order of increasing
-precedence: boolean or, boolean and, equality, inequality, less, greater, less-or-
-equal, greater-or-equal, boolean not, addition, subtraction, the probabilistic
-operator `a : b`, multiplication, division, modulo, bitwise and, bitwise or, bitset
-`.+=`, bitunset `.-=`, unary minus, and bit test `a . b`.
+precedence: boolean or; boolean and; comparison (`==`, `!=`, `<`, `>`, `<=`,
+`>=`, which share one precedence level rather than six); the range comparison
+`a == b .. c`; boolean not; addition and subtraction; the probabilistic operator
+`a : b`; multiplication, division and modulo; bitwise and, bitwise or, bitset
+`.+` and bitunset `.-`; unary minus; and the bit test `a . b`.
+
+`.+=` and `.-=` are assignments and are not expression operators; `.+` and `.-`,
+at the bitwise level, are. The probabilistic operator, boolean not, the range
+comparison, unary minus and the bit test are non-associative.
 
 #### Scenario: Boolean operators
 
