@@ -27,8 +27,8 @@ import {
   boardHeight,
   boardWidth,
   cellOrigin,
-  colourFor,
 } from "./geometry.ts";
+import { buildPalette, colourFor as paletteColourFor } from "./palette.ts";
 import type { BoardFrame } from "./geometry.ts";
 import { render } from "./board.ts";
 import { Simulation } from "../engine/game-core/simulation.ts";
@@ -464,10 +464,15 @@ describe("render fills the whole board", () => {
           new Set(drawn).size,
           `${orientation}: both cells drew ${drawn[0]}`,
         ).toBe(2);
-        // And they are the piece's own two colours, in order.
+        // And they are the piece's own two colours, in order - the palette's, which is
+        // per level rather than a hash of the picture name. `colourFor` from
+        // geometry.ts is the *old* per-key hash and no longer what the renderer uses.
+        const palette = buildPalette(level.kinds, {
+          background: level.colours.background,
+        });
         expect(drawn).toEqual([
-          colourFor(level.kinds[piece!.blobs[0].kind]!.artKey, 0),
-          colourFor(level.kinds[piece!.blobs[1].kind]!.artKey, 0),
+          paletteColourFor(palette, piece!.blobs[0].kind),
+          paletteColourFor(palette, piece!.blobs[1].kind),
         ]);
       }
     });

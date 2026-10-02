@@ -10,6 +10,7 @@
 
 import { GRX, GRY, columnShift } from "../engine/game-core/constants.ts";
 import type { HexGeometry } from "../engine/game-core/constants.ts";
+import { deltaE, labOfHsl } from "./perceptual.ts";
 
 /** The level properties that affect board geometry. */
 export interface BoardFrame {
@@ -198,99 +199,147 @@ export function stubRadius(f: BoardFrame): number {
   return f.size * 0.16;
 }
 
-/**
- * A marker drawn on a blob whose kind has a special role.
+/*
+ * Blob markers.
  *
- * Upstream tells goal and grey blobs apart by their artwork, which is per-kind and
- * authored. There is no artwork here yet, so without a marker the only clue that a
- * blob is the one to clear is the rule text in the HUD - which points at "marked"
- * blobs that the board does not in fact mark.
- *
- * The marker is deliberately not colour: goal blobs already have their own colour,
- * and tinting them further would work against the goal blobs being told apart *from
- * each other*. A shape says "this one is special" and survives both a black
+ * A goal blob gets a dot and a grey a square, so the two roles are distinguishable
+ * from each other and from an ordinary blob by *shape* rather than by colour. Shape
+ * because goal blobs already have their own colour and recolouring them would work
+ * against telling them apart from each other, and because a shape survives both a black
  * background and a colour that happens to match.
+ *
+ * Which marker a kind gets comes from `palette.ts`, which is what knows about roles.
+ * This file keeps the geometry of the mark - its size and the ink colour - because that
+ * is geometry.
  */
-export type BlobMarker = "goal" | "grey" | null;
-
-/** The marker a kind's role calls for, or null for an ordinary colour. */
-export function markerForRole(role: string): BlobMarker {
-  if (role === "grass") return "goal";
-  if (role === "grey") return "grey";
-  return null;
-}
-
-/** Radius of the marker's inner shape, as a fraction of the cell. */
-export const MARKER_RADIUS = 0.16;
-
-/** A colour that reads against the blob's own, for the marker's inner shape. */
-export function markerInk(colour: string): string {
-  return shade(colour, 0.55);
-}
-
-// ------------------------------------------------------------------- colour
 
 /**
+ * Radius of the marker's inner shape, as a fraction of the cell.
+ *
+ * A fraction of the cell, but the number that matters is its fraction of the *blob*,
+ * because that is what the eye compares. An isolated blob is 35% of the cell wide -
+ * `stubRect` insets it by 6% and then pulls the free edges in to 30% - so a mark
+ * wider than about a fifth of the cell stops reading as a mark on a blob and becomes
+ * the blob.
+ *
+ * It was 0.16, which is a diameter of 32% of the cell: **91% of the blob's width.** A
+ * screenshot of a dark level showed the consequence exactly - a row of goal blobs read
+ * as a row of white circles sitting in green pills, and the greys as grey squares with a
+ * white bar across them. The mark had become the object. The shape distinction still
+ * worked, so nothing looked *broken*; it just stopped looking like a marked blob, which
+ * is the thing the marker is for.
+ *
+ * 0.075 puts the diameter at 43% of the blob: unmistakably a mark, still solid enough
+ * to see on a phone. `geometry.test.ts` ties the two numbers together so they cannot
+ * drift apart, since a change to `stubRect` would silently undo this.
+ */
+export const MARKER_RADIUS = 0.075;
+
+/**
+ * A colour that reads against the blob's own, for the marker's inner shape.
+ *
+ * Whichever direction gives more contrast, rather than always lightening. A mark on a
+ * pale fill has nowhere to lighten to - on the lightest grey the palette uses, a
+ * lightening ink lands ΔE 13.8 from the fill, which at six pixels across is not a mark
+ * you can rely on - while the same fill darkened is ΔE 30. Measuring the direction
+ * instead of assuming it is a few lines and removes the whole class of failure, which
+ * matters because an unreadable mark means the *shape* distinction between a goal and a
+ * grey silently stops working.
+ */
+export function markerInk(colour: string): string {
+  const lighter = shade(colour, 0.55);
+  const darker = shade(colour, -0.5);
+  const from = labOfHsl(colour);
+  const a = labOfHsl(lighter);
+  const b = labOfHsl(darker);
+  // An unreadable fill is not worth guessing about: fall back to a light mark, which is
+  // what this always did and is the better guess against a dark board.
+  if (from === null || a === null || b === null) return lighter;
+  return deltaE(from, b) > deltaE(from, a) ? darker : lighter;
+}
+
+/*
+ * Per-key colour, gone.
+ *
+ * These hashed a picture name to a hue independently of every other name, which meant
+ * two kinds in one level could land a couple of degrees apart: across the 79 real
+ * levels, 17 pairs under 25° and a worst case of 2°, in `pfeile.ld`. No improvement to
+ * the hash fixes it, because two names can hash near each other however good the hash
+ * is - a palette is a set, and has to be chosen as one.
+ *
+ * `palette.ts` builds one per level instead. It is kept out of this file deliberately:
+ * geometry is about where things go, and a palette is about what they look like.
+ */
+
+/*
  * Base colours per art key.
  *
- * A stand-in for the authored art manifest (design.md decision 7). Keys not
- * listed get a stable hue derived from the key text, so an unstyled kind is
- * still visually distinct rather than an unidentifiable blank.
+ * Artwork is generated procedurally rather than authored, so there is nothing to
+ * look up here. Upstream's spritesheets are GPL-2.0 and deliberately not shipped;
+ * see scripts/check-no-upstream-art.sh.
  */
-export const ART_COLOURS: Readonly<Record<string, string>> = {
-  inGruen: "#3bb03b",
-  inGelb: "#e0c020",
-  inSchwarz: "#303030",
-  inRosaNasen: "#d05090",
-  inOrangeNasen: "#e08030",
-  inGras: "#7a9a4a",
-  inGrau: "#909090",
-  ihRot: "#c03030",
-  ihGruen: "#30a050",
-  ihBlau: "#3060c0",
-  ihLila: "#9050c0",
-  ihBunt: "#b07040",
-  ihGrau: "#808080",
-};
 
 /** A stable hue in [0, 360) derived from a key, so it never varies per run. */
 export function stableHue(key: string): number {
   let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
+  for (let i = 0; i < key.length; i++) {
+    h = (Math.imul(h, 31) + key.charCodeAt(i)) | 0;
+  }
   return Math.abs(h) % 360;
-}
-
-/**
- * Colour for an art key and version.
- *
- * `version` shifts the lightness so kinds sharing a fallback hue stay
- * distinguishable.
- */
-export function colourFor(key: string, version: number): string {
-  const known = ART_COLOURS[key];
-  if (known !== undefined) return known;
-  return `hsl(${stableHue(key)} 62% ${52 - (version % 3) * 6}%)`;
 }
 
 /**
  * Lightens (amount > 0) or darkens (amount < 0) a hex or hsl colour.
  *
- * Unrecognised formats are returned unchanged rather than throwing, so a
- * malformed art key degrades to a visible colour instead of a blank cell.
+ * `amount` is the fraction of the distance to white, or to black. It used to be a fixed
+ * step in the same units, which is the same arithmetic under a different name and a
+ * different result: a fixed step is the same size whichever fill it lands on, so a
+ * decoration is a different visual weight on every colour.
+ *
+ * The blob's seam is `shade(colour, -0.28)`, and measured against its own fill the two
+ * behaviours are nothing alike:
+ *
+ * | Fill L | Seam L, fixed step | Contrast | Seam L, proportional | Contrast |
+ * | ------ | ------------------ | -------- | -------------------- | -------- |
+ * | 30     | 4                  | **ΔE 1** | 22                   | ΔE 7     |
+ * | 50     | 22                 | ΔE 7     | 36                   | ΔE 14    |
+ * | 70     | 42                 | ΔE 17    | 50                   | ΔE 21    |
+ * | 80     | 52                 | ΔE 22    | 58                   | ΔE 24    |
+ *
+ * So a dark blob got no visible seam at all and a pale one got a heavy black line, and
+ * the marker - `shade(colour, 0.55)` - was pure white on every fill with a lightness
+ * above 41%, which is nearly all of them. The proportional version holds the seam at a
+ * steady weight and lets the marker's contrast follow the fill it is drawn on.
+ *
+ * Unrecognised formats are returned unchanged rather than throwing, so a malformed art
+ * key degrades to a visible colour instead of a blank cell.
  */
 export function shade(colour: string, amount: number): string {
   const hex = /^#([0-9a-f]{6})$/i.exec(colour);
   if (hex !== null) {
     const n = parseInt(hex[1] as string, 16);
-    const f = (c: number) =>
-      Math.max(0, Math.min(255, Math.round(c + amount * 255)));
+    // A fraction of the way to white, or to black - not a fixed step towards it. See
+    // the note above: a fixed step makes the same decoration a different weight on
+    // every fill, which for the seam meant invisible on dark blobs and heavy on light
+    // ones.
+    const f = (c: number): number =>
+      Math.max(
+        0,
+        Math.min(
+          255,
+          Math.round(amount >= 0 ? c + amount * (255 - c) : c + amount * c),
+        ),
+      );
     return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
   }
   const hsl = /^hsl\((\d+) (\d+)% (\d+)%\)$/.exec(colour);
   if (hsl !== null) {
     const l = Number(hsl[3]);
-    const next = Math.max(4, Math.min(96, l + amount * 100));
-    return `hsl(${hsl[1]} ${hsl[2]}% ${next}%)`;
+    const next = Math.max(
+      4,
+      Math.min(96, amount >= 0 ? l + amount * (100 - l) : l + amount * l),
+    );
+    return `hsl(${hsl[1]} ${hsl[2]}% ${Math.round(next)}%)`;
   }
   return colour;
 }

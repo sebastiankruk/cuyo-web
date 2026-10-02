@@ -17,28 +17,26 @@ import {
   GRY,
   hexGeometry,
 } from "../engine/game-core/constants.ts";
-import type { LevelDef } from "../engine/level-format/level-data.ts";
+import type { KindColour } from "./palette.ts";
 import type { Simulation } from "../engine/game-core/simulation.ts";
 import {
   MARKER_RADIUS,
   borderBand,
   cellOrigin,
-  markerForRole,
   markerInk,
-  colourFor,
   explosionProgress,
   explosionRadius,
   shade,
   stubRadius,
   stubRect,
 } from "./geometry.ts";
-import type {
-  BlobMarker,
-  BoardFrame,
-  Contacts,
-  Point,
-  Rect,
-} from "./geometry.ts";
+import type { BoardFrame, Contacts, Point, Rect } from "./geometry.ts";
+import {
+  buildPalette,
+  colourFor as paletteColourFor,
+  markerFor,
+} from "./palette.ts";
+import type { Palette } from "./palette.ts";
 
 function roundRect(
   ctx: CanvasRenderingContext2D,
@@ -58,16 +56,13 @@ function roundRect(
 function drawCell(
   ctx: CanvasRenderingContext2D,
   f: BoardFrame,
-  level: LevelDef,
+  colour: string,
   x: number,
   y: number,
-  kind: number,
-  version: number,
   contacts: Contacts,
-  role: string,
+  marker: KindColour["marker"],
 ): void {
   const origin = cellOrigin(f, x, y);
-  const colour = colourFor(level.kinds[kind]?.artKey ?? "", version);
   // `stubRect` gives the shape *within* a cell, so it has to be moved to the
   // cell's origin before it is filled. This was missing: every blob was filled at
   // the same near-origin rectangle, so the whole board piled up in the top-left
@@ -124,7 +119,7 @@ function drawCell(
   }
   ctx.stroke();
 
-  drawMarker(ctx, f, origin, colour, markerForRole(role));
+  drawMarker(ctx, f, origin, colour, marker);
 }
 
 /**
@@ -139,15 +134,15 @@ function drawMarker(
   f: BoardFrame,
   origin: Point,
   colour: string,
-  marker: BlobMarker,
+  marker: KindColour["marker"],
 ): void {
-  if (marker === null) return;
+  if (marker === "") return;
   const cx = origin.x + f.size / 2;
   const cy = origin.y + f.size / 2;
   const r = f.size * MARKER_RADIUS;
   ctx.fillStyle = markerInk(colour);
   ctx.beginPath();
-  if (marker === "goal") {
+  if (marker === "dot") {
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
   } else {
     ctx.rect(cx - r, cy - r, r * 2, r * 2);
@@ -203,6 +198,15 @@ export function render(
   const width = 10 * size;
   const height = 20 * size;
 
+  // One palette per frame, built from the level rather than per blob. Building it per
+  // blob would be the same work done a hundred times and would make the assignment
+  // order-dependent, so the same two kinds could get different colours on different
+  // frames. Cheap to build, and the only way it can be got wrong is to hash keys
+  // independently - which is what this replaced.
+  const palette: Palette = buildPalette(level.kinds, {
+    background: level.colours.background,
+  });
+
   ctx.save();
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = level.colours.background;
@@ -225,10 +229,7 @@ export function render(
   for (const { x, y } of sim.board.occupied()) {
     const blob = sim.board.at(x, y);
     if (blob === null) continue;
-    const colour = colourFor(
-      level.kinds[blob.kind]?.artKey ?? "",
-      blob.version,
-    );
+    const colour = paletteColourFor(palette, blob.kind);
     if (blob.exploding !== 0) {
       drawExplosion(ctx, f, x, y, colour, blob.exploding);
       continue;
@@ -240,18 +241,16 @@ export function render(
     drawCell(
       ctx,
       f,
-      level,
+      colour,
       x,
       y,
-      blob.kind,
-      blob.version,
       {
         up: same(0, -1),
         down: same(0, 1),
         left: same(-1, 0),
         right: same(1, 0),
       },
-      level.kinds[blob.kind]?.role ?? "colour",
+      markerFor(palette, blob.kind),
     );
   }
 
@@ -276,13 +275,11 @@ export function render(
       drawCell(
         ctx,
         f,
-        level,
+        paletteColourFor(palette, p.blob.kind),
         p.x,
         p.y,
-        p.blob.kind,
-        p.blob.version,
         isolated,
-        level.kinds[p.blob.kind]?.role ?? "colour",
+        markerFor(palette, p.blob.kind),
       );
     }
     ctx.globalAlpha = 1;

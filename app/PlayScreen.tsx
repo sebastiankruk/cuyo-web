@@ -5,32 +5,40 @@ import type { Phase } from "../engine/game-core/simulation.ts";
 import type { LevelDef } from "../engine/level-format/level-data.ts";
 import { GRX, GRY } from "../engine/game-core/constants.ts";
 import { render } from "../render/board.ts";
+import { boardHeight, boardSizing, boardWidth } from "../render/geometry.ts";
 import {
-  boardHeight,
-  boardSizing,
-  boardWidth,
-  colourFor,
-} from "../render/geometry.ts";
-import { applyGesture, readGesture } from "./gestures.ts";
+  buildPalette,
+  colourFor as paletteColourFor,
+} from "../render/palette.ts";
+import { COMMIT as BUILD_COMMIT, DIRTY as BUILD_DIRTY } from "virtual:build-stamp";
+import {
+  NO_TOUCH,
+  applyGesture,
+  moveTouch,
+  pressTouch,
+  releaseTouch,
+} from "./gestures.ts";
+import type { TouchState } from "./gestures.ts";
 import { goalSummary, goalSummaryLines } from "./goals.ts";
-import type { PointerSample } from "./gestures.ts";
 
 /** Held-direction repeat timings, in ms. */
 const DAS_DELAY = 170;
 const DAS_RATE = 55;
 
+/**
+ * The kind constant for a goal kind's name.
+ *
+ * The summary carries names and the board stores constants, so the swatch needs the
+ * translation. `-1` when the name is not in the table, which the palette answers with
+ * its fallback rather than throwing - a missing swatch is not worth failing a frame for.
+ */
+function goalKindIndex(level: LevelDef, name: string | null): number {
+  if (name === null) return -1;
+  return level.kinds.findIndex((k) => k.name === name);
+}
+
 /** How often the HUD is allowed to re-render. */
 const HUD_INTERVAL_MS = 100;
-
-/**
- * How far a touch may wander and still count as a tap, in CSS pixels.
- *
- * Shared with `readGesture`, which uses the same number to decide whether a move
- * is a tap. Kept here as a named constant because the event handler needs it too:
- * a drag has to be recognised as a drag *during* the move, to suppress the tap on
- * release, and that check cannot wait for the release.
- */
-const TAP_PIXELS = 10;
 
 interface Props {
   level: LevelDef;
@@ -210,40 +218,39 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas === null) return;
-    let start: PointerSample | null = null;
-    let moved = false;
+    // The touch state is one value, not two nullable locals, and every decision about
+    // what a press means is made by the pure functions in `gestures.ts`. What is left
+    // here is only plumbing: read the pointer, apply what comes back.
+    //
+    // That decision used to live in this handler, where nothing could test it - and
+    // the bug it produced was in this wiring, not in the gesture decoding. A browser
+    // fires `pointermove` the instant a finger lands, at a distance of a couple of
+    // pixels, and the handler was asking `readGesture` what to do with it. The answer
+    // was "rotate", because a short press *is* a tap. So every touch rotated on its
+    // first event and again on release: swipes appeared to rotate, and taps rotated
+    // twice.
+    let touch: TouchState = NO_TOUCH;
 
     const onDown = (e: PointerEvent): void => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
-      start = { x: e.offsetX, y: e.offsetY };
-      moved = false;
+      touch = pressTouch({ x: e.offsetX, y: e.offsetY });
       canvas.setPointerCapture(e.pointerId);
     };
     const onMove = (e: PointerEvent): void => {
-      if (start === null) return;
-      // Past the tap threshold this is a drag, not a tap. Set before applying
-      // anything, because `applyGesture` acting is not the same as the finger
-      // having moved: a drag into a wall applies no move but must still suppress
-      // the tap on release.
-      if (Math.hypot(e.offsetX - start.x, e.offsetY - start.y) > TAP_PIXELS) {
-        moved = true;
-      }
-      const gesture = readGesture(
-        start,
+      const result = moveTouch(
+        touch,
         { x: e.offsetX, y: e.offsetY },
         {
           cellSize: sizeRef.current,
         },
       );
-      if (applyGesture(sim, gesture)) start = { x: e.offsetX, y: e.offsetY };
+      // Applied, the anchor follows the finger; refused, it stays where it was. The
+      // tracker offers both states because only applying it can say which happened.
+      touch = applyGesture(sim, result.gesture) ? result.state : result.held;
     };
     const onUp = (e: PointerEvent): void => {
-      // A tap rotates, so it is decided here on release rather than during the
-      // move: a press that never travelled is a tap, and one that travelled is a
-      // drag whatever the drag did.
-      if (start !== null && !moved) applyGesture(sim, { kind: "rotate" });
-      start = null;
-      moved = false;
+      applyGesture(sim, releaseTouch(touch).gesture);
+      touch = NO_TOUCH;
       if (canvas.hasPointerCapture(e.pointerId)) {
         canvas.releasePointerCapture(e.pointerId);
       }
@@ -309,9 +316,15 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
         <button type="button" className="chip" onClick={onExit}>
           ‹ Levels
         </button>
-        <div className="play__title">
+        {/*
+          `title` because the name truncates on a narrow phone, and a truncated name
+          is not a name. The browser's own tooltip is the one tooltip on this screen
+          that cannot be clipped by the HUD, is reachable by keyboard, and costs
+          nothing.
+        */}
+        <div className="play__title" title={level.name}>
           <strong>{level.name}</strong>
-          <span>{level.author}</span>
+          {level.author !== "" && <span>{level.author}</span>}
         </div>
         {/*
           The rules, one tap away. They were previously a bare `10` with a tooltip,
@@ -333,7 +346,18 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
               <p className="play__rulesSwatch">
                 <span
                   className="play__swatch"
-                  style={{ background: colourFor(goals.targetArtKey, 0) }}
+                  style={{
+                    background: paletteColourFor(
+                      // The same palette the board is drawn with, built from the
+                      // level's kinds rather than hashed from the art key - so the
+                      // swatch beside "these are the blobs to clear" is the colour of
+                      // those blobs and cannot drift from it.
+                      buildPalette(level.kinds, {
+                        background: level.colours.background,
+                      }),
+                      goalKindIndex(level, goals.targetName),
+                    ),
+                  }}
                   aria-hidden="true"
                 />
                 <span title={goals.targetName ?? undefined}>
@@ -443,7 +467,16 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
           {hud.phase} · step {hud.steps} · {hud.frameMs.toFixed(0)} ms/frame
         </span>
         <span>
-          {GRX}×{GRY} · seed {seed + runId}
+          {GRX}×{GRY} · seed {seed + runId} ·{" "}
+          {/*
+            Which build this is, so a screenshot settles it. Twice now a report of "it
+            looks the same" has turned out to be indistinguishable between a stale page
+            and a fix that did not work, and the only way to tell them apart was to ask
+            whether the page had been reloaded. A `dirty` marker matters as much as the
+            hash: a dev server started before a commit keeps serving the old modules.
+          */}
+          {BUILD_COMMIT}
+          {BUILD_DIRTY ? "*" : ""}
         </span>
       </footer>
     </div>

@@ -3,6 +3,18 @@
 Working notes for agents on this repository. Facts that are easy to get wrong, or
 that are expensive to rediscover, live here rather than in someone's memory.
 
+## Restarting the dev server disconnects open tabs
+
+Vite pushes updates over a websocket, and killing and restarting the server drops it.
+An open tab does not notice, does not reconnect, and does not reload: it keeps showing
+whatever it loaded when the connection was live. So a screenshot can be several commits
+old while the server is serving the current code, and "it looks the same as before" then
+means the tab, not the fix.
+
+The dev overlay's right-hand text now carries the commit and a `*` for a dirty tree, so
+any screenshot says which build produced it. **Read it before believing a visual
+report.** If it does not match, the answer is a reload, not a diagnosis.
+
 ## Screenshots of the running app
 
 Screenshots are a regular part of reviewing this project, because a browser canvas

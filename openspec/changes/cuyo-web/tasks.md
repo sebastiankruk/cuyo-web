@@ -160,6 +160,23 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 
 ## 8. Art Pipeline
 
+- [ ] 8.0 Make kinds distinguishable by **shape**, not only colour
+
+  The palette now keeps every level's kinds at least 20 ΔE apart, and that has a hard
+  ceiling: two of the 79 levels have more colour kinds than colour can separate —
+  `bonimali.ld` with 42 and `bunt.ld` with **153**. Measured, the palette reaches ΔE
+  21.8 on white and 19.9 on black at 42 kinds, and 11.5 at 153. Two blobs 11 ΔE apart at
+  cell size are not reliably tellable apart, and no palette fixes that, because the
+  problem is the number of kinds rather than the choice of colours.
+
+  Upstream solves it with 153 distinct spritesheets. This project draws procedurally, so
+  the answer is a small set of authored shapes that combine with the palette — which is
+  8.1 below, and the reason it is worth doing rather than deferring indefinitely.
+
+  Until then those two levels are honestly hard to read, and
+  `render/palette.test.ts` names them and their measured numbers rather than asserting a
+  property the code does not have.
+
 - [ ] 8.1 Define the authored base-tile format (shape, palette, material treatment) and verify a tile can be authored and rendered at board scale
 - [ ] 8.2 Implement the variant compositor for `schema16`, `schema5`, `schema4`, `schemaDiag16` and `schemaDiag2`, and verify generated variants tile seamlessly against the Cual code of `hormone`, `elemente` and `maennchen`
 - [ ] 8.3 Implement the hex variant compositor for `schemaHex4` and `schemaHex8`, and verify the generated set is complete for `unmoeglich`

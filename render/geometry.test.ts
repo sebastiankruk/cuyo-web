@@ -13,24 +13,25 @@ import {
   hexGeometry,
 } from "../engine/game-core/constants.ts";
 import {
-  ART_COLOURS,
+  MARKER_RADIUS,
   boardHeight,
   boardWidth,
   borderBand,
   cellAt,
   cellOrigin,
   cellSizeFor,
-  colourFor,
   dragCells,
   explosionProgress,
   explosionRadius,
   fitBoard,
+  markerInk,
   shade,
   stableHue,
   stubRect,
   stubRadius,
 } from "./geometry.ts";
-import type { BoardFrame } from "./geometry.ts";
+import type { BoardFrame, Contacts } from "./geometry.ts";
+import { deltaE, labOfHsl } from "./perceptual.ts";
 
 const SIZE = 32;
 const rect: BoardFrame = {
@@ -186,7 +187,12 @@ describe("borderBand", () => {
   });
 
   it("grows upward from the bottom when mirrored", () => {
-    expect(borderBand(mirrored, 2)).toEqual({ x: 0, y: 640 - 64, w: 320, h: 64 });
+    expect(borderBand(mirrored, 2)).toEqual({
+      x: 0,
+      y: 640 - 64,
+      w: 320,
+      h: 64,
+    });
   });
 
   it("clamps to the board height", () => {
@@ -256,19 +262,11 @@ describe("stubRect", () => {
   });
 });
 
-describe("colourFor", () => {
-  it("returns the declared colour for a known art key", () => {
-    expect(colourFor("inGruen", 0)).toBe(ART_COLOURS["inGruen"]);
-  });
-
-  it("is stable for an unknown key", () => {
-    expect(colourFor("zzz-unknown", 0)).toBe(colourFor("zzz-unknown", 0));
-  });
-
-  it("varies by version for an unknown key", () => {
-    expect(colourFor("zzz-unknown", 0)).not.toBe(colourFor("zzz-unknown", 1));
-  });
-
+describe("stableHue", () => {
+  // Still exported, still tested, but no longer used for anything a player sees: it was
+  // the per-key hash whose collisions `palette.ts` exists to fix. Kept because it is a
+  // reasonable deterministic hash and `shade` and the art manifest do not need it
+  // removed to be correct - but nothing should reach for it to pick a colour again.
   it("keeps a stable hue in range", () => {
     for (const k of ["", "a", "abc", "inGruen", "x".repeat(200)]) {
       const h = stableHue(k);
@@ -277,25 +275,153 @@ describe("colourFor", () => {
       expect(Number.isInteger(h)).toBe(true);
     }
   });
+
+  it("is stable for a given key", () => {
+    for (const k of ["", "inGruen", "zhlen"]) {
+      expect(stableHue(k)).toBe(stableHue(k));
+    }
+  });
+});
+
+describe("the blob marker", () => {
+  it("is a mark on the blob rather than the blob", () => {
+    // The relationship that matters. `stubRect` insets an isolated blob and then pulls
+    // its free edges inwards, so a blob is much narrower than its cell, and a marker
+    // sized as a fraction of the *cell* can easily end up nearly as wide as the thing it
+    // is marking. It did: 91%, which made a row of goal blobs read as a row of white
+    // circles in green pills.
+    //
+    // Both numbers are asserted together because either can be changed on its own, and
+    // a change to `stubRect` would quietly undo the marker's size.
+    const noContacts: Contacts = {
+      left: false,
+      right: false,
+      up: false,
+      down: false,
+    };
+    const blob = stubRect(rect, noContacts);
+    const marker = MARKER_RADIUS * 2 * SIZE;
+    const fraction = marker / blob.w;
+    expect(
+      fraction,
+      `marker is ${(fraction * 100).toFixed(0)}% of the blob's width`,
+    ).toBeGreaterThan(0.25);
+    expect(
+      fraction,
+      `marker is ${(fraction * 100).toFixed(0)}% of the blob's width`,
+    ).toBeLessThan(0.6);
+  });
+
+  it("stays inside the blob even when the blob is at its widest", () => {
+    // A blob in the middle of a group spans the full padded cell, so the marker is a
+    // larger fraction of it there. It must still fit, or the mark spills over the seam
+    // and onto the neighbour.
+    const allTouching: Contacts = {
+      left: true,
+      right: true,
+      up: true,
+      down: true,
+    };
+    const blob = stubRect(rect, allTouching);
+    expect(MARKER_RADIUS * 2 * SIZE).toBeLessThan(blob.w);
+    expect(MARKER_RADIUS * 2 * SIZE).toBeLessThan(blob.h);
+  });
+});
+
+describe("markerInk", () => {
+  it("reads against every fill the palette can produce", () => {
+    // The mark is six pixels across. If its contrast against the blob is marginal, the
+    // *shape* distinction between a goal and a grey quietly stops working, and nothing
+    // else on the board changes to say so.
+    //
+    // The fills are the ones that actually occur: every grey in the ladder, the goal
+    // green on both backgrounds, and the extremes of the palette's own range.
+    const fills = [
+      "hsl(0 0% 72%)",
+      "hsl(0 0% 60%)",
+      "hsl(0 0% 46%)",
+      "hsl(0 0% 34%)",
+      "hsl(96 55% 52%)",
+      "hsl(96 50% 42%)",
+      "hsl(240 70% 48%)",
+      "hsl(45 70% 34%)",
+      "hsl(200 70% 70%)",
+      "hsl(300 70% 60%)",
+    ];
+    for (const fill of fills) {
+      const ink = markerInk(fill);
+      const d = deltaE(labOfHsl(ink)!, labOfHsl(fill)!);
+      expect(
+        d,
+        `mark on ${fill} is ΔE ${d.toFixed(1)} (${ink})`,
+      ).toBeGreaterThan(25);
+    }
+  });
+
+  it("darkens a pale fill and lightens a dark one", () => {
+    // The point of measuring the direction rather than assuming it. A mark has nowhere
+    // to lighten to on a pale fill, and the lightest grey in the ladder is pale.
+    const pale = labOfHsl(markerInk("hsl(0 0% 72%)"))!;
+    const paleFill = labOfHsl("hsl(0 0% 72%)")!;
+    expect(pale[0]).toBeLessThan(paleFill[0]);
+
+    const dark = labOfHsl(markerInk("hsl(0 0% 34%)"))!;
+    const darkFill = labOfHsl("hsl(0 0% 34%)")!;
+    expect(dark[0]).toBeGreaterThan(darkFill[0]);
+  });
+
+  it("falls back to a light mark for a colour it cannot read", () => {
+    // Defensive: a malformed colour should give a visible mark, not throw mid-frame.
+    expect(markerInk("rebeccapurple")).toBe(shade("rebeccapurple", 0.55));
+  });
 });
 
 describe("shade", () => {
-  it("lightens and darkens a hex colour", () => {
-    expect(shade("#808080", 0.5)).toBe("rgb(255,255,255)");
+  it("moves a fraction of the way to white or black, not a fixed step", () => {
+    // The property, on both formats. A fixed step is the same size on every fill, which
+    // made the blob's seam invisible on a dark blob and heavy on a pale one - see the
+    // note on `shade`.
     expect(shade("#808080", 0)).toBe("rgb(128,128,128)");
-    // 128 - 127.5 rounds to 1, so a half-step does not reach pure black.
-    expect(shade("#808080", -0.5)).toBe("rgb(1,1,1)");
-    expect(shade("#808080", -1)).toBe("rgb(0,0,0)");
+    // Half of the 127 remaining to white.
+    expect(shade("#808080", 0.5)).toBe("rgb(192,192,192)");
+    // A quarter of the way to white is a quarter of the remaining headroom, so a lighter
+    // fill moves less in absolute terms - which is the point.
+    expect(shade("#404040", 0.5)).toBe("rgb(160,160,160)");
+    // And towards black, symmetrically.
+    expect(shade("#808080", -0.5)).toBe("rgb(64,64,64)");
+    expect(shade("#c0c0c0", -0.5)).toBe("rgb(96,96,96)");
+    expect(shade("hsl(200 50% 50%)", 0.5)).toBe("hsl(200 50% 75%)");
+    expect(shade("hsl(200 50% 50%)", -0.5)).toBe("hsl(200 50% 25%)");
+    // A small step is small on a light fill and proportionally larger on a dark one.
+    expect(shade("hsl(200 50% 80%)", 0.2)).toBe("hsl(200 50% 84%)");
+    expect(shade("hsl(200 50% 20%)", 0.2)).toBe("hsl(200 50% 36%)");
+  });
+
+  it("keeps the seam a roughly constant weight on every fill", () => {
+    // The reason the semantics changed, stated as a test so it cannot quietly revert:
+    // the seam is `shade(colour, -0.28)` and its contrast against its own fill must not
+    // collapse at the dark end, which is what a fixed step did - ΔE 1 at fill L=30.
+    for (const l of [30, 40, 50, 60, 70, 80]) {
+      const fill = `hsl(0 0% ${l}%)`;
+      const seam = shade(fill, -0.28);
+      const d = deltaE(labOfHsl(seam)!, labOfHsl(fill)!);
+      expect(
+        d,
+        `seam on a fill of L=${l} is ΔE ${d.toFixed(1)}`,
+      ).toBeGreaterThan(5);
+      expect(d, `seam on a fill of L=${l} is ΔE ${d.toFixed(1)}`).toBeLessThan(
+        30,
+      );
+    }
   });
 
   it("clamps out-of-range results", () => {
     expect(shade("#ffffff", 1)).toBe("rgb(255,255,255)");
+    expect(shade("#ffffff", 5)).toBe("rgb(255,255,255)");
     expect(shade("#000000", -1)).toBe("rgb(0,0,0)");
-  });
-
-  it("shifts hsl lightness and clamps it", () => {
-    expect(shade("hsl(200 50% 50%)", 0.5)).toBe("hsl(200 50% 96%)");
+    // The lightness floor exists so a marker is never invisible against its own blob.
     expect(shade("hsl(200 50% 2%)", -0.5)).toBe("hsl(200 50% 4%)");
+    expect(shade("hsl(200 50% 98%)", 0.5)).toBe("hsl(200 50% 96%)");
   });
 
   it("returns an unrecognised format unchanged instead of throwing", () => {
