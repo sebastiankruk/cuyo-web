@@ -43,7 +43,7 @@ been wrong twice.
 
 - Work on a branch and open a pull request. `main` is always green and always something
   the user could have handed to someone. `make check` is the gate and CI runs the same
-  eight jobs.
+  nine jobs.
 - **A merge to `main` is not a release.** Only a `release/X.Y.Z` branch merges to `main`,
   and that merge is what creates the tag. GitHub cannot enforce this — branch protection
   can require pull requests, reviews and status checks, but not the source branch's name

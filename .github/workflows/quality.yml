@@ -76,6 +76,30 @@ jobs:
       - name: TypeScript
         run: npx tsc --noEmit
 
+  # A workflow GitHub cannot parse does not fail: it produces a run with zero jobs and no
+  # log. `release.yml` shipped with a missing action owner that way, and every other job
+  # in this file was green while no release was published. Hence its own job, rather than
+  # a step inside `lint`, so that the failure names the thing that broke.
+  workflows:
+    name: Lint workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # actionlint is a devDependency, so the check needs the same `npm ci` as `docs`.
+      # Without this it fails on a missing module, which is a red job that says nothing
+      # about workflows - the confusion this whole job exists to prevent, one level down.
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Check the workflows parse
+        run: npm run lint:workflows
+
   docs:
     name: Lint documentation
     runs-on: ubuntu-latest
