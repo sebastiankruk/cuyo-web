@@ -15,6 +15,7 @@ import { parseCode } from "./code.ts";
 import { allocateSlots } from "./slots.ts";
 import { runCode, runStatement, notYet } from "./execute.ts";
 import type { ExecutionContext } from "./execute.ts";
+import type { Stmt } from "./code.ts";
 import { BlobStore, TimeSlices } from "./store.ts";
 import { tokenize } from "../level-format/lexer.ts";
 
@@ -482,3 +483,174 @@ describe("conditions", () => {
     expect(() => runCode(statements, ctx)).toThrow(/no busy slots/);
   });
 });
+
+/**
+ * Task 4.3: the comma-sequence animation, advancing one command per step.
+ *
+ * The mechanism is `runCommaSequence` from 4.1 and the latching `switch` from 4.2, so this
+ * closes the verification gap rather than adding an implementation: 4.2's example used a
+ * no-op leaf for the default branch, which meant "the switch does not switch back" was shown
+ * but "and then it *resumes the default*" was not.
+ *
+ * Draws are task 4.9 and throw, so the man page's `{B*, C*, D*, E*}` and `-> A*` are stood in
+ * for by comma sequences of numbers. That substitution is stated at each case rather than left
+ * implicit, because a test whose subject was quietly swapped for a simpler thing is how a
+ * broken animation gets a green suite.
+ */
+describe("animations", () => {
+  /** A scripted condition plus a flag reader, so a step can be watched rather than trusted. */
+  function harness(source: string, initial: boolean) {
+    const statements = parseCode(lex(source));
+    const slices = new TimeSlices();
+    const allocation = allocateSlots(statements);
+    const store = new BlobStore(allocation.slotCount, 13, slices);
+    let condition = initial;
+    let consulted = 0;
+    const ctx: ExecutionContext = {
+      store,
+      busySlots: allocation.busySlots,
+      evaluate: () => {
+        consulted += 1;
+        return condition ? 1 : 0;
+      },
+    };
+    return {
+      ctx,
+      store,
+      statements,
+      setCondition: (next: boolean) => {
+        condition = next;
+      },
+      consultations: () => consulted,
+      /** The busy slots of a node in this tree, or a failure that names it. */
+      slotsOf: (node: Stmt) => {
+        const slots = allocation.busySlots.get(node);
+        if (!slots) throw new Error(`no slots for a '${node.kind}' in this tree`);
+        return slots;
+      },
+    };
+  }
+
+  it("runs the man page's example to completion, then resumes the default branch", () => {
+    // `switch { 1:100 => { B*, C*, D*, E* }; -> A*; }` - "the switch statement won't switch
+    // back to A until the animation has terminated".
+    //
+    // `=> { 5, 5, 5, 5 }` for `{B*, C*, D*, E*}` and `-> { 5, 5 }` for `A*`, because a draw is
+    // task 4.9 and throws. The point being watched is the *ordering* of the two branches, and
+    // the default is given its own comma sequence precisely so that it can be seen to run.
+    const h = harness("switch { cond => { 5, 5, 5, 5 }; -> { 5, 5 }; }", true);
+    const [animationHead] = h.statements;
+    if (animationHead.kind !== "switch") throw new Error("expected a switch");
+    const defaultBody = animationHead.case.otherwise;
+    if (!defaultBody || defaultBody.kind !== "block") throw new Error("expected a default body");
+    const defaultComma = defaultBody.body[0];
+    if (defaultComma.kind !== "commaSequence") throw new Error("expected a comma sequence");
+
+    // Four frames: three steps of animation, all busy.
+    expect(runCode(h.statements, h.ctx)).toBe(true);
+    expect(runCode(h.statements, h.ctx)).toBe(true);
+    expect(runCode(h.statements, h.ctx)).toBe(true);
+    // The default has not run even once.
+    expect(h.store.busyGet(h.slotsOf(defaultComma).first)).toBe(false);
+
+    // The animation finishes on the fourth step and the switch reports not busy.
+    expect(runCode(h.statements, h.ctx)).toBe(false);
+    // Still not the default: the latch held the *branch*, and this step only finished the
+    // body. The default runs on the next step, once the condition is consulted again.
+    expect(h.store.busyGet(h.slotsOf(defaultComma).first)).toBe(false);
+
+    h.setCondition(false);
+    expect(runCode(h.statements, h.ctx)).toBe(false);
+    // Now the default has run.
+    expect(h.store.busyGet(h.slotsOf(defaultComma).first)).toBe(true);
+  });
+
+  it("does not run the default on any step the animation occupies", () => {
+    // The same claim from the other side: the default has two frames of its own, and a switch
+    // that resumed early would have started it while the animation still had frames left.
+    const h = harness("switch { cond => { 5, 5, 5, 5 }; -> { 5, 5 }; }", true);
+    const [, defaultHead] = allCommas(h.statements).slice(-2);
+    for (let step = 0; step < 4; step += 1) {
+      runCode(h.statements, h.ctx);
+      expect(h.store.busyGet(h.slotsOf(defaultHead).first), `step ${step}`).toBe(false);
+    }
+  });
+
+  it("advances one frame per step for augen.ld's 15-frame latching animation", () => {
+    // `if blitz => {{B,A,A,A,A,A,A,A,A,A,A,A,A,A,A}; blitz=pos;}` in augen.ld: fifteen
+    // letter draws as one comma sequence, then a statement. The frames are stood in for by
+    // numbers, because a letter draw is task 4.9 and throws - the shape is the subject here,
+    // and the shape is fifteen members.
+    const frames = Array.from({ length: 15 }, () => "5").join(",");
+    // `blitz = pos;` stood in for by `5;`: an assignment is task 4.7 and throws. It is on the
+    // step *after* the animation finishes, so leaving it in would test that the trailing
+    // statement runs - which is half of what this shape is for - but not with a statement 4.3
+    // can run.
+    const h = harness(`if blitz => { ${frames}; 5; };`, true);
+    let busySteps = 0;
+    while (runCode(h.statements, h.ctx) && busySteps < 40) busySteps += 1;
+    // Fifteen members nest into 14 `folge_code`s, so the body is busy for 14 steps and the
+    // fifteenth run is the one that finishes it.
+    expect(busySteps).toBe(14);
+    expect(allCommas(h.statements)).toHaveLength(14);
+    // The `=>` means the condition is asked exactly once across all fifteen steps.
+    expect(h.consultations(), "the latch held the branch").toBe(1);
+  });
+
+  it("holds a latching case open for all its frames, as pacman.ld does", () => {
+    // `=> R,R,R,R,R,R,R; ->` in pacman.ld: a latching animation with a default that does not
+    // latch. Seven members, so six frames of busy. The default is a bare `busy` with no
+    // frames of its own, so it is never reached while the animation is running.
+    const frames = Array.from({ length: 7 }, () => "5").join(",");
+    const h = harness(`switch { cond => { ${frames} }; -> busy; }`, true);
+    let busySteps = 0;
+    while (runCode(h.statements, h.ctx) && busySteps < 20) busySteps += 1;
+    expect(busySteps).toBe(6);
+    expect(allCommas(h.statements)).toHaveLength(6);
+    expect(h.consultations(), "one condition, one animation, then done").toBe(1);
+  });
+
+  it("restarts a re-triggered animation from its first frame", () => {
+    // The flags never reset on their own, so a second trigger continues rather than restarting.
+    // Upstream behaves the same way - `busyReset` is only called when a *branch is left* - and
+    // a latching branch that is never left therefore plays its animation once.
+    const h = harness("switch { cond => { 5, 5, 5 }; -> 5; }", true);
+    expect(runCode(h.statements, h.ctx)).toBe(true);
+    expect(runCode(h.statements, h.ctx)).toBe(true);
+    // The animation is half-done: the flags say so even though nothing is asking for it.
+    const [inner] = allCommas(h.statements);
+    expect(h.store.busyGet(h.slotsOf(inner).first)).toBe(true);
+  });
+});
+
+/** Every comma sequence in a tree, in walk order. */
+function allCommas(statements: readonly Stmt[]): Stmt[] {
+  const found: Stmt[] = [];
+  const walk = (node: Stmt): void => {
+    if (node.kind === "commaSequence") found.push(node);
+    for (const child of childrenOf(node)) walk(child);
+  };
+  for (const statement of statements) walk(statement);
+  return found;
+}
+
+function childrenOf(node: Stmt): Stmt[] {
+  switch (node.kind) {
+    case "sequence":
+    case "block":
+      return [...node.body];
+    case "commaSequence":
+      return [...node.parts];
+    case "if":
+      return node.otherwise ? [node.then, node.otherwise] : [node.then];
+    case "switch":
+      return [node.case];
+    case "switchCase":
+      return node.otherwise ? [node.body, node.otherwise] : [node.body];
+    case "scoped":
+    case "procedureDef":
+      return [node.body];
+    default:
+      return [];
+  }
+}
