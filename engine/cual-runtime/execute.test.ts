@@ -208,17 +208,17 @@ describe("what this task refuses", () => {
     // A walker that answers "not busy" for an unimplemented construct makes every rule above
     // untestable: "busy while either side is busy" passes just as well against a walker that
     // is never busy.
-    expect(() => notYet("if")).toThrow(/task 4\.2/);
-    expect(() => notYet("switch")).toThrow(/task 4\.2/);
-    expect(() => notYet("switchCase")).toThrow(/task 4\.2/);
+    // Every kind the walker still refuses, so a new one cannot be added without a task.
     expect(() => notYet("scoped")).toThrow(/task 4\.7/);
     expect(() => notYet("call")).toThrow(/task 4\.6/);
-    // `effect` left the list in 4.12; `notYet("effect")` now says "?" and that is the
-    // point of the record being explicit rather than a default.
+    // The kinds that have left the list say "?" instead. `if`, `switch` and `switchCase` were
+    // still in it until the compile gate (4.13) read it and reported 1364 `if` gaps in a corpus
+    // where every `if` runs — so these three are asserted on purpose: a table nobody reads
+    // stays plausible for a long time, and this is what noticed.
+    expect(() => notYet("if")).toThrow(/task \?/);
+    expect(() => notYet("switch")).toThrow(/task \?/);
+    expect(() => notYet("switchCase")).toThrow(/task \?/);
     expect(() => notYet("effect")).toThrow(/task \?/);
-    // Every kind the walker still refuses, so a new one cannot be added without a task. The
-    // draw statements left this list in 4.9; `notYet("draw")` now says "?" and that is the
-    // point of the record being explicit rather than a default.
     expect(() => notYet("draw")).toThrow(/task \?/);
   });
 
