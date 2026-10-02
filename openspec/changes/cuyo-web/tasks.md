@@ -138,7 +138,7 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [x] 6.2 Implement the seven tracks from the level summary and verify Standard has 48 levels and All has 70
 - [ ] 6.3 Implement the three difficulty settings with descriptions and verify a difficulty change alters `numexplode` where the level defines it
 - [x] 6.4 Implement availability gating so levels requiring unsupported modes are skipped rather than failing to load, and verify they are not listed as playable
-- [ ] 6.5 Implement per-level, per-difficulty progress records (completed flag, best score) with first-completion unlocking the next level in the track, and verify unlock and record-retention behaviour
+- [x] 6.5 Implement per-level, per-difficulty progress records (completed flag, best score) with first-completion unlocking the next level in the track, and verify unlock and record-retention behaviour
 - [ ] 6.6 Implement the level introduction screen data (name, author, description) and the seen-level skip option, and verify both
 
 ### Catalogue navigation, from playing it
