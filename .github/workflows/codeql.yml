@@ -1,0 +1,96 @@
+# Copyright (C) 2026 Sebastian Ryszard Kruk (dev@kruk.me)
+#
+# This file is part of the cuyo-web project.
+#
+# cuyo-web is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# cujo-web is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with cuyo-web. If not, see <https://www.gnu.org/licenses/>.
+name: CodeQL
+
+# Static analysis, for the other half of what `make check` cannot see.
+#
+# `quality.yml` asks whether the code is written correctly. CodeQL asks what the code
+# *does* - and the questions barely overlap: an unsanitised value from `innerHTML`, a
+# prototype-polluting merge of stored JSON, a path built from a level id. The progress
+# records added for 0.3.0 are the reason this matters concretely: they are the first
+# thing in this project that reads attacker-shaped bytes out of `localStorage` and merges
+# them into an object, which is a pattern CodeQL has opinions about.
+#
+# This is also, as of today, the only reason a merge can happen. The `main` ruleset
+# carries a `code_quality` rule at severity `errors`, and a ruleset rule that waits for
+# an analysis which has never run blocks every merge, with no bypass actor configured.
+# That is the failure mode this file exists to prevent: a gate that cannot run is not a
+# gate, and a gate nobody notices is worse than one that is absent.
+#
+# Not part of `make check`, for the same reason code scanning is not a local tool here:
+# it needs the GitHub API to publish results. So `make check` and CI are no longer quite
+# the same set of gates, which is worth knowing rather than rediscovering.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Mondays at 03:04 UTC. The minute is deliberately off the hour: this is GitHub's
+    # own recommended slot precisely because every other scheduled workflow on the
+    # platform is queued for the top of the hour.
+    - cron: "4 3 * * 1"
+  workflow_dispatch:
+
+# A superseded run on the same ref has nothing left to say. Same as `quality.yml`, and
+# for the same reason: a cancelled analysis is a fresh one, not a half-finished one.
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  # Without this the analysis runs and the results are thrown away, which looks exactly
+  # like a clean scan and is the most expensive kind of quiet.
+  security-events: write
+  actions: read
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  analyze:
+    name: Analyse javascript-typescript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Pinned to the same Node as every other job here. CodeQL parses the TypeScript
+      # sources with the compiler it finds, and a version it cannot run reports nothing
+      # rather than failing - which again looks identical to a clean scan.
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+
+      # A no-op for JavaScript, and kept anyway. The documented sequence for a
+      # JavaScript project includes it, and removing it is how a workflow silently stops
+      # matching the template when CodeQL is upgraded.
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:javascript-typescript"
