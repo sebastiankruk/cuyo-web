@@ -728,21 +728,30 @@ function parseSwitch(cursor: SharedCursor): Stmt {
   // there. So a default followed by another case is not valid Cual - `auswahl_liste` cannot
   // continue after the two-arrow shape - and it is refused rather than silently dropping the
   // case that follows.
+  //
+  // **`next` must be the folded entry, not the raw one.** The fold builds each case's `mF3` as it
+  // goes, so the case handed to the entry *before* it has to be the one that has already been
+  // given its own `mF3` — otherwise the chain it points at dead-ends after one link.
+  //
+  // It was the raw entry, and the effect was that **every `switch` in the corpus with three or
+  // more cases ran only its first two**, silently: `globals.ld`'s 33 variant schemas lose
+  // fourteen of `schema16`'s sixteen faces, and with them 298 of the corpus's 600 neighbour
+  // patterns. Found by 4.16, whose verification could not be trusted while half its subject was
+  // invisible to the parse.
   let next: SwitchCase | null = null;
   const folded: SwitchCase[] = [];
   for (let i = cases.length - 1; i >= 0; i -= 1) {
     const entry = cases[i];
-    if (entry.otherwise !== null) {
-      if (next !== null) {
-        cursor.fail(
-          `a case with a '->' default ends the switch; ${next.condition.kind} follows it`,
-        );
-      }
-      folded[i] = entry;
-      continue;
+    if (entry.otherwise !== null && next !== null) {
+      cursor.fail(
+        `a case with a '->' default ends the switch; ${next.condition.kind} follows it`,
+      );
     }
-    folded[i] = { ...entry, otherwise: next };
-    next = entry;
+    // An explicit default is kept and the chain stops there; otherwise this case points at the
+    // next one. Both come from `folded[i]`, so the case before it receives a chain that is
+    // already complete rather than one that dead-ends.
+    folded[i] = { ...entry, otherwise: entry.otherwise ?? next };
+    next = folded[i];
   }
   return { kind: "switch", case: folded[0] };
 }

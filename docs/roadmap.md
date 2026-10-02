@@ -177,16 +177,42 @@ its source.
 **Groups 3 and 4 are done, and that is not the same as the runtime being done.** Task 4.13
 wired a compile pass into `make check` that names every construct in the corpus this
 runtime cannot run, by file, line and construct. It reported 1538 places in three
-constructs; 4.14 closed the 845 `call` ones and it now reports **693 in two**. The rest are tasks
-4.15, 4.16 and — found along the way — 4.17 and 4.18:
+constructs; 4.14 closed the `call`s, 4.15 the `scoped` ones and 4.16 the neighbour
+reads, so it now reports **none at all**.
 
-| construct    | places | what is missing                                       |
-| ------------ | -----: | ----------------------------------------------------- |
-| `scoped`     |    395 | `[x = expr]` blocks                                   |
-| `neighbour`  |    298 | reading a pattern out of a blob's array               |
+That is a claim worth being careful about, because _no unimplemented construct_ is not
+_"the levels run"_. The pass is static: it asks whether there is a case for each construct,
+with no board and no simulation, so `connectionsAt` can be implemented and still be wrong
+about a hex column. Only 12.3 and 12.7 will catch that.
 
-Three features rather than 1538 problems, and the gate is a checked snapshot rather than a
-claim that the list is empty — so 0.4.0 is not cut while these are open.
+**Closing the gate turned up a parser bug that had been shrinking the gate's own numbers.**
+`parseSwitch` folded its case list right and gave each case the _unfolded_ next entry, so
+the chain dead-ended after one link and **every `switch` in the corpus with three or more
+cases ran only its first two** — silently, with nothing to fail. `globals.ld`'s 33 variant
+schemas lost fourteen of `schema16`'s sixteen faces, and 298 of the corpus's 609 neighbour
+patterns sat in cases that were never built, which is why the gate reported 298 places
+needing 4.16 when half of its subject was invisible to the parse. The real figures are
+**1039 `call`s, 441 `scoped` blocks and 609 neighbour reads**, so every count 4.13
+recorded was an undercount. That is worth saying plainly: _all 339 blocks parse_ has meant
+_parse without throwing_ all along and not _parse correctly_, and one token-versus-expression
+comparison per block is what finally noticed.
+
+**Replacing the gate found three holes in the gate itself** — which is the argument for it
+having been a snapshot rather than a claim. `walkExpressions` never reached a lettered
+draw's address (`Y@(1)*`, 3372 of them) or an assignment's _target_ (`kind@@(xc@@+1,…)`,
+354, three expressions each), and `walkStatements` never reached a `sharedCall` body. No
+construct was hidden by any of them, because a coordinate cannot hold a neighbour pattern —
+but a gate that skips a third of a level's arithmetic cannot be trusted to say the rest is
+fine. So the gate now asserts the list is empty _and_ takes a census of what the corpus
+contains, which is what stops _"no gaps"_ from also meaning _"did not look"_.
+
+**Two tasks the checklist did not have**, found while reading upstream rather than while
+running the corpus: 4.17, where a procedure definition is only recognised at a `code_zeile`
+boundary, and 4.18, where a comma sequence inside a spliced body runs to completion instead
+of advancing a frame. No level in the corpus does either, so neither is on the critical
+path — but 4.18 is why `cual.6`'s two ampersand examples are structurally right and
+arithmetically wrong, and that is the sort of thing that is much cheaper to record now than
+to rediscover.
 
 ### 5. Menus, pause, settings (group 9) — _0.5.0_
 

@@ -52,6 +52,30 @@ Groups 7, 9 and 10 have substantial code but no task is complete against its own
 bar: 7.2, 7.3, 7.9-7.11, 7.13 need Cual or the art pipeline; the rest are
 implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 10 is 0/11.
+
+Group 4 has one construct left in the compile gate: `neighbour` in 298 places, which is
+task 4.16 rather than 298 problems. 4.17 and 4.18 are gaps that no corpus level exercises,
+recorded because they were found rather than designed for.
+
+**4.16 closed the gate, and closing it turned up a parser bug that had been shrinking the
+gate's own numbers.** `parseSwitch`'s fold gave each case the *unfolded* next entry, so the
+chain dead-ended after one link: **every `switch` in the corpus with three or more cases ran
+only its first two**, silently. `globals.ld`'s 33 variant schemas lost fourteen of
+`schema16`'s sixteen faces, and 298 of the corpus's 609 neighbour patterns sat in the cases
+that were never built — so the gate reported "298 places needing 4.16" when half its subject
+was invisible to the parse. Fixed in the same change, because 4.16's own verification could
+not be trusted while half of what it verifies was dropped before it got there. The real
+figures are 1039 `call`s, 441 `scoped` blocks and 609 neighbour reads, so **every count 4.13
+recorded was an undercount** — which is worth saying plainly, because "all 339 blocks parse"
+has meant "parse without throwing" all along and not "parse correctly".
+
+The gate also had to be replaced rather than loosened: it now asserts the list is *empty*
+and takes a census of what the corpus contains, so that an empty report cannot mean a walk
+that stopped. Replacing it found three more holes in the walk: `letterDraw`'s address (3372
+of them), an assignment's *target* (354 addressed ones, three expressions each), and
+`sharedCall`'s body, which 4.14 added without teaching the walk about. None of them hid a
+construct, because a coordinate cannot hold a neighbour pattern — but a gate claiming to
+reach every expression while skipping a third of them is a gate nobody can trust.
 -->
 
 ## 1. Project Setup and Toolchain
@@ -107,13 +131,13 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [x] 4.10 Implement event dispatch for `init`, `turn`, `land`, `changeside`, `connect`, `row_up`, `row_down` and the four `key*` events with the correct eligibility and firing order, and verify `init` fires exactly once and `keyturn` fires even when rotation is blocked — an event is an ordinary definition named `<kind>.<event>`, and the *draw* code is the bare `<kind>` name: the one `Paratrooper.draw` in the corpus is a procedure
 - [x] 4.11 Implement the global blob (running before all board blobs) and the per-player semiglobal blob, and verify ordering and isolation — the whole step is **one** `beginGleichzeitig()` window, so the semiglobal running last still reads the beginning-of-step world through `@`
 - [x] 4.12 Implement `bonus`, `message`, `explode`, `lose` and `sound`, and verify each effect reaches the correct player — which is **four different rules**: `bonus`/`message` follow the asking blob's own side and throw in the global blob, `sound` follows the blob's *position* into a sample set, `explode` reaches no player and is a silent no-op in a falling blob, and `lose` ends the whole game rather than one player
-- [x] 4.13 Wire compile of all levels into the build gate so an unimplemented construct fails the build with file, line and construct, and verify by temporarily removing a construct — the gate is a **snapshot**, not an assertion that the list is empty, because group 4 is not finished: 1538 places in 3 constructs (`call` 845, `scoped` 395, `neighbour` 298). It found a real bug on its first run: `if`/`switch`/`switchCase` were still in the refusal table after 4.2, so it reported 1364 `if` gaps in a corpus where every `if` runs
+- [x] 4.13 Wire compile of all levels into the build gate so an unimplemented construct fails the build with file, line and construct, and verify by temporarily removing a construct — the gate is a **snapshot**, not an assertion that the list is empty, because group 4 is not finished: it reported 1538 places in 3 constructs (`call` 845, `scoped` 395, `neighbour` 298), and 4.14 and 4.15 have since closed two of them, so it reports **298 in one** — `neighbour`, which is 4.16. It found a real bug on its first run: `if`/`switch`/`switchCase` were still in the refusal table after 4.2, so it reported 1364 `if` gaps in a corpus where every `if` runs. Its non-triviality guard had to weaken with it: it used to assert that more than one *kind* of gap was found, and cannot now that there genuinely is only one
 
-- [ ] 4.14 Implement procedure calls (`Code::aufrufen`), including the `&name` form that does not copy the definition and the return-value assignment `yy = f(xx);`, and verify recursion depth and the `sharesDefinition` distinction — 845 places in the corpus; the largest single gap
+- [x] 4.14 Implement procedure calls, and verify the `&name` distinction — 845 places in the corpus; the largest single gap. **The task text was wrong and is corrected here**: there is no runtime call at all. Upstream's grammar resolves a call while it parses, so `name;` splices a *copy* of the definition's `Code` into the caller and `&name;` splices a `weiterleit_code` pointing at it; there is no call stack, no depth limit and no return value, because `set_zeile`'s right-hand side is an `ausdruck` and the grammar has no call in expression position — so `yy = f(xx)` does not parse and Cual has procedures rather than functions (asserted). Cual also **cannot recurse**: `speicherDefinition` runs in the grammar action, after the body is reduced, so a procedure's own body cannot see the procedure; `linkCalls` therefore walks in source order and registers each definition only after rewriting its body. The difference between the two forms is the copy constructor's third argument, `neueBusyNummern`: a three-frame animation gives 2 flags shared across two `&` sites and 4 across two spliced copies. The corpus uses the plain form 302 times and `&name` zero times
 - [ ] 4.17 Recognise a procedure definition anywhere in a `<< >>`, not only where a zeile boundary falls — upstream's grammar is `code_modus: code_modus code_zeile`, so `name = body;` is a zeile wherever it appears. A `var`/`default` line leaves a boundary; a call, a second definition, or anything inside `{ .. }` does not. Found by 4.14; no corpus level does it
 - [ ] 4.18 Make a comma sequence inside a *spliced* body advance one member per step, so `cual.6`'s two ampersand examples come out frame by frame. A bare sequence advances correctly; a spliced one runs to completion in a single step. The man page's ampersand section is the only place the `&` distinction is documented, and the corpus uses the plain form 302 times and `&` zero times
-- [ ] 4.15 Implement scoped blocks (`[x = expr] ...`), with the scope restored at the end rather than at the next statement, and verify nesting — 395 places; the value is evaluated once on entry, not per step
-- [ ] 4.16 Read a neighbour pattern out of a blob's array (`1???0???` and the eight-character forms), connecting `neighbours.ts`'s patterns to a live board, and verify against the man page's worked example — 298 places; the patterns themselves are 3.10's, the read is the walker's
+- [x] 4.15 Implement scoped blocks (`[x = expr] ...`), and verify nesting — 395 places, the second-largest gap. Upstream's whole of it is `push_code`, five lines: save the variable, set it from the expression, run the body, put the old value back, return 0. **The task text said two things the source contradicts, and both were implemented as upstream does it**: the value is evaluated *every step*, not once on entry, because `mF1->eval(b)` is inside `eval` and `eval` runs once per step per blob — so `[x = x + 1] ...` never drifts, where a cached value would climb by one per step; and the restore does *not* wait for the body to stop being busy, because the third line runs whether or not the second returned busy — so a scoped animation does not hold its value open for the frames it takes. Nesting needs nothing extra, `merk` being a local in `eval`
+- [x] 4.16 Read a neighbour pattern out of a blob's array (`1???0???` and the eight-character forms), connecting `neighbours.ts`'s patterns to a live board, and verify against the man page's worked example — 298 places as the compile gate counted them, which was **an undercount**: the real figure is 609, and the gate said 298 because the parse was dropping half of them (see the reconciliation note). The patterns themselves are 3.10's; 4.16 is the read. Two pieces: `access.ts` answers a blob's connections off a live `AccessField` (`Blop::getVerbindungen`), and `expr.ts` turns the match into 1 or 0 through a new `EvalContext.neighbour`. Three rules the man page states and the read has to keep: only a blob on a *cell* has an owner, so a falling piece and the global and semiglobal blobs answer `verbindung_solo` — the ninth bit, above all eight directions, which makes every pattern read as all zeros, and `kacheln4.ld` and `kacheln6.ld` ask a falling piece exactly that; `verbindetMit` compares the **shadow** kind on *both* sides, so the pair is snapshotted rather than the neighbours; and the mirror swap is three `TAUSCH_BITS`, so a mirrored level's "above" is the cell that was below
 
 ## 5. Game Core
 

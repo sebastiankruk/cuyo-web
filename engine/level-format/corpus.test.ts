@@ -187,6 +187,36 @@ describe("upstream corpus: shape of what it contains", () => {
     expect(six).toBeGreaterThan(0);
   });
 
+  it("reads a run of six or eight 0s and 1s as a pattern, not as a number", () => {
+    // Flex takes the *longest* match and then the *earliest* rule, and `scanner.ll` lists
+    // `[01?]{8}` and `[01?]{6}` at rules 5 and 6 with `([0-9]+)|(0[Xx]…)` at rule 7. So
+    // `11111111` ties at eight characters and rule 5 wins: a pattern, not a number.
+    //
+    // This is the count that changed when the pattern rules were moved ahead of the number
+    // rules — the corpus has nine such tokens, and before it it had six fewer patterns than it
+    // should have had, read as numbers that are almost never true.
+    let patterns = 0;
+    const misread: string[] = [];
+    for (const name of ALL_LD_FILES) {
+      for (const t of lexFile(name).tokens) {
+        if (t.kind === "neighbour") {
+          patterns++;
+          continue;
+        }
+        // A number of exactly six or eight digits, all of them 0 or 1, is the shape that used to
+        // win the tie. Anything with a digit above 1 was never in the running.
+        if (t.kind === "number") {
+          const digits = String(t.value);
+          if ((digits.length === 6 || digits.length === 8) && /^[01]+$/.test(digits)) {
+            misread.push(`${name}:${t.line} ${digits}`);
+          }
+        }
+      }
+    }
+    expect(misread).toEqual([]);
+    expect(patterns).toBeGreaterThan(600);
+  });
+
   it("finds all Cual operators", () => {
     const seen = new Set<string>();
     for (const name of ALL_LD_FILES) {

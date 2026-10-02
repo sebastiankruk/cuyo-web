@@ -203,6 +203,18 @@ export interface EvalContext {
     position: Ort,
     evaluate: (expr: Expr) => number,
   ) => number;
+  /**
+   * A neighbour pattern: `1???0???`, `0??1??0?` and the rest.
+   *
+   * Separate from `variable` and `addressed` for the same reason those are — each names a
+   * different *value* — but this one needs a board rather than a single blob, and `neighbour`
+   * is the only expression that does. Optional for the same reason: a context without a board
+   * still evaluates everything else, and a pattern in it throws by name rather than answering
+   * `0`, which every pattern would silently match against.
+   *
+   * `neighbourReader` in `access.ts` is the one to hand it.
+   */
+  readonly neighbour?: (pattern: string) => boolean;
 }
 
 /** Thrown for anything the language rules out at evaluation time. */
@@ -236,9 +248,18 @@ export function evaluate(expr: Expr, ctx: EvalContext): number {
       return ctx.variable(expr.name);
 
     case "neighbour":
-      // Task 3.10. In the tree because the grammar can already produce it, and a missing
-      // case here would read as a wrong answer rather than an unimplemented one.
-      throw new CualError(`neighbour patterns are not implemented yet (${expr.pattern})`);
+      // `case nachbar_acode: return (b.getVariable(spezconst_connect) & mZahl) == mZahl2;`
+      // — an int used as truth, so 1 and 0 are the whole of its range.
+      //
+      // Task 4.16, which is what read the pattern out of a blob's array. The mask arithmetic is
+      // `neighbours.ts`'s (3.10) and the board behind it is `access.ts`'s; what is here is the
+      // one line that turns the match into a number every other operator can consume.
+      if (!ctx.neighbour) {
+        throw new CualError(
+          `a neighbour pattern needs a context with a board to read the blob's connections from`,
+        );
+      }
+      return ctx.neighbour(expr.pattern) ? 1 : 0;
 
     case "positioned":
       if (!ctx.addressed) {

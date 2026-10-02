@@ -144,6 +144,9 @@ export function runStatement(node: Stmt, ctx: ExecutionContext): boolean {
         ctx,
       );
 
+    case "scoped":
+      return runScoped(node, ctx);
+
     case "assign":
       return runAssign(node, ctx);
 
@@ -317,6 +320,76 @@ function runAssign(node: Extract<Stmt, { kind: "assign" }>, ctx: ExecutionContex
   if (slot === null) throw new Error(`Cual: no variable named '${node.target.name}'`);
   ctx.store.set(slot, applyLocally(node.operator, ctx.store.get(slot), operand));
   return false;
+}
+
+/**
+ * `push_code`: `[x = e] body` — a value pushed for the duration of one statement.
+ *
+ *     case push_code: {
+ *       int merk = b.getVariable(*mVar1);
+ *       b.setVariable(*mVar1, mF1->eval(b), set_code);
+ *       mF2->eval(b, busy);
+ *       b.setVariable(*mVar1, merk, set_code);
+ *       return 0;
+ *     }
+ *
+ * `cual.6`'s entire description is "Sets the variable `varname` to `expr`, executes `code` and
+ * then resets the variable to the old value", and 395 places in the corpus are
+ * `[qu = Q_TL] <a draw>`. Four lines of C++ and three things in them that the man page does not
+ * say, all three of which a plausible reading gets wrong:
+ *
+ * - **The expression is evaluated every step, not once on entry.** `mF1->eval(b)` is inside
+ *   `eval`, and `eval` runs once per step per blob, so a block re-evaluates its value every time
+ *   it is reached. `[x = x + 1] ...` therefore sets `x` to one more than its *restored* value
+ *   however many steps the body takes, and `x` never drifts. An implementation that cached the
+ *   value on entry would climb by one per step instead — visible as a level whose animations
+ *   run at the wrong speed rather than as a crash.
+ * - **The restore happens even while the body is busy.** `mF2->eval(b, busy)` returns as soon as
+ *   the body has been run, busy or not, and the third line runs regardless. So a scoped
+ *   animation does not hold its value open for the frames it takes: on the second frame of
+ *   `[x = 2] a, b, c`, `x` is 2 again from a fresh evaluation, not a leftover from the first.
+ * - **Both writes are immediate.** `setVariable`, not `setVariableZukunft` — so the value is in
+ *   place before the body's first statement reads it, and the restore is not deferred to
+ *   end-of-step where a `@` read would see it.
+ *
+ * Nesting needs nothing extra: `merk` is a local in `eval`, so an inner block on the same
+ * variable saves whatever the outer one put there and gives it back, and `globals.ld`'s
+ * `[qu = Q_TL] {switch { … }}` relies on nothing more than the braces being transparent.
+ *
+ * **Busyness is the body's**, because `mF2->eval(b, busy)` writes through the caller's `busy`
+ * reference — the same pass-through as `weiterleit_code`. The `return 0` is the *stack height*,
+ * not the busyness: `getStapelHoehe` for `push_code` returns its body's, so `[qu = 1] *`
+ * contributes one picture. Nothing in this runtime needs that count yet (it is
+ * `sorte.cpp`'s `mStapelHoehe`, which sizes the picture stacks), and it is a property of the
+ * tree rather than of a step, so it belongs with the renderer rather than with the walker.
+ */
+function runScoped(node: Extract<Stmt, { kind: "scoped" }>, ctx: ExecutionContext): boolean {
+  const { slotOf } = ctx;
+  if (!slotOf) {
+    throw new Error(
+      "Cual: a scoped block needs a context with slotOf, so a name can be resolved to a slot",
+    );
+  }
+  const slot = slotOf(node.variable);
+  // Upstream's grammar action is the check that would otherwise be missing: `if
+  // ($2->istKonstante()) throw Fehler("%s is a constant. (Variable expected.)")`, at load time
+  // rather than here. A constant has no slot, so it lands here as an unknown name — the same
+  // refusal an assignment to a constant gets, and the same one the man page's grammar already
+  // makes a syntax error rather than a run-time surprise.
+  if (slot === null) throw new Error(`Cual: no variable named '${node.variable}'`);
+
+  const previous = ctx.store.get(slot);
+  // `setVariable`, so the beginning-of-step value is preserved before the write — the shadow a
+  // later `@` read in the same slice is measured against, and `store.hasShadow` is how the
+  // tests see that this went through `set` rather than through the low-level write.
+  ctx.store.set(slot, ctx.evaluate(node.value));
+  // Straight on: no `try`/`finally`, because upstream has none either. Its `eval` has a `try`
+  // around the whole switch that only re-throws with better wording, so a `Fehler` from the
+  // body leaves the variable pushed rather than restored — which is unreachable from Cual in
+  // any case that continues.
+  const busy = runStatement(node.body, ctx);
+  ctx.store.set(slot, previous);
+  return busy;
 }
 
 /** `setVariableIntern`'s switch, applied at once rather than at end-of-step. */
@@ -506,10 +579,13 @@ function runCommaSequence(node: Stmt, ctx: ExecutionContext): boolean {
  * Returns `never` so the caller can `return notYet(node.kind)` and keep its exhaustiveness,
  * and so that adding a statement kind without deciding what it does is a type error rather
  * than a silent "not busy".
+ *
+ * **Empty since 4.15**, which was the last entry: `scoped` was filed under 4.7, which had
+ * already been spent on addressed access. Every statement in the corpus can now be run by the
+ * walker, so the table has one job left — being the place the next refusal goes, and being
+ * visibly empty so that a `notYet` saying "task ?" is a real answer rather than a missing one.
  */
-const TASKS: Readonly<Record<string, string>> = {
-  scoped: "4.7",
-};
+const TASKS: Readonly<Record<string, string>> = {};
 
 /**
  * The task that will close a construct, or `null` when there is none.
@@ -521,7 +597,8 @@ const TASKS: Readonly<Record<string, string>> = {
  * still in it after 4.2 implemented them, so the gate reported 1364 `if` gaps in a corpus where
  * every `if` runs. A table nobody reads stays plausible for a long time; the gate is the thing
  * that read it. Each entry to leave is a "refused until then" test that moved rather than
- * disappeared — the effects in 4.12, the draw statements in 4.9, the conditions in 4.2.
+ * disappeared — the effects in 4.12, the draw statements in 4.9, the conditions in 4.2, the
+ * call in 4.14 and the scoped block in 4.15.
  */
 export function notYetTask(kind: string): string | null {
   return TASKS[kind] ?? null;

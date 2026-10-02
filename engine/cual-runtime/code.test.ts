@@ -313,6 +313,60 @@ describe("scoped blocks", () => {
   });
 });
 
+describe("a switch's case list", () => {
+  /** Every case in a `switch`, head first, as its condition's literal value. */
+  function chain(source: string): number[] {
+    const stmt = one(source);
+    if (stmt.kind !== "switch") throw new Error("expected a switch");
+    const out: number[] = [];
+    for (let c: Stmt | null = stmt.case; c; c = c.kind === "switchCase" ? c.otherwise : null) {
+      if (c.kind !== "switchCase") break;
+      const condition = c.condition as { kind: string; value: unknown };
+      if (condition.kind !== "number") throw new Error(`expected a literal, got ${condition.kind}`);
+      out.push(condition.value as number);
+    }
+    return out;
+  }
+
+  it("chains every case, not only the first two", () => {
+    // **This is the assertion that would have caught it.** `parseSwitch` folds the flat list
+    // right, and each case's `otherwise` is the *next* case — so the case before it has to
+    // receive an already-folded entry. It received the raw one, whose `otherwise` was null, and
+    // the chain dead-ended after one link. Every `switch` in the corpus with three or more cases
+    // ran only its first two: `globals.ld`'s 33 variant schemas lost fourteen of `schema16`'s
+    // sixteen faces, and 298 of the corpus's 609 neighbour patterns with them.
+    //
+    // Six cases, because a bug that loses the third is invisible at two.
+    expect(chain("switch { 1 -> a; 2 -> b; 3 -> c; 4 -> d; 5 -> e; 6 -> f; }")).toEqual([
+      1, 2, 3, 4, 5, 6,
+    ]);
+    // The same shape at two, which is where it used to stop.
+    expect(chain("switch { 1 -> a; 2 -> b; }")).toEqual([1, 2]);
+  });
+
+  it("chains the cases *before* a default, so the default is reachable", () => {
+    // `ausdruck PFEIL code_1 ';' PFEIL code_1 ';'` — the two-arrow shape is the default, and it
+    // is the *last* case that holds it. The cases before it must still reach it, which is the
+    // other half of the same fold: a case with a default used to `continue` without becoming
+    // `next`, so the case in front of it got `otherwise: null` and the default branch was
+    // unreachable from a two-case switch.
+    expect(chain("switch { 1 -> a; 2 -> b; => c; }")).toEqual([1, 2]);
+    expect(chain("switch { 1 -> a; 2 -> b; 3 -> c; => d; }")).toEqual([1, 2, 3]);
+    // One case and a default: nothing to chain, and both survive.
+    expect(chain("switch { 1 -> a; => c; }")).toEqual([1]);
+  });
+
+  it("keeps an explicit default rather than the case after it", () => {
+    // The chain and the default are the same slot, so the default wins — and the case that would
+    // have gone there is a case that follows a default, which `auswahl_liste` forbids and which
+    // `parseSwitch` refuses by name.
+    const stmt = one("switch { 1 -> a; => *; }");
+    if (stmt.kind !== "switch") throw new Error("expected a switch");
+    expect(stmt.case.otherwise?.kind).toBe("draw");
+    expect(() => one("switch { 1 -> a; => *; 2 -> b; }")).toThrow(/ends the switch/);
+  });
+});
+
 describe("draw commands", () => {
   it("parses a bare '*'", () => {
     const stmt = one("*");

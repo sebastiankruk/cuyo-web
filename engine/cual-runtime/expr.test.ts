@@ -89,9 +89,33 @@ describe("literals and variables", () => {
     expect(() => value({ kind: "variable", name: "nope" })).toThrow(CualError);
   });
 
-  it("refuses neighbour patterns until 3.10 implements them", () => {
+  it("asks the context for a neighbour pattern, and turns the match into 1 or 0", () => {
+    // `case nachbar_acode: return (b.getVariable(spezconst_connect) & mZahl) == mZahl2;` — an
+    // int used as truth, so 1 and 0 are the whole range. Which patterns match is
+    // `neighbours.ts`'s arithmetic; what is asserted here is that the evaluator asks, and hands
+    // back a number every other operator can consume.
+    const asked: string[] = [];
+    const ctx: EvalContext = {
+      variable: () => 0,
+      random: () => 0,
+      neighbour: (pattern) => {
+        asked.push(pattern);
+        return pattern === "1???0???";
+      },
+    };
+    expect(evaluate({ kind: "neighbour", pattern: "1???0???" }, ctx)).toBe(1);
+    expect(evaluate({ kind: "neighbour", pattern: "0???1???" }, ctx)).toBe(0);
+    expect(asked).toEqual(["1???0???", "0???1???"]);
+    // And it composes: `if 1???0??? ->` is a condition, which is 298 of the corpus's uses.
+    expect(evaluate(u("!", { kind: "neighbour", pattern: "0???1???" }), ctx)).toBe(1);
+  });
+
+  it("refuses a pattern when the context has no board rather than answering 0", () => {
+    // Zero would be indistinguishable from "the neighbours really are all zeros", so a typo in a
+    // level would compile into a rule that quietly never fires. The message names what is
+    // missing, which is a board rather than a pattern.
     expect(() => value({ kind: "neighbour", pattern: "1???0???" })).toThrow(
-      /not implemented/i,
+      /needs a context with a board/,
     );
   });
 });

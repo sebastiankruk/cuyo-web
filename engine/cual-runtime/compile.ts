@@ -63,16 +63,24 @@ const IMPLEMENTED_EXPRESSIONS: ReadonlySet<Expr["kind"]> = new Set<Expr["kind"]>
   "unary",
   "binary",
   "call",
+  // `neighbour` joined it in 4.16. Its *patterns* were 3.10's; what was missing was reading one
+  // out of a blob's array, which is `access.ts`'s `neighbourReader` and the evaluator's one
+  // line. It is listed here rather than special-cased below, because an expression is
+  // implemented or it is not — whether the *context* it needs happens to be present is a
+  // run-time question and throws by name.
+  "neighbour",
 ]);
 
-/** Expressions that are known gaps, with the task that closes them and how to describe one. */
+/**
+ * Expressions that are known gaps, with the task that closes them and how to describe one.
+ *
+ * **Empty since 4.16**, which closed the last of them. Kept for the same reason `TASKS` is
+ * kept in `execute.ts`: it is the place the next known gap goes, and being visibly empty is
+ * what tells a `report(expr.kind, null, "")` — "a newly parsed expression nobody has looked at"
+ * — apart from a missing entry.
+ */
 const EXPRESSION_GAPS: Partial<Record<Expr["kind"], { task: string; detail: (e: Expr) => string }>> =
-  {
-    // `verbindetMit` and the other neighbour patterns. The patterns themselves are implemented
-    // in `neighbours.ts` for 3.10 — what is missing is reading one out of a blob's array, which
-    // is the walker's job and needs the board this pass deliberately does not have.
-    neighbour: { task: "3.10", detail: (e) => (e.kind === "neighbour" ? e.pattern : "") },
-  };
+  {};
 
 /** Every statement in a tree, including nested ones, paired with how it was reached. */
 export function* walkStatements(nodes: readonly Stmt[]): Generator<Stmt> {
@@ -100,6 +108,15 @@ export function* walkStatements(nodes: readonly Stmt[]): Generator<Stmt> {
       case "scoped":
       case "procedureDef":
         yield* walkStatements([node.body]);
+        break;
+      case "sharedCall":
+        // `&name` holds a *body*, which is where the comma sequences and conditions live. It was
+        // missing here when 4.14 added the node, and it went unnoticed because the gate runs on
+        // parsed trees — where a call is still a `call` and no `sharedCall` exists yet. A caller
+        // that links first, which is the order upstream does it in, would have had its shared
+        // bodies skipped: the same class of bug as `if` sitting in the refusal table, and found
+        // the same way, by asking what this walk does not reach rather than what it reports.
+        for (const child of node.body) yield* walkStatements([child]);
         break;
       default:
         break;
@@ -150,6 +167,13 @@ export function* walkExpressions(nodes: readonly Stmt[]): Generator<Expr> {
   for (const node of walkStatements(nodes)) {
     switch (node.kind) {
       case "assign":
+        // **Both sides.** Only the value was walked, which hid every *addressed* assignment
+        // target: `kind@@(xc@@+1,yc@@+1) = Red+next1@@` has three expressions in its target
+        // (`xc@@+1`, `yc@@+1` and the address itself), and the corpus has 354 of those. No
+        // neighbour pattern can appear in a coordinate, so the gap list was unaffected — but
+        // "the corpus has no unimplemented construct" was being checked against a walk that had
+        // never looked at a third of the level's arithmetic.
+        yield* fromExpr(node.target);
         yield* fromExpr(node.value);
         break;
       case "if":
@@ -165,6 +189,14 @@ export function* walkExpressions(nodes: readonly Stmt[]): Generator<Expr> {
         yield* fromExpr(node.value);
         break;
       case "draw":
+      case "letterDraw":
+        // Both were needed and only one was here. `letterDraw` is `Y@(1)*` — a letter with an
+        // address — and the corpus has **3372** of those, so a third of every address in every
+        // level was never walked. No neighbour pattern can hide in a coordinate, so the gap list
+        // was unaffected and nothing failed; but a gate that claims to reach every expression
+        // while skipping a third of them is a gate nobody can trust, and 4.16 makes that claim
+        // load-bearing: with the list empty, the only thing standing between the runtime and a
+        // false all-clear is that this walk is complete.
         if (node.position) yield* fromOrt(node.position);
         break;
       case "effect":
