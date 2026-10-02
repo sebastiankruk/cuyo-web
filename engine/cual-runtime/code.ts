@@ -141,8 +141,17 @@ export type Stmt =
       readonly kind: "effect";
       readonly name: "bonus" | "message" | "sound" | "explode" | "lose";
       readonly argument: Expr | null;
-      /** For `message` and `sound`, which name a file rather than evaluate a number. */
+      /**
+       * For `message` and `sound`, which name a file rather than evaluate a number.
+       *
+       * `message` keeps the name as written — it is shown, never looked up. `sound` also
+       * carries `sampleNumber`, because upstream resolves the sample in the *grammar action*
+       * (`newCode1(sound_code, Sound::ladSample(*$3))`), so an unknown name fails when the
+       * level is parsed and never reaches the evaluator at all.
+       */
       readonly filename: string | null;
+      /** `Sound::ladSample`'s result, when the level declared a sound. */
+      readonly sampleNumber?: number;
     }
   /** `name` or `&name` — a procedure call, the latter without copying the definition. */
   | { readonly kind: "call"; readonly name: string; readonly sharesDefinition: boolean }
