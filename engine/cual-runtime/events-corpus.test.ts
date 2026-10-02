@@ -7,9 +7,17 @@
  * transcription slip in either direction shows up here rather than as a level that quietly
  * never runs its `init`.
  *
- * The counts are the real ones from `public/levels/*.ld`, so if a level stops using an event
+ * The counts are the real ones from `levels/upstream/*.ld`, so if a level stops using an event
  * this fails — which is the point: an event the table lists but no level uses is a rule nobody
  * has checked, and one the table omits is a level that silently does nothing.
+ *
+ * **That path was `public/levels`, which is not committed.** `public/levels` is what
+ * `scripts/copy-level-data.sh` produces for the browser to fetch, so it exists on a machine that
+ * has run `make level-data` and nowhere else — which meant this file passed locally and failed
+ * in CI, and `main` has been red for it since it landed. The committed corpus is
+ * `levels/upstream`, which is what every other corpus test reads; the two are the same files,
+ * one of them a copy. Task 12.8 records the same lesson for `render/palette.test.ts`, the last
+ * test still skipping itself.
  */
 
 import { readFileSync, readdirSync } from "node:fs";
@@ -17,7 +25,7 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { EVENTS, eventForName } from "./events.ts";
 
-const LEVELS = resolve(import.meta.dirname, "../../public/levels");
+const LEVELS = resolve(import.meta.dirname, "../../levels/upstream");
 
 /** Every `<name>.<suffix> =` in every level, with the file it came from. */
 function eventDefinitions(): { file: string; name: string; suffix: string }[] {
