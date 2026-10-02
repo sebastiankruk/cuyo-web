@@ -18,6 +18,7 @@ import {
   setBool,
   slotOf,
 } from "./slots.ts";
+import { SPECIAL_VARIABLE_COUNT } from "./store.ts";
 
 function lex(source: string) {
   return tokenize(source, "test")
@@ -29,11 +30,14 @@ describe("bit packing", () => {
   it("puts 32 flags in one int and starts a new one for the 33rd", () => {
     const allocator = new SlotAllocator();
     const bits = Array.from({ length: 33 }, () => allocator.allocateBool());
-    expect(slotOf(bits[0])).toBe(0);
-    expect(slotOf(bits[31])).toBe(0);
-    expect(slotOf(bits[32])).toBe(1);
+    // The first int is slot 14: the fourteen special variables come first upstream, so the
+    // first block of flags starts after them.
+    expect(SPECIAL_VARIABLE_COUNT).toBe(14);
+    expect(slotOf(bits[0])).toBe(14);
+    expect(slotOf(bits[31])).toBe(14);
+    expect(slotOf(bits[32])).toBe(15);
     // One int was allocated to hold the first 32, and another began for the 33rd.
-    expect(allocator.slotCount).toBe(2);
+    expect(allocator.slotCount).toBe(16);
     expect(allocator.boolCount).toBe(33);
   });
 
@@ -70,11 +74,11 @@ describe("bit packing", () => {
     const before = Array.from({ length: 32 }, () => allocator.allocateBool());
     const variable = allocator.allocateDeclaredVariable();
     const after = allocator.allocateBool();
-    expect(slotOf(before[31])).toBe(0);
-    expect(variable).toBe(1);
-    // Resumed at 32 * 2, not 32 * 1.
-    expect(after).toBe(64);
-    expect(slotOf(after)).toBe(2);
+    expect(slotOf(before[31])).toBe(14);
+    expect(variable).toBe(15);
+    // Resumed at 32 * 16, not 32 * 15.
+    expect(after).toBe(512);
+    expect(slotOf(after)).toBe(16);
   });
 
   it("always needs declared + ceil(flags / 32) ints, whatever the order", () => {
@@ -94,7 +98,10 @@ describe("bit packing", () => {
         for (let i = 0; i < split; i += 1) allocator.allocateDeclaredVariable();
         for (let i = 0; i < run; i += 1) allocator.allocateBool();
         for (let i = 0; i < 2 - split; i += 1) allocator.allocateDeclaredVariable();
-        const naive = allocator.declaredCount + Math.ceil(allocator.boolCount / BITS_PER_SLOT);
+        const naive =
+          SPECIAL_VARIABLE_COUNT +
+          allocator.declaredCount +
+          Math.ceil(allocator.boolCount / BITS_PER_SLOT);
         expect(allocator.slotCount, `${run} flags split ${split}/${2 - split}`).toBe(naive);
       }
     }
@@ -108,8 +115,9 @@ describe("which nodes own a flag", () => {
     // a local with `busy |= busy1`, and has nothing to come back to next execution.
     const sequence = allocateSlots(parseCode(lex("A, B")));
     expect(sequence.boolCount).toBe(1);
+    // The first bit of the block: 32 flags per int, starting after the special variables.
     expect(sequence.busySlots.get(sequence.busySlots.keys().next().value!)).toEqual({
-      first: 0,
+      first: BITS_PER_SLOT * SPECIAL_VARIABLE_COUNT,
       second: -1,
     });
   });
@@ -148,7 +156,7 @@ describe("which nodes own a flag", () => {
     expect(allocateSlots(parseCode(lex("default inhibit = 3;")))).toMatchObject({
       boolCount: 0,
       declaredCount: 0,
-      slotCount: 0,
+      slotCount: SPECIAL_VARIABLE_COUNT,
     });
   });
 
@@ -158,10 +166,12 @@ describe("which nodes own a flag", () => {
     expect(allocateSlots(parseCode(lex("var alpha, beta, gamma;")))).toMatchObject({
       declaredCount: 3,
       boolCount: 0,
-      slotCount: 3,
+      slotCount: SPECIAL_VARIABLE_COUNT + 3,
     });
     expect(allocateSlots(parseCode(lex("var alpha[2];"))).declaredCount).toBe(1);
-    expect(allocateSlots(parseCode(lex("var alpha = 4;"))).slotCount).toBe(1);
+    expect(allocateSlots(parseCode(lex("var alpha = 4;"))).slotCount).toBe(
+      SPECIAL_VARIABLE_COUNT + 1,
+    );
   });
 
   it("counts a procedure body's flags against the level", () => {
@@ -177,7 +187,7 @@ describe("which nodes own a flag", () => {
     const allocation = allocateSlots(statements);
     expect(allocation.declaredCount).toBe(1);
     expect(allocation.boolCount).toBe(2);
-    expect(allocation.slotCount).toBe(2);
+    expect(allocation.slotCount).toBe(SPECIAL_VARIABLE_COUNT + 2);
   });
 
   it("allocates children before their parent, as a bottom-up reduction does", () => {
@@ -219,6 +229,6 @@ describe("allocation is deterministic", () => {
     expect(allocateSlots(statements).busySlots.size).toBe(1);
     expect(allocateSlots(statements).busySlots.size).toBe(1);
     const bit = [...allocateSlots(statements).busySlots.values()][0].first;
-    expect(bit).toBe(0);
+    expect(bit).toBe(BITS_PER_SLOT * SPECIAL_VARIABLE_COUNT);
   });
 });
