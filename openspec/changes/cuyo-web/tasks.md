@@ -91,7 +91,7 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [x] 3.7 Implement the per-blob variable store as a single `Int32Array` holding user variables and busy flags, and verify busy flags are independent between two blobs of the same kind
 - [x] 3.8 Implement the begin-of-step shadow copy with per-time-slice refresh (draw, key and land events each opening their own slice) and verify the six documented `@`-assignment examples produce exactly the documented results — verified for the mechanism 3.8 owns; statements 2, 5 and 6 need the deferred writes of 3.9 and the addressed reads of 4.7, and are asserted refused rather than skipped
 - [x] 3.9 Implement the deferred write queue applied at end-of-step, and verify a cross-blob write is invisible until the step ends — statements 2, 5 and 6 of the six `@`-assignment examples verified as queue-and-shadow mechanics; end-to-end through the evaluator still needs the addressed reads of 4.7
-- [ ] 3.10 Implement neighbour-pattern expressions including the empty-blob out-of-board rule and the start-of-step snapshot, and verify the `1???0???` example from the man page
+- [x] 3.10 Implement neighbour-pattern expressions including the empty-blob out-of-board rule and the start-of-step snapshot, and verify the `1???0???` example from the man page
 
 ## 4. Cual Runtime - Execution
 
