@@ -74,6 +74,8 @@ function board(
 
   return {
     players,
+    width,
+    height,
     hex: options.hex ?? false,
     mirrored: options.mirrored ?? false,
     hexShift: () => false,

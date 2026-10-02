@@ -14,7 +14,9 @@ import type { Expr } from "./expr.ts";
 import type { BusySlots } from "./slots.ts";
 import type { BlobStore, TimeSlices } from "./store.ts";
 import { resolveOrt, writeAddressed } from "./access.ts";
-import type { AccessField } from "./access.ts";
+import type { AccessField, ResolvedOrt } from "./access.ts";
+import { canDrawAt, isPaintable, PictureStack } from "./draw.ts";
+import type { DrawContext } from "./draw.ts";
 import { divv, modd } from "./divmod.ts";
 
 /** What the walker needs from the blob it is running. */
@@ -37,6 +39,15 @@ export interface ExecutionContext {
   readonly field?: AccessField;
   /** The window deferred writes queue onto. */
   readonly slices?: TimeSlices;
+  /** The three draw statements need a board and a place to queue pictures. */
+  readonly draw?: {
+    /** `mMalenErlaubt` and the blob's own `file`/`pos`/`quarter`. */
+    readonly context: DrawContext;
+    /** The asking blob's own picture stack, for a plain `*`. */
+    readonly ownStack: PictureStack;
+    /** The picture stacks of the cells a foreign draw can land on. */
+    stackAt(field: AccessField, resolved: ResolvedOrt): PictureStack | null;
+  };
 }
 
 /**
@@ -109,6 +120,9 @@ export function runStatement(node: Stmt, ctx: ExecutionContext): boolean {
     case "assign":
       return runAssign(node, ctx);
 
+    case "draw":
+      return runDraw(node, ctx);
+
     case "busy":
       // `busy_code` is the one leaf that *is* busy: `case busy_code: busy = true;`. It is
       // how a level says "I am still working on this" without any machinery of its own, and
@@ -147,6 +161,58 @@ export function runStatement(node: Stmt, ctx: ExecutionContext): boolean {
     default:
       return notYet(node.kind);
   }
+}
+
+/**
+ * `speichereBild` and `speichereBildFremd`: the three draw statements.
+ *
+ * `*` needs the drawing flag and the asking blob's *own* place to be paintable; `* ort` and
+ * `ort *` need the *target's* place to be paintable, and the target's place being paintable is
+ * what makes the semiglobal and global blobs refuse a draw rather than quietly ignoring it.
+ *
+ * The picture always records the *asking* blob's `file`, `pos`, `quarter` and kind — a foreign
+ * draw is "put my picture over there", not "put *their* picture over there".
+ */
+function runDraw(node: Extract<Stmt, { kind: "draw" }>, ctx: ExecutionContext): boolean {
+  const draw = ctx.draw;
+  if (!draw) {
+    throw new Error("Cual: a draw needs a context with a board and picture stacks");
+  }
+  const { context } = draw;
+  const { field, here, source, picture, kind, drawingAllowed } = context;
+  // A draw never makes the code busy — `getStapelHoehe` returns 1 for `mal_code` and 0 for
+  // `mal_code_fremd`, and neither sets it.
+  const entry = {
+    kind,
+    file: picture.file,
+    pos: picture.pos,
+    quarter: picture.quarter,
+    level: node.position === null ? 0 : node.ahead ? 1 : -1,
+  };
+
+  if (node.position === null) {
+    if (!drawingAllowed || !isPaintable(here)) {
+      throw new Error("Cual: drawing is not allowed at the moment");
+    }
+    draw.ownStack.add(entry, source);
+    return false;
+  }
+
+  const resolved = resolveOrt(field, node.position, ctx.evaluate);
+  // `korrekt(true)`, not `korrekt()`: drawing is allowed one row above the field, for the
+  // hex edge blobs. An unreachable address is not an error — the branch is simply not taken.
+  if (!canDrawAt(field, resolved)) return false;
+  // The paintable check comes *before* the target is touched, because it is the target's own
+  // `mOrt` that is being asked: `Blop & b = ziel.finde(); if ((!mMalenErlaubt) ||
+  // (!b.mOrt.bemalbar())) throw`. Checking it afterwards would quietly skip the global and
+  // semiglobal blobs instead of refusing them.
+  if (!drawingAllowed || !isPaintable(resolved)) {
+    throw new Error("Cual: drawing is not allowed at the moment");
+  }
+  const stack = draw.stackAt(field, resolved);
+  if (!stack) return false;
+  stack.add(entry, source);
+  return false;
 }
 
 /**
@@ -382,13 +448,16 @@ function runCommaSequence(node: Stmt, ctx: ExecutionContext): boolean {
  * than a silent "not busy".
  */
 export function notYet(kind: string): never {
+  // The draw statements left this list in 4.9 and the scoped assignment in 4.7; both were
+  // "refused until then" tests that had to move rather than disappear. What is still refused
+  // is a `switch` shape, a builtin call, and the effects (`bonus`, `message`, `explode`,
+  // `lose`, `sound`).
   const task: Record<string, string> = {
     if: "4.2",
     switch: "4.2",
     switchCase: "4.2",
     scoped: "4.7",
     call: "4.6",
-    draw: "4.9",
     effect: "4.12",
   };
   throw new Error(

@@ -127,8 +127,14 @@ export type Stmt =
   /** `[x = e] body` — a value pushed for the duration of one statement. */
   | { readonly kind: "scoped"; readonly variable: string; readonly value: Expr; readonly body: Stmt }
   | { readonly kind: "busy" }
-  /** `*`, `*@(x,y)` or `@(x,y)*` — the draw shorthand. */
-  | { readonly kind: "draw"; readonly position: Ort | null }
+  /**
+   * `*`, `*@(x,y)` or `@(x,y)*` — the draw shorthand.
+   *
+   * `ahead` is true for `* ort` (`newCode2(mal_code_fremd, ort, 1)`) and false for
+   * `ort *` (`..., -1`), and it is the whole difference between them: the level the picture is
+   * drawn on. `*` on its own has no address and is always level 0.
+   */
+  | { readonly kind: "draw"; readonly position: Ort | null; readonly ahead: boolean }
   /** A single letter optionally followed by a position: `A`, `A@(2,3)`. */
   | { readonly kind: "letterDraw"; readonly letter: number; readonly position: Ort | null }
   | {
@@ -648,11 +654,12 @@ function parseDraw(cursor: SharedCursor): Stmt {
   if (isPunctAhead(cursor, "*")) {
     cursor.next();
     const position = isOrtAhead(cursor) ? takeOrt(cursor) : null;
-    return { kind: "draw", position };
+    return { kind: "draw", position, ahead: true };
   }
   const position = takeOrt(cursor);
   if (!cursor.takePunct("*")) cursor.fail("expected '*' after a position");
-  return { kind: "draw", position };
+  // `ort '*'` is level -1, the mirror of `* ort`. Same address, opposite side.
+  return { kind: "draw", position, ahead: false };
 }
 
 /** `if cond -> then`, `... else otherwise`, `... else -> otherwise`. */

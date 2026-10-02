@@ -59,6 +59,8 @@ function bench(x0: number): Bench {
   const neighbour = new BlobStore(20, 13, slices);
   const field: AccessField & { slices: TimeSlices } = {
     players: 1,
+    width: 4,
+    height: 4,
     hex: false,
     mirrored: false,
     hexShift: () => false,
@@ -265,6 +267,8 @@ describe("the six examples, end to end", () => {
     let draws = 0;
     const field: AccessField = {
       players: 1,
+      width: 4,
+      height: 4,
       hex: false,
       mirrored: false,
       hexShift: () => false,

@@ -210,16 +210,26 @@ describe("what this task refuses", () => {
     // is never busy.
     expect(() => notYet("if")).toThrow(/task 4\.2/);
     expect(() => notYet("switch")).toThrow(/task 4\.2/);
-    expect(() => notYet("draw")).toThrow(/task 4\.9/);
+    expect(() => notYet("switchCase")).toThrow(/task 4\.2/);
+    expect(() => notYet("scoped")).toThrow(/task 4\.7/);
+    expect(() => notYet("call")).toThrow(/task 4\.6/);
     expect(() => notYet("effect")).toThrow(/task 4\.12/);
+    // Every kind the walker still refuses, so a new one cannot be added without a task. The
+    // draw statements left this list in 4.9; `notYet("draw")` now says "?" and that is the
+    // point of the record being explicit rather than a default.
+    expect(() => notYet("draw")).toThrow(/task \?/);
   });
 
   it("refuses them when they turn up in a tree, rather than skipping them", () => {
     const slices = new TimeSlices();
-    // `evaluate` returns 1 so the `if` branch is *taken*. With 0 the condition is false and
-    // the draw in its then-branch is never reached, so the third case would pass for the
+    // `evaluate` returns 1 so the `if` branch is *taken*. With 0 the condition would be false
+    // and the refused construct inside it never reached, so the third case would pass for the
     // wrong reason - a refusal test that does not refuse.
-    for (const source of ["{ *; 5 }", "{ 5, 5; * }", "{ 5; if 1 -> *; }"]) {
+    //
+    // The draw statements were in this list until 4.9 and are not any more, so they are not
+    // here. Their refusal moved to `draw.test.ts`, where it is by name ("a draw needs a
+    // context with a board") rather than by task number.
+    for (const source of ["{ explode; }", "{ 5; if 1 -> { explode; } }"]) {
       const statements = parseCode(lex(source));
       const allocation = allocateSlots(statements);
       const ctx: ExecutionContext = {
