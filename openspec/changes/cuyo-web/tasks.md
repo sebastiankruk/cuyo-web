@@ -177,6 +177,18 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
   `render/palette.test.ts` names them and their measured numbers rather than asserting a
   property the code does not have.
 
+  The FSF's guidance for AGPL is to attach the notice to the start of each source file.
+  This project has no per-file notices, and the shell scripts are the only files that
+  carry one — which is the arrangement that let the licence be stated four different ways
+  at once (README badge GPL v2, `LICENSE-OR-LATER.md` GPL-2.0-or-later, five scripts AGPL,
+  contributor guide GPL-2.0-or-later) with no gate noticing.
+
+  A two-line `SPDX-License-Identifier: AGPL-3.0-or-later` header per file makes the
+  licence machine-readable and survives being copied, which a prose file does not. Held
+  back from the licence change itself because a 45-file mechanical diff in the same
+  commit as a licence change makes the licence change harder to review, which is the
+  opposite of what the licence change is for.
+
 - [ ] 8.1 Define the authored base-tile format (shape, palette, material treatment) and verify a tile can be authored and rendered at board scale
 - [ ] 8.2 Implement the variant compositor for `schema16`, `schema5`, `schema4`, `schemaDiag16` and `schemaDiag2`, and verify generated variants tile seamlessly against the Cual code of `hormone`, `elemente` and `maennchen`
 - [ ] 8.3 Implement the hex variant compositor for `schemaHex4` and `schemaHex8`, and verify the generated set is complete for `unmoeglich`
@@ -185,6 +197,8 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [ ] 8.6 Author base tiles for the remaining tracks' kinds and verify all 81 levels render with no missing-icon fallback
 - [ ] 8.7 Add a build assertion that no file from `cuyo-2.1.0/data/pics` appears in `dist/`, and verify the assertion fails when a sprite is deliberately copied in
 - [ ] 8.8 Review the Standard track visually as an art milestone and record sign-off before extending to the long tail
+
+- [ ] 8.9 Add SPDX identifiers to the source files
 
 ## 9. Application Shell
 

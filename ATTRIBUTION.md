@@ -64,5 +64,10 @@ normative worked examples which are encoded as tests — see task group 12.
 
 ## This project
 
-New code in this directory is authored for the Cuyo web port and is likewise
-GPL-2.0-or-later. See [LICENSE-OR-LATER.md](LICENSE-OR-LATER.md).
+New code in this directory is authored for the Cuyo web port and is licensed
+**AGPL-3.0-or-later**, which is compatible with the GPL-2.0-or-later material
+above because of its "or later" clause. It is *not* compatible with GPL-2.0-only
+material, which is worth stating plainly: a patch offered under v2-only cannot be
+included. See [LICENSING.md](LICENSING.md) for the compatibility argument, the
+reason for choosing the AGPL over the GPL, and the note that copies already
+distributed under GPL-2.0-or-later keep that grant permanently.

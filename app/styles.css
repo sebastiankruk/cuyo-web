@@ -165,9 +165,29 @@ button::-moz-focusring {
 }
 
 .shell__footer {
+  display: grid;
+  gap: 0.5rem;
   margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+/*
+ * The AGPL interface notice.
+ *
+ * Styled apart from the key hints above it, because it is not documentation: section
+ * 5(d) makes it a condition of distributing the work at all, and it should read as a
+ * legal notice rather than as another line of help text. Small and quiet, but present.
+ */
+.shell__licence {
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.shell__licence a {
+  color: var(--accent);
 }
 
 /* ------------------------------------------------------------------- play */

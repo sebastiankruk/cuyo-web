@@ -43,7 +43,7 @@ indexed exactly as the original is: sections give identity and display names, an
 
 ## Licence
 
-Contributed levels are covered by [GPL-2.0-or-later](../LICENSE-OR-LATER.md), the same as
+Contributed levels are covered by [AGPL-3.0-or-later](../LICENSING.md), the same as
 the rest of this repository. If yours derives from an upstream level, say so in the pull
 request and name it — upstream is GPL-2.0-or-later by Immanuel Halupczok, so derivation
 is fine, it just has to be recorded in [ATTRIBUTION.md](../ATTRIBUTION.md).

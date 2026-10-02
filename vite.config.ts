@@ -124,6 +124,9 @@ export default defineConfig({
     // precisely so they can be tested without a browser; excluding `app/` would
     // leave those numbers untestable, which is the thing the split was for.
     // Component tests that need a DOM are a separate environment, not this one.
-    include: ["{app,engine,levels-src,render}/**/*.test.ts"],
+    // The root `*.test.ts` is for whole-repository facts that belong to no one
+    // directory - currently the licence, which has to agree across the README, the
+    // badge, the script headers and the prose, and which no per-directory test can see.
+    include: ["{app,engine,levels-src,render}/**/*.test.ts", "*.test.ts"],
   },
 });
