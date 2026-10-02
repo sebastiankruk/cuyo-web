@@ -40,6 +40,58 @@ themselves on a fresh clone now run. The artwork stays generated, and the check 
 enforces that now runs in CI too — it did not before, and the way that was found is
 written up in `ATTRIBUTION.md`.
 
+## Cutting a release
+
+The convention, and the reason for it.
+
+**Only a `release/*` branch merges to `main`, and that merge is the release.** Not a
+convention this repository can enforce on its own — GitHub branch protection can require
+pull requests, reviews and status checks, but it cannot restrict the _source_ branch's
+name, and anyone who can open a pull request can choose it. So the rule is checked in
+`.github/workflows/release.yml` instead: it looks up which pull request the commit came
+on, and refuses to tag if the answer is not `release/*`.
+
+That check is deliberately late. A status check that is red on every ordinary pull
+request teaches you to ignore red checks, and the point of a gate is that red means
+something. The release is the point where the mistake is expensive enough to be worth
+stopping for.
+
+**What counts as a release is the version changing, not the tag being missing.** The
+workflow compares `package.json` against its parent commit and does nothing if the
+version is the same, so an ordinary merge to `main` finishes green and untouched. The
+alternative — keying on “has this version got a tag” — would be simpler and wrong here: no
+version has ever been tagged, so it would read every merge, including the one that merges
+the release workflow itself, as an attempt to release.
+
+**The steps, in order:**
+
+1. Work on a normal branch, as always. Merge it to `main` — that is not a release.
+2. When there is something worth shipping, branch `main` as `release/X.Y.Z`.
+3. In that branch, make the version real:
+   - bump `version` in `package.json`
+   - rename `## [Unreleased]` to `## [X.Y.Z]` in `CHANGELOG.md`, with the date
+   - `make check-version` — it fails with the exact edit needed if either is missing
+4. Merge `release/X.Y.Z` into `main`.
+5. `release.yml` sees the version changed, checks the source branch, sees the tag does
+   not exist, and creates `vX.Y.Z` and the GitHub release, with the changelog section as
+   the notes.
+
+**The version bump is not a formality, and that is the point.** Step 3 is two visible
+edits that say what is being released. A release cut by bumping a version automatically,
+with no other edit, is a release nobody decided to make — and this project's rule is that
+versions are cut when the app is _worth using_, which is a judgement, not a schedule.
+
+Re-running the release workflow is safe: it sees the tag exists and does nothing, so
+fixing a typo in the notes afterwards is not a broken pipeline.
+
+**Direct pushes that bump the version fail.** There is no pull request to check, and a
+push that changes the version is exactly the one that would put a tag somewhere nobody
+reviewed, so it is refused rather than assumed deliberate.
+
+**Not enforced:** pushes to `main` that leave the version alone are not blocked — they
+just do nothing. Blocking those needs branch protection on `main`, which needs repository
+admin, so it is not configured from here.
+
 ## What decides the order
 
 Two questions, asked of every candidate piece of work:

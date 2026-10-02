@@ -19,8 +19,8 @@
 #
 # See the "AiOps Environment Mode Directive" in .agents/rules/cuyo-standards.md.
 .PHONY: help init dev dev-lan check lint lint-code lint-types lint-docs \
-        lint-specs lint-shell check-art check-levels-upstream fetch-corpus \
-        test test-engine build \
+        lint-specs lint-shell check-art check-levels-upstream check-version \
+        fetch-corpus test test-engine build \
         preview preview-host clean distclean
 
 SHELL := /bin/bash
@@ -102,6 +102,7 @@ help:
 	@echo "  make lint-specs   - openspec validate --strict over the change"
 	@echo "  make lint-shell   - shellcheck over scripts/"
 	@echo "  make check-art    - Assert no upstream artwork reached dist/"
+	@echo "  make check-version - Assert package.json and CHANGELOG.md agree"
 	@echo "  make art-digests  - Regenerate the committed upstream-artwork digests"
 	@echo "  make fetch-corpus - Fetch upstream Cuyo, to compare the vendored levels"
 	@echo ""
@@ -175,6 +176,14 @@ lint-shell:
 # that is the reason the digests are committed. Run it when the upstream version moves.
 art-digests:
 	@bash scripts/emit-art-digests.sh
+
+# The version in package.json and the section in CHANGELOG.md are two sources of truth,
+# and the drift this catches is a release tagged 0.3.0 whose changelog entry still says
+# [Unreleased] - a tag pointing at something nobody can describe. Deliberately a plain
+# Node script with no dependencies: this runs in `make check`, in CI and in the release
+# workflow, and a release gate that needs a build to run is one that gets skipped.
+check-version:
+	@bash -c 'node scripts/check-version.mjs'
 
 check-art:
 	@bash scripts/check-no-upstream-art.sh
@@ -259,7 +268,7 @@ build: level-data
 # The single command CI runs, so that "green locally" and "green on GitHub" mean
 # the same thing. `make check` is not a separate set of checks: it is these four
 # targets in the order a person would run them.
-check: lint test build check-art check-art-manifest check-level-index validate-levels
+check: lint test build check-art check-art-manifest check-level-index validate-levels check-version
 	$(AI_ECHO) "All checks passed."
 
 # Serves the production bundle from dist/ rather than the source, which is what
