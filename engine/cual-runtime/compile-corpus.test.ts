@@ -154,7 +154,6 @@ describe("the compile gate", () => {
     for (const error of allErrors) counts.set(error.construct, (counts.get(error.construct) ?? 0) + 1);
     expect(Object.fromEntries([...counts.entries()].sort())).toMatchInlineSnapshot(`
       {
-        "call": 845,
         "neighbour": 298,
         "scoped": 395,
       }
@@ -179,24 +178,24 @@ describe("the compile gate", () => {
     expect(worst).toMatchInlineSnapshot(`
       [
         [
-          "theater.ld",
-          179,
-        ],
-        [
           "globals.ld",
-          101,
-        ],
-        [
-          "wuerfel.ld",
-          85,
-        ],
-        [
-          "schach.ld",
-          83,
+          98,
         ],
         [
           "doors.ld",
-          77,
+          60,
+        ],
+        [
+          "schach.ld",
+          48,
+        ],
+        [
+          "wuerfel.ld",
+          42,
+        ],
+        [
+          "springer.ld",
+          40,
         ],
       ]
     `);

@@ -155,6 +155,17 @@ export type Stmt =
     }
   /** `name` or `&name` — a procedure call, the latter without copying the definition. */
   | { readonly kind: "call"; readonly name: string; readonly sharesDefinition: boolean }
+  /**
+   * `&name`, after linking: `weiterleit_code`, holding the *shared* body.
+   *
+   * Distinct from a spliced call precisely because it is not spliced. `allocateSlots` numbers
+   * this body's comma-sequence flags, and two `&anim;` in a level hold the *same* body, so they
+   * are one animation that continues across a branch change — which is what `cual.6`'s
+   * ampersand section is about. Two plain `anim;` get two copies and restart instead.
+   *
+   * `eval` is `mF1->eval(b, busy); return 0;` — a forward that is never busy.
+   */
+  | { readonly kind: "sharedCall"; readonly name: string; readonly body: readonly Stmt[] }
   /** A bare number used as a statement: it means nothing and is legal. */
   | { readonly kind: "number"; readonly value: number }
   | { readonly kind: "nothing" }

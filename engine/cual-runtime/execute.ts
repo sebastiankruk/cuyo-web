@@ -87,6 +87,29 @@ export function runStatement(node: Stmt, ctx: ExecutionContext): boolean {
       // keeps it, and it has to behave identically to the sequence it stands for.
       return runCode(node.body, ctx);
 
+    case "call":
+      // `undefiniert_code`, which the grammar substitutes for a call to a procedure that is not
+      // defined: `throw iFehler("Internal error in Code::eval(): CodeArt undefined_code")`.
+      //
+      // Reaching here means linking left an unresolved call in the tree, so the procedure name
+      // is in the message — an `iFehler` does not name the level, and with 845 call sites in
+      // the corpus that would be no help at all.
+      throw new Error(
+        `Cual: '${node.name}' is not defined. Upstream throws an internal error here, because by this point the level has already parsed.`,
+      );
+
+    case "sharedCall": {
+      // `case weiterleit_code: mF1->eval(b, busy); return 0;` — a forward that passes its
+      // busyness straight through and never becomes busy itself, even if its body does not
+      // finish. That last part is the difference from a spliced call, which contributes to the
+      // enclosing comma sequence's own busyness like any other statement.
+      let busyHere = false;
+      for (const statement of node.body) {
+        busyHere = runStatement(statement, ctx) || busyHere;
+      }
+      return busyHere;
+    }
+
     case "commaSequence":
       return runCommaSequence(node, ctx);
 
@@ -486,7 +509,6 @@ function runCommaSequence(node: Stmt, ctx: ExecutionContext): boolean {
  */
 const TASKS: Readonly<Record<string, string>> = {
   scoped: "4.7",
-  call: "4.6",
 };
 
 /**
