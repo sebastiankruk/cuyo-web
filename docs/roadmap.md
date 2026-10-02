@@ -22,17 +22,24 @@ Everything else is untouched: 3 and 4 (the Cual runtime), 6 (catalogue), 7
 **0.2.0 is cut and playable.** All 79 levels, real rules, playable on a phone. That is
 the honest description of where this is: not a game yet, but the game underneath one.
 
-**0.3.0 is in progress, and nearly done.** Colours are now assigned per level by
-perceptual distance rather than hashed per picture name, so two kinds can no longer come
-out the same colour. The rules are a dialog that pauses the game, so reading them is no
-longer a way to lose a piece. The licence is AGPL-3.0-or-later, and the level files are
-committed, so a fresh clone needs no fetch to build.
+**0.3.0 is cut.** Colours are assigned per level by perceptual distance rather than hashed
+per picture name, so two kinds can no longer come out the same colour. The rules are a
+dialog that pauses the game, so reading them is no longer a way to lose a piece. The
+licence is AGPL-3.0-or-later, and the level files are committed, so a fresh clone needs no
+fetch to build.
 
-**Still to come in 0.3.0: progress and unlocking** (6.5, 6.6) — which levels you have
-finished, best scores, the next level in a track unlocking. Without it every visit starts
-from the catalogue with no memory, and that is the main thing that makes a game feel like a
-game rather than a demo. It is also entirely testable and needs no visual decisions, which
-makes it the obvious thing to pick up next.
+**Progress is stored from 0.3.0 onwards, and none of it is visible yet.** Which levels you
+have finished, your best score per level per difficulty, and the next level in a track
+unlocking are all implemented, tested, and kept on the device — plus the introduction
+shown before a level starts and skipped once read. None of it appears on screen, because
+the catalogue screen that would show it is task 9.4, and that lives with the menus in
+0.5.0 rather than here.
+
+So the version whose headline is "remembers you played it" does remember you played it,
+and does not yet say so. That is the one thing to know about 0.3.0, and it is why 9.4 is
+the first thing worth picking up next: it is the difference between a feature and a
+capability. The roadmap line was written before 6.5 and 6.6 were split from 9.4, and it
+should not be read as a claim about the screen.
 
 **The level files are committed.** All 79, verbatim, in `levels/upstream/`. A fresh clone
 builds, tests and plays with no fetch step, and five test files that used to skip
@@ -133,13 +140,28 @@ is a way to lose a piece you were watching.
 
 Small, well-specified, and I can build it without asking. Good first pull request.
 
-### 3. Progress and unlocking (6.5, 6.6) — _0.3.0_
+### 3. Progress and unlocking (6.5, 6.6) — _done, in 0.3.0_
 
 Which levels you have finished, best scores, and the next level in a track unlocking.
 Without it every visit starts from the catalogue with no memory, which is the main thing
 that makes a game feel like a game rather than a demo.
 
-Straightforward, entirely testable, no visual decisions.
+Straightforward, entirely testable, no visual decisions — and that turned out to be the
+whole shape of it. Four decisions the spec left open, each settled by looking at the
+corpus rather than by taste: a win at any difficulty unlocks (gating per difficulty would
+lock two thirds of the catalogue behind a second playthrough); a level unlocks if it is
+reachable in _any_ track it is in (fifty levels have different predecessors in different
+tracks); an unplayable level does not block its successor (`DreiD` sits mid-track in two
+of them, which would otherwise strand two of seventy levels behind a completion that can
+never arrive); and an unordered track is left open.
+
+Reached 77 of the 78 playable levels. The one that is not is named in the test:
+`UnterWasser` is defined in `summary.ld` and listed in no track, so it has no position
+anywhere, and upstream would not list it either.
+
+**Stored, not shown.** Nothing on screen reads any of this yet — that is 9.4, below. The
+entry in the changelog says so, which felt like the only honest option for a release
+whose headline promises memory.
 
 ### 4. Cual runtime (groups 3 and 4) — _0.4.0_
 
@@ -177,7 +199,7 @@ rather than what is in it:
 | Version | For                                            | Contains                                       |
 | ------- | ---------------------------------------------- | ---------------------------------------------- |
 | 0.2.0   | _done_                                         | All 79 levels, real rules, playable on a phone |
-| 0.3.0   | Looks like a game, and remembers you played it | 1, 2, 3                                        |
+| 0.3.0   | Looks like a game, and remembers you played it | 1, 2, 3 — see below                            |
 | 0.4.0   | Every upstream level, correctly                | 4                                              |
 | 0.5.0   | A finished game                                | 5, 6                                           |
 | 0.6.0   | Playable with no connection                    | 7                                              |

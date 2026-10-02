@@ -10,6 +10,19 @@ something a player can tell.
 
 ## [Unreleased]
 
+### Added
+
+- Progress tracking, unlocking and the level introduction are implemented and
+  tested (tasks 6.5 and 6.6), but nothing on screen shows them yet: the catalogue
+  screen that would display locked levels, best scores and the skip-introductions
+  setting is task 9.4, which arrives with the menus. Nothing here changes what the
+  game looks like, so per this file's own rule it is not a release note.
+
+## [0.3.0] - 2026-10-02
+
+The board is readable and the rules no longer kill you. Progress is stored from this
+version onwards, so what you finish is remembered even before you can see it.
+
 ### Changed
 
 - **The licence is now AGPL-3.0-or-later**, was GPL-2.0-or-later. The AGPL is GPL plus
