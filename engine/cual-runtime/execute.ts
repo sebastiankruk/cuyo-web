@@ -484,22 +484,29 @@ function runCommaSequence(node: Stmt, ctx: ExecutionContext): boolean {
  * and so that adding a statement kind without deciding what it does is a type error rather
  * than a silent "not busy".
  */
+const TASKS: Readonly<Record<string, string>> = {
+  scoped: "4.7",
+  call: "4.6",
+};
+
+/**
+ * The task that will close a construct, or `null` when there is none.
+ *
+ * Split out from `notYet` so the compile gate (task 4.13) can ask "which statements are still
+ * refused?" without catching anything.
+ *
+ * **This list was wrong until the compile gate read it.** `if`, `switch` and `switchCase` were
+ * still in it after 4.2 implemented them, so the gate reported 1364 `if` gaps in a corpus where
+ * every `if` runs. A table nobody reads stays plausible for a long time; the gate is the thing
+ * that read it. Each entry to leave is a "refused until then" test that moved rather than
+ * disappeared — the effects in 4.12, the draw statements in 4.9, the conditions in 4.2.
+ */
+export function notYetTask(kind: string): string | null {
+  return TASKS[kind] ?? null;
+}
+
 export function notYet(kind: string): never {
-  // The draw statements left this list in 4.9 and the scoped assignment in 4.7; both were
-  // "refused until then" tests that had to move rather than disappear. What is still refused
-  // is a `switch` shape, a builtin call, and the effects (`bonus`, `message`, `explode`,
-  // `lose`, `sound`).
-  // The effects left this list in 4.12 and the draw statements in 4.9; both were "refused until
-  // then" tests that had to move rather than disappear. What is still refused is a `switch`
-  // shape, a scoped block, and a builtin call.
-  const task: Record<string, string> = {
-    if: "4.2",
-    switch: "4.2",
-    switchCase: "4.2",
-    scoped: "4.7",
-    call: "4.6",
-  };
   throw new Error(
-    `Cual: a '${kind}' statement is not implemented yet (task ${task[kind] ?? "?"})`,
+    `Cual: a '${kind}' statement is not implemented yet (task ${TASKS[kind] ?? "?"})`,
   );
 }
