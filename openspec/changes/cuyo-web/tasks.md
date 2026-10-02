@@ -109,6 +109,10 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [x] 4.12 Implement `bonus`, `message`, `explode`, `lose` and `sound`, and verify each effect reaches the correct player — which is **four different rules**: `bonus`/`message` follow the asking blob's own side and throw in the global blob, `sound` follows the blob's *position* into a sample set, `explode` reaches no player and is a silent no-op in a falling blob, and `lose` ends the whole game rather than one player
 - [x] 4.13 Wire compile of all levels into the build gate so an unimplemented construct fails the build with file, line and construct, and verify by temporarily removing a construct — the gate is a **snapshot**, not an assertion that the list is empty, because group 4 is not finished: 1538 places in 3 constructs (`call` 845, `scoped` 395, `neighbour` 298). It found a real bug on its first run: `if`/`switch`/`switchCase` were still in the refusal table after 4.2, so it reported 1364 `if` gaps in a corpus where every `if` runs
 
+- [ ] 4.14 Implement procedure calls (`Code::aufrufen`), including the `&name` form that does not copy the definition and the return-value assignment `yy = f(xx);`, and verify recursion depth and the `sharesDefinition` distinction — 845 places in the corpus; the largest single gap
+- [ ] 4.15 Implement scoped blocks (`[x = expr] ...`), with the scope restored at the end rather than at the next statement, and verify nesting — 395 places; the value is evaluated once on entry, not per step
+- [ ] 4.16 Read a neighbour pattern out of a blob's array (`1???0???` and the eight-character forms), connecting `neighbours.ts`'s patterns to a live board, and verify against the man page's worked example — 298 places; the patterns themselves are 3.10's, the read is the walker's
+
 ## 5. Game Core
 
 - [x] 5.1 Implement the seeded PRNG and route every random draw in the simulation through the single instance, and verify two runs with the same seed and inputs produce identical state at every step
