@@ -16,8 +16,8 @@ reasoning behind the sequence.
 | 14. Lint and CI | 15/20 | Code, docs, shell, spec and workflow linting; nine CI jobs.         |
 | 13. Coverage    | 3/8   | Some of it; thresholds and DOM tests outstanding.                   |
 
-Everything else is untouched: 3 and 4 (the Cual runtime), 6 (catalogue), 7
-(presentation), 8 (art), 9 (shell), 10 (mobile), 11 (PWA), 12 (verification).
+Everything else is untouched: 6 (catalogue), 7 (presentation), 8 (art), 9 (shell),
+10 (mobile), 11 (PWA), 12 (verification).
 
 **0.2.0 is cut and playable.** All 79 levels, real rules, playable on a phone. That is
 the honest description of where this is: not a game yet, but the game underneath one.
@@ -167,12 +167,26 @@ whose headline promises memory.
 
 The scripting language levels use for custom rules. `rollenspiel.ld` and about twenty
 others ignore their Cual block and are therefore subtly wrong. This is the largest
-single block of remaining work - 23 tasks - and it is the reason the port is not yet
-complete rather than merely unpolished.
+single block of remaining work - it is the reason the port is not yet complete rather
+than merely unpolished.
 
 Sequenced late because it is the hardest to verify: the oracle is upstream's
 interpreter, which cannot be built here, so correctness rests on tests written against
 its source.
+
+**Groups 3 and 4 are done, and that is not the same as the runtime being done.** Task 4.13
+wired a compile pass into `make check` that names every construct in the corpus this
+runtime cannot run, by file, line and construct. It reports **1538 places in three
+constructs**, and they are now tasks 4.14-4.16:
+
+| construct    | places | what is missing                                       |
+| ------------ | -----: | ----------------------------------------------------- |
+| `call`       |    845 | `Code::aufrufen`: the `&name` form, and return values |
+| `scoped`     |    395 | `[x = expr]` blocks                                   |
+| `neighbour`  |    298 | reading a pattern out of a blob's array               |
+
+Three features rather than 1538 problems, and the gate is a checked snapshot rather than a
+claim that the list is empty — so 0.4.0 is not cut while these are open.
 
 ### 5. Menus, pause, settings (group 9) — _0.5.0_
 
