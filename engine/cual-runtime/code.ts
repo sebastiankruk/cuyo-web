@@ -53,6 +53,14 @@ export interface SwitchCase {
   readonly latching: boolean;
   /** A second body, for `cond -> a; -> b;` — the arrow on the far side. */
   readonly otherwise: Stmt | null;
+  /**
+   * True when that second arrow was `=>`. Upstream's `mZahl & 2`.
+   *
+   * Recorded separately because it is a separate arrow: `pacman.ld` has
+   * `=> R,R,R,R,R,R,R; ->` - a latching animation with a default that does *not* latch, so
+   * hard-coding either arrow's value would be wrong for one of the two shapes.
+   */
+  readonly otherwiseLatching: boolean;
 }
 
 /** One `var` declaration. */
@@ -97,7 +105,17 @@ export type Stmt =
       /** The arrow after `else`, when there is one. Recorded separately on purpose. */
       readonly elseLatching: boolean | null;
     }
-  | { readonly kind: "switch"; readonly cases: readonly SwitchCase[] }
+  /**
+   * One head case; the rest of the list hangs off each case's `otherwise`.
+   *
+   * `ausdruck PFEIL code_1 ';' auswahl_liste` puts the remainder of the list in the case's
+   * `mF3`, so upstream's list is a right-nested chain. Collected flat it looked equivalent
+   * and was not: every case's condition would be evaluated, so `switch { 1:5 -> a; 1:5 -> b; }`
+   * would draw *two* randoms per step where upstream draws one, and a case after a match
+   * would run its side effects at all. Same lesson as the comma sequence, found one task
+   * later.
+   */
+  | { readonly kind: "switch"; readonly case: SwitchCase }
   /** One `switch` case, i.e. one upstream `bedingung_code`. */
   | SwitchCase
   | {
@@ -656,6 +674,14 @@ function parseIf(cursor: SharedCursor): Stmt {
     otherwise = parseCode1(cursor);
   }
 
+  // `IF_TOK ausdruck PFEIL code_1 ELSE_TOK code_1` exists only for a non-latching first arrow;
+  // with `=>` and no arrow after `else` the grammar has no production, and upstream throws
+  // "Please specify \"else ->\" or \"else =>\"". Refused rather than guessed at, because the
+  // two possible readings differ: with no arrow `mZahl` is `3 * ohne_merk_pfeil`, which is
+  // zero, so *neither* branch latches.
+  if (otherwise !== null && elseLatching === null && arrow) {
+    cursor.fail('please specify "else ->" or "else =>"');
+  }
   return { kind: "if", condition, then, otherwise, latching: arrow, elseLatching };
 }
 
@@ -669,7 +695,29 @@ function parseSwitch(cursor: SharedCursor): Stmt {
   }
   cursor.expectPunct("}");
   if (cases.length === 0) cursor.fail("a switch needs at least one case");
-  return { kind: "switch", cases };
+
+  // Fold right. A case that wrote no explicit `-> body` gets the next case in its `mF3`; one
+  // that did keeps it, because the arrow is the second shape's second body and the list ends
+  // there. So a default followed by another case is not valid Cual - `auswahl_liste` cannot
+  // continue after the two-arrow shape - and it is refused rather than silently dropping the
+  // case that follows.
+  let next: SwitchCase | null = null;
+  const folded: SwitchCase[] = [];
+  for (let i = cases.length - 1; i >= 0; i -= 1) {
+    const entry = cases[i];
+    if (entry.otherwise !== null) {
+      if (next !== null) {
+        cursor.fail(
+          `a case with a '->' default ends the switch; ${next.condition.kind} follows it`,
+        );
+      }
+      folded[i] = entry;
+      continue;
+    }
+    folded[i] = { ...entry, otherwise: next };
+    next = entry;
+  }
+  return { kind: "switch", case: folded[0] };
 }
 
 function isSwitchEnd(cursor: SharedCursor): boolean {
@@ -693,16 +741,17 @@ function parseSwitchCase(cursor: SharedCursor): SwitchCase {
   cursor.expectPunct(";");
 
   let otherwise: Stmt | null = null;
+  let otherwiseLatching = false;
   if (isArrowAhead(cursor)) {
     // The grammar's second shape is `ausdruck PFEIL code_1 ';' PFEIL code_1 ';'`, so the
     // arrow belongs to this second body and has to be consumed *before* it. Parsing the body
     // with the arrow still in front failed on it, and this is the shape every `switch` in
     // the corpus ends with - `-> gemalt=0;` as the default case.
-    takeArrow(cursor);
+    otherwiseLatching = takeArrow(cursor);
     otherwise = parseCode1(cursor);
     cursor.expectPunct(";");
   }
-  return { kind: "switchCase", condition, body, latching, otherwise };
+  return { kind: "switchCase", condition, body, latching, otherwise, otherwiseLatching };
 }
 
 /** `->` and `=>` are the same token with a value, so read it as one. */

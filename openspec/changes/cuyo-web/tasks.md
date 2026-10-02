@@ -96,7 +96,7 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 ## 4. Cual Runtime - Execution
 
 - [x] 4.1 Implement the code-tree walker threading busy state through `;` (busy while either side) and `,` (busy until all members ran), and verify the documented busyness rules
-- [ ] 4.2 Implement `if`/`else` and `switch` with both arrow forms, and verify `->` re-tests every step while `=>` latches
+- [x] 4.2 Implement `if`/`else` and `switch` with both arrow forms, and verify `->` re-tests every step while `=>` latches
 - [ ] 4.3 Implement the comma-sequence animation advancing one command per step, and verify the latching `switch` example runs its animation to completion before resuming the default branch
 - [ ] 4.4 Implement the system variables (`file`, `pos`, `kind`, `version`, `qu`, `out1`, `out2`, `weight`, `inhibit`, `behaviour`, `falling_speed`, `falling_fast_speed`) with per-step resets for `file`, `pos`, `qu` and the debug outputs, and verify the resets happen before each draw
 - [ ] 4.5 Implement the read-only constants (`time`, `turn`, `size`, `basekind`, `loc_*`, `loc_p`, `falling`, `falling_fast`, `informational`, `players`, `exploding`) and verify each against a constructed board

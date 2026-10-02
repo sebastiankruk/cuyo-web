@@ -84,10 +84,13 @@ function descend(node: Stmt): Stmt[] {
       if (node.otherwise) found.push(...descend(node.otherwise));
       break;
     case "switch":
-      for (const entry of node.cases) {
-        found.push(...descend(entry.body));
-        if (entry.otherwise) found.push(...descend(entry.otherwise));
-      }
+      found.push(...descend(node.case));
+      break;
+    case "switchCase":
+      // A case is a `Stmt` so that slot allocation can key its flags by node. Its `otherwise`
+      // holds either an explicit `-> body` default or the rest of the list.
+      found.push(...descend(node.body));
+      if (node.otherwise) found.push(...descend(node.otherwise));
       break;
     case "scoped":
     case "procedureDef":
