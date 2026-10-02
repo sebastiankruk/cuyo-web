@@ -8,11 +8,12 @@
  * one task 3.7 asks for: two blobs of the same kind have independent busy flags.
  */
 
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { BITS_PER_SLOT, SlotAllocator, allocateSlots } from "./slots.ts";
 import {
   BLOBART_AUSSERHALB,
   BlobStore,
+  TimeSlices,
   SPECIAL_VARIABLE_COUNT,
   SPECIAL_VARIABLES,
   SPEZVAR_OUT_NICHTS,
@@ -21,6 +22,7 @@ import {
 } from "./store.ts";
 import { tokenize } from "../level-format/lexer.ts";
 import { parseCode } from "./code.ts";
+import { evaluate } from "./expr.ts";
 
 function lex(source: string) {
   return tokenize(source, "test").filter((t) => t.kind !== "beginCode" && t.kind !== "endCode");
@@ -79,14 +81,14 @@ describe("the special variables", () => {
     // `gric` is configuration, not a constant. Hard-coding it would bake one configured
     // level's geometry into the runtime, and the value would be wrong on every other one.
     expect(SPECIAL_VARIABLES[12].defaultValue).toBeTypeOf("function");
-    expect(new BlobStore(20, 13).getSpecial("falling_fast_speed")).toBe(13);
-    expect(new BlobStore(20, 7).getSpecial("falling_fast_speed")).toBe(7);
+    expect(new BlobStore(20, 13, new TimeSlices()).getSpecial("falling_fast_speed")).toBe(13);
+    expect(new BlobStore(20, 7, new TimeSlices()).getSpecial("falling_fast_speed")).toBe(7);
   });
 });
 
 describe("initialisation", () => {
   it("copies the defaults of the three kinds that carry a value", () => {
-    const store = new BlobStore(20, 13);
+    const store = new BlobStore(20, 13, new TimeSlices());
     expect(store.getSpecial("file")).toBe(0);
     expect(store.getSpecial("out1")).toBe(SPEZVAR_OUT_NICHTS);
     expect(store.getSpecial("weight")).toBe(1);
@@ -98,7 +100,7 @@ describe("initialisation", () => {
     // declares a default of `blopart_ausserhalb` but is `da_keinblob`, and Blop assigns it
     // explicitly a few lines later - reading the default would make every fresh blob claim to
     // be off the board for one instruction too long.
-    const store = new BlobStore(20, 13);
+    const store = new BlobStore(20, 13, new TimeSlices());
     expect(SPECIAL_VARIABLES[2].defaultValue).toBe(BLOBART_AUSSERHALB);
     expect(store.getSpecial("kind")).toBe(0);
     expect(store.getSpecial("version")).toBe(0);
@@ -106,12 +108,12 @@ describe("initialisation", () => {
   });
 
   it("initialises slot 7 from its default even though it has no name", () => {
-    expect(new BlobStore(20, 13).data[7]).toBe(BLOBART_AUSSERHALB);
-    expect(new BlobStore(20, 13).data[13]).toBe(0);
+    expect(new BlobStore(20, 13, new TimeSlices()).data[7]).toBe(BLOBART_AUSSERHALB);
+    expect(new BlobStore(20, 13, new TimeSlices()).data[13]).toBe(0);
   });
 
   it("applies a kind's user-variable defaults", () => {
-    const store = new BlobStore(20, 13, [
+    const store = new BlobStore(20, 13, new TimeSlices(), [
       { slot: SPECIAL_VARIABLE_COUNT, value: 7 },
       { slot: SPECIAL_VARIABLE_COUNT + 1, value: -2 },
     ]);
@@ -122,11 +124,11 @@ describe("initialisation", () => {
   it("refuses a user default that would land on a special variable", () => {
     // Silently accepting it would write `file`, which is the failure mode the whole
     // fourteen-first ordering exists to prevent.
-    expect(() => new BlobStore(20, 13, [{ slot: 2, value: 1 }])).toThrow(/special variable/);
+    expect(() => new BlobStore(20, 13, new TimeSlices(), [{ slot: 2, value: 1 }])).toThrow(/special variable/);
   });
 
   it("clears everything on reset, so a respawned blob is not the old one", () => {
-    const store = new BlobStore(20, 13);
+    const store = new BlobStore(20, 13, new TimeSlices());
     store.set(SPECIAL_VARIABLE_COUNT, 99);
     store.setSpecial("weight", 42);
     store.reset(13);
@@ -144,8 +146,8 @@ describe("busy flags are independent between two blobs of the same kind", () => 
   it("gives two stores of the same size independent flags", () => {
     const statements = parseCode(lex("alpha, beta;"));
     const { busySlots, slotCount } = allocateSlots(statements);
-    const first = new BlobStore(slotCount, 13);
-    const second = new BlobStore(slotCount, 13);
+    const first = new BlobStore(slotCount, 13, new TimeSlices());
+    const second = new BlobStore(slotCount, 13, new TimeSlices());
     const bit = [...busySlots.values()][0].first;
 
     expect(first.busyGet(bit)).toBe(false);
@@ -163,7 +165,7 @@ describe("busy flags are independent between two blobs of the same kind", () => 
   it("keeps two flags in one int apart", () => {
     const statements = parseCode(lex("alpha, beta; gamma, delta;"));
     const { busySlots, slotCount } = allocateSlots(statements);
-    const store = new BlobStore(slotCount, 13);
+    const store = new BlobStore(slotCount, 13, new TimeSlices());
     const [a, b] = [...busySlots.values()];
     // Both in the same int, so a write to one is a write to that int - and still must not
     // disturb the other.
@@ -178,7 +180,7 @@ describe("busy flags are independent between two blobs of the same kind", () => 
     const allocator = new SlotAllocator();
     allocator.allocateDeclaredVariable();
     const bit = allocator.allocateBool();
-    const store = new BlobStore(allocator.slotCount, 13);
+    const store = new BlobStore(allocator.slotCount, 13, new TimeSlices());
     const variable = SPECIAL_VARIABLE_COUNT;
     store.set(variable, 0x00ff00ff);
     store.busySet(bit, true);
@@ -194,7 +196,7 @@ describe("busy flags are independent between two blobs of the same kind", () => 
     const allocator = new SlotAllocator();
     allocator.allocateDeclaredVariable();
     const bit = allocator.allocateBool();
-    const store = new BlobStore(allocator.slotCount, 13);
+    const store = new BlobStore(allocator.slotCount, 13, new TimeSlices());
     store.set(SPECIAL_VARIABLE_COUNT, -1);
     expect(store.busyGet(bit)).toBe(false);
     store.busySet(bit, true);
@@ -203,23 +205,240 @@ describe("busy flags are independent between two blobs of the same kind", () => 
   });
 });
 
-describe("the snapshot", () => {
-  it("is an independent copy, not the same array", () => {
-    const store = new BlobStore(20, 13);
-    store.set(SPECIAL_VARIABLE_COUNT, 5);
-    store.busySet(BITS_PER_SLOT * SPECIAL_VARIABLE_COUNT, true);
-    const shadow = store.snapshot();
-    store.set(SPECIAL_VARIABLE_COUNT, 6);
-    store.busySet(BITS_PER_SLOT * SPECIAL_VARIABLE_COUNT, false);
-    expect(shadow[SPECIAL_VARIABLE_COUNT]).toBe(5);
-    expect(getBusyIn(shadow, BITS_PER_SLOT * SPECIAL_VARIABLE_COUNT)).toBe(true);
+describe("the beginning-of-step shadow copy", () => {
+  it("is not taken until the first write of the slice", () => {
+    // `merkeAlteVarWerte` is called by the write, not when the slice opens. Upstream copies
+    // on a blob's first write; copying eagerly would allocate a second Int32Array for every
+    // blob on the board on every slice whether or not anything reads it.
+    const slices = new TimeSlices();
+    const store = new BlobStore(20, 13, slices);
+    expect(store.hasShadow).toBe(false);
+    store.get(SPECIAL_VARIABLE_COUNT);
+    store.getAlt(SPECIAL_VARIABLE_COUNT);
+    expect(store.hasShadow).toBe(false);
+    store.set(SPECIAL_VARIABLE_COUNT, 1);
+    expect(store.hasShadow).toBe(true);
   });
 
-  it("has the same length as the store", () => {
-    expect(new BlobStore(37, 13).snapshot()).toHaveLength(37);
+  it("keeps the value a slot had at the beginning of the slice", () => {
+    // This is the whole of statement 4 of cual.6's six: `X = X@(0, 0) + 1` sets X to one
+    // more than it was at the beginning of the step, not one more than it is now.
+    const slices = new TimeSlices();
+    const store = new BlobStore(20, 13, slices);
+    store.set(SPECIAL_VARIABLE_COUNT, 5);
+    slices.open();
+    store.set(SPECIAL_VARIABLE_COUNT, 9);
+    expect(store.get(SPECIAL_VARIABLE_COUNT)).toBe(9);
+    expect(store.getAlt(SPECIAL_VARIABLE_COUNT)).toBe(5);
+    // And the value it had before this slice began is 5, not 0.
+    expect(store.getAlt(SPECIAL_VARIABLE_COUNT)).toBe(5);
+  });
+
+  it("takes the shadow once per slice, not once per write", () => {
+    const slices = new TimeSlices();
+    const store = new BlobStore(20, 13, slices);
+    slices.open();
+    store.set(SPECIAL_VARIABLE_COUNT, 1);
+    store.set(SPECIAL_VARIABLE_COUNT, 2);
+    // The shadow is from before the first write, so it still reads 0.
+    expect(store.getAlt(SPECIAL_VARIABLE_COUNT)).toBe(0);
+    slices.open();
+    expect(store.hasShadow).toBe(false);
+    store.set(SPECIAL_VARIABLE_COUNT, 3);
+    expect(store.getAlt(SPECIAL_VARIABLE_COUNT)).toBe(2);
+  });
+
+  it("falls back to the live value when the shadow is from an older slice", () => {
+    // A stale shadow is a blob's history, not this slice's past. `getVariableAlt` falls
+    // through to the live array, which is right: nothing has been written this slice yet.
+    const slices = new TimeSlices();
+    const store = new BlobStore(20, 13, slices);
+    slices.open();
+    store.set(SPECIAL_VARIABLE_COUNT, 7);
+    slices.open();
+    expect(store.hasShadow).toBe(false);
+    expect(store.getAlt(SPECIAL_VARIABLE_COUNT)).toBe(7);
+  });
+
+  it("preserves the busy flag too, since a flag is a variable", () => {
+    const allocator = new SlotAllocator();
+    allocator.allocateBool();
+    const slices = new TimeSlices();
+    const store = new BlobStore(allocator.slotCount, 13, slices);
+    const bit = [...allocateSlots(parseCode(lex("alpha, beta;"))).busySlots.values()][0].first;
+    slices.open();
+    expect(store.busyGet(bit)).toBe(false);
+    store.busySet(bit, true);
+    // Written this slice, so the beginning-of-slice value is false.
+    expect(store.busyGetAlt(bit)).toBe(false);
+    slices.open();
+    expect(store.busyGetAlt(bit)).toBe(true);
+  });
+
+  it("does not let setInternal overwrite the shadow", () => {
+    // `endGleichzeitig` applies deferred writes through this. A preserve here would replace
+    // the beginning-of-slice values that the *next* slice's @ reads are relative to.
+    const slices = new TimeSlices();
+    const store = new BlobStore(20, 13, slices);
+    slices.open();
+    store.set(SPECIAL_VARIABLE_COUNT, 5);
+    expect(store.getAlt(SPECIAL_VARIABLE_COUNT)).toBe(0);
+    store.setInternal(SPECIAL_VARIABLE_COUNT, 42);
+    expect(store.get(SPECIAL_VARIABLE_COUNT)).toBe(42);
+    // The shadow still says what the slice began with.
+    expect(store.getAlt(SPECIAL_VARIABLE_COUNT)).toBe(0);
+  });
+
+  it("drops the shadow on reset, so a respawned blob has no past", () => {
+    const slices = new TimeSlices();
+    const store = new BlobStore(20, 13, slices);
+    slices.open();
+    store.set(SPECIAL_VARIABLE_COUNT, 5);
+    expect(store.hasShadow).toBe(true);
+    store.reset(13);
+    expect(store.hasShadow).toBe(false);
   });
 });
 
-function getBusyIn(array: Int32Array, bit: number): boolean {
-  return (array[Math.floor(bit / BITS_PER_SLOT)] & (1 << (bit % BITS_PER_SLOT))) !== 0;
-}
+describe("time slices", () => {
+  it("starts at zero and increments on open", () => {
+    const slices = new TimeSlices();
+    expect(slices.current).toBe(0);
+    expect(slices.open()).toBe(1);
+    expect(slices.current).toBe(1);
+  });
+
+  it("gives the step and each event its own slice", () => {
+    // The step is one `beginGleichzeitig` window and so is each draw, key and land event, so
+    // a @ read during a draw does not see what a @ read during the step saw.
+    const slices = new TimeSlices();
+    slices.open(); // step
+    const duringStep = slices.current;
+    slices.open(); // draw
+    slices.open(); // key
+    slices.open(); // land
+    expect(duringStep).toBe(1);
+    expect(slices.current).toBe(4);
+  });
+
+  it("close does nothing yet, and that is 3.9's to fill in", () => {
+    // Not an oversight to be tidied away: `endGleichzeitig` applies the deferred-write queue,
+    // and a test asserting "close is a no-op" would quietly become false in 3.9. What is
+    // asserted instead is that close does not disturb the store.
+    const slices = new TimeSlices();
+    const store = new BlobStore(20, 13, slices);
+    slices.open();
+    store.set(SPECIAL_VARIABLE_COUNT, 3);
+    slices.close();
+    expect(store.get(SPECIAL_VARIABLE_COUNT)).toBe(3);
+    expect(store.getAlt(SPECIAL_VARIABLE_COUNT)).toBe(0);
+  });
+});
+
+/**
+ * `cual.6`'s six `@`-assignment examples, and what 3.8 can honestly say about each.
+ *
+ * The man page asks for all six to produce the documented results. Two of the three things
+ * that need are not in this task:
+ *
+ * - a *deferred write* (statements 2, 5 and 6 all write through `@`, and the write happens
+ *   at the end of the step) - that is task 3.9;
+ * - an *addressed read* (`X@(0, 0)` on the right-hand side) - that is task 4.7, and
+ *   `expr.ts` still refuses `positioned` outright.
+ *
+ * So this block does two things and deliberately does not do a third. It verifies the
+ * mechanism each documented result rests on, where that mechanism is 3.8's, and it asserts
+ * that the statements which cannot yet work are **refused**. Not skipped, and not asserted
+ * with the wrong answer: a test that quietly passes on unimplemented behaviour is worse than
+ * no test, because the number in the summary stays the same either way and only one of them
+ * means anything.
+ */
+describe("cual.6's six examples", () => {
+  const X = SPECIAL_VARIABLE_COUNT;
+  const slices = new TimeSlices();
+  const store = new BlobStore(20, 13, slices);
+
+  beforeEach(() => {
+    slices.open();
+    store.reset(13);
+  });
+
+  /**
+   * The documented text, kept in the test so that "verified" means verified against these
+   * words rather than against my recollection of them.
+   */
+  const documented = {
+    "1) X += 1": "only 1) and 3) do the same; they simply increment X by 1",
+    "2) X@(0, 0) += 1": "X is set to one more than the value of X just before the change",
+    "3) X = X + 1": "only 1) and 3) do the same; they simply increment X by 1",
+    "4) X = X@(0, 0) + 1": "sets X to one more than it was at the beginning of the step",
+    "5) X@(0, 0) = X + 1": "X is set to one more than the current value of X",
+    "6) X@(0, 0) = X@(0, 0) + 1": "X is set to one more than the value of X at the beginning of the step",
+  } as const;
+
+  it("has transcribed all six documented results", () => {
+    // A transcription that quietly lost a statement would make the rest of this block look
+    // complete. Six in, six out.
+    expect(Object.keys(documented)).toHaveLength(6);
+    for (const text of Object.values(documented)) expect(text).toMatch(/X/);
+  });
+
+  it("1) and 3) increment X by one, which needs no snapshot at all", () => {
+    // Both are a plain read of the live value and a plain write.
+    //
+    // The slice has to open *after* X is set, or the shadow is right and the expectation is
+    // wrong: setting X during a slice makes the beginning-of-slice value 0, not the value
+    // just written. The man page's example presumes X already had a value, so the slice
+    // begins with X = 5.
+    store.set(X, 5);
+    slices.open();
+    // `X += 1`
+    store.set(X, store.get(X) + 1);
+    expect(store.get(X)).toBe(6);
+    // `X = X + 1`
+    store.set(X, store.get(X) + 1);
+    expect(store.get(X)).toBe(7);
+    // Neither touches the beginning-of-slice value, which is what "they simply increment"
+    // means: no `@` involved, so no deferred anything.
+    expect(store.getAlt(X)).toBe(5);
+  });
+
+  it("4) reads the value from the beginning of the step, which is the shadow's whole job", () => {
+    store.set(X, 5);
+    slices.open(); // a new step begins; X is 5 at its start
+    store.set(X, 9); // something wrote during the step
+    // `X = X@(0, 0) + 1`
+    store.set(X, store.getAlt(X) + 1);
+    expect(store.get(X)).toBe(6);
+    // "one more than it was at the beginning of the step" - not 10.
+    expect(store.get(X)).not.toBe(10);
+  });
+
+  it("refuses an addressed read, which is 4.7 and not this task", () => {
+    // `expr.ts` throws on `positioned` by name rather than reading the wrong slot. Asserting
+    // the refusal is the honest half of "verified": it is true today, and it will start
+    // being false in 4.7, at which point this assertion is what gets replaced by 4.7's own.
+    const statements = parseCode(lex("XC@(0, 0) += 1;"));
+    const target = (statements[0] as { target?: unknown }).target;
+    expect(target).toMatchObject({ kind: "positioned", name: "XC" });
+    expect(() => evaluate({ kind: "positioned", name: "XC", position: { kind: "feld", x: { kind: "number", value: 0 }, y: { kind: "number", value: 0 }, half: null } }, {
+      variable: () => 0,
+      random: () => 0,
+    })).toThrow(/addressed variables are not implemented/);
+  });
+
+  it("refuses a deferred write, which is 3.9", () => {
+    // Every statement that writes through `@` needs the queue. `close` applies nothing yet,
+    // so there is no way to produce statements 2, 5 or 6 - and no way to produce them
+    // *wrongly* either, which is the outcome that would be dangerous to discover later.
+    slices.open();
+    store.set(X, 5);
+    slices.open();
+    store.set(X, 9);
+    slices.close();
+    // Nothing was queued, so nothing was applied: X is still 9, not 10.
+    expect(store.get(X)).toBe(9);
+    // And 3.9 will change this assertion. It is here so that the change is a test failing
+    // rather than a behaviour shifting unnoticed.
+  });
+});
