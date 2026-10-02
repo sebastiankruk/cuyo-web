@@ -41,12 +41,23 @@ describe("sequences and grouping", () => {
     expect(stmt.body).toHaveLength(3);
   });
 
-  it("builds a comma sequence for ',', as a separate kind", () => {
+  it("builds a comma sequence for ',', as a separate kind, nested to the left", () => {
     // The distinction that matters: `,` runs one member per step.
+    //
+    // And `a, b, c` is `folge_code(folge_code(a, b), c)` - binary, nested left - because
+    // `code_1: code_1 ',' code_1` is. Each of those is a node with a busy flag, so three
+    // members need *two* slots. Collected flat it needed one, and nothing about parsing or
+    // walking complained: of the 250 comma sequences in the corpus only 48 have two
+    // members, one has 114, and every flag after the first was wrong.
     const stmt = one("busy, busy, busy");
     expect(stmt.kind).toBe("commaSequence");
     if (stmt.kind !== "commaSequence") throw new Error("expected a comma sequence");
-    expect(stmt.parts).toHaveLength(3);
+    expect(stmt.parts).toHaveLength(2);
+    const [outer, second] = stmt.parts;
+    expect(second.kind).toBe("busy");
+    if (outer.kind !== "commaSequence") throw new Error("expected the left member to nest");
+    expect(outer.parts).toHaveLength(2);
+    expect(outer.parts[1].kind).toBe("busy");
   });
 
   it("binds ',' tighter than ';', so the sequence groups as a ; b, c", () => {

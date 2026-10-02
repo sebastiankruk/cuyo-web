@@ -82,7 +82,11 @@ export type Stmt =
   /** `{ ... }` — grouping, so a `;` sequence can appear where one statement may. */
   | { readonly kind: "block"; readonly body: readonly Stmt[] }
   /** `a, b, c` — one part per step. The animation mechanism. */
-  | { readonly kind: "commaSequence"; readonly parts: readonly Stmt[] }
+    /**
+   * Exactly two members, never more: `code_1: code_1 ',' code_1` is binary and `a, b, c`
+   * nests to the left. See `parseCode1`.
+   */
+  | { readonly kind: "commaSequence"; readonly parts: readonly [Stmt, Stmt] }
   | {
       readonly kind: "if";
       readonly condition: Expr;
@@ -426,15 +430,29 @@ function parseCode1(cursor: SharedCursor): Stmt {
     ? { kind: "nothing" }
     : parseCode1Single(cursor);
   if (!isPunctAhead(cursor, ",")) return first;
-  const parts: Stmt[] = [first];
+
+  // **Left-nested and binary**, because `code_1: code_1 ',' code_1` is: `a, b, c` is
+  // `folge_code(folge_code(a, b), c)`, and *each* of those is a node with a busy flag of its
+  // own. Collecting the members into one flat list was wrong in a way that looked harmless:
+  // it parsed, it walked, and it allocated one slot instead of n-1 - so of the 250 comma
+  // sequences in the corpus only 48 have two members, one has 114, and the flags are all
+  // wrong. One bool cannot index a flat list anyway; the flag says "my second member is
+  // next", and the nesting is what makes that mean anything.
+  //
+  // So `parts` is a two-tuple rather than an array, which puts the binary shape in the type
+  // instead of in a comment.
+  let node: Stmt = first;
   while (cursor.takePunct(",")) {
     // An empty member is legal on either side of a comma, since `code_1` may be empty:
     // `{,,,,,version=rnd(3)}` in aliens.ld and bunt.ld. It has to be *pushed*, not treated
     // as the end of the sequence - stopping there left four commas and a statement behind,
     // and the enclosing `{` then asked for a `}` that had already gone past.
-    parts.push(isEmptyMemberAhead(cursor) ? { kind: "nothing" } : parseCode1Single(cursor));
+    const next: Stmt = isEmptyMemberAhead(cursor)
+      ? { kind: "nothing" }
+      : parseCode1Single(cursor);
+    node = { kind: "commaSequence", parts: [node, next] };
   }
-  return { kind: "commaSequence", parts };
+  return node;
 }
 
 /** One statement, with no comma sequence attached. */
