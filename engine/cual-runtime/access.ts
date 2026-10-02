@@ -77,6 +77,10 @@ export type Here =
 export interface AccessField {
   /** `Cuyo::getSpielerZahl()`, which `rechts_ok` asks. */
   readonly players: number;
+  /** `BlopGitter::grx`: the field's width in cells. */
+  readonly width: number;
+  /** `BlopGitter::getGrY()`: the field's height in cells, *not* counting the hex edge row. */
+  readonly height: number;
   /** `ld->mSechseck`. */
   readonly hex: boolean;
   /** `ld->mSpiegeln`. */
