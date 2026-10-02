@@ -105,7 +105,7 @@ implemented but unverified. Group 7 is honestly 0/14 by that bar, 9 is 0/7 and
 - [x] 4.8 Implement setting `kind` with reapply defaults and same-step draw behaviour, and verify the three documented side effects
 - [x] 4.9 Implement the draw commands `*`, `*@(pos)` and `@(pos)*` with quarter clipping, and verify the recorded ops carry the right cell, file, index and quarter — the `Ort` needed a `relative` flag and a `@`-addressed `Ort` a `bemalbar` rule; `PictureStack` records the quarter number rather than resolving the clip, so `malBildchen` stays render-time
 - [x] 4.10 Implement event dispatch for `init`, `turn`, `land`, `changeside`, `connect`, `row_up`, `row_down` and the four `key*` events with the correct eligibility and firing order, and verify `init` fires exactly once and `keyturn` fires even when rotation is blocked — an event is an ordinary definition named `<kind>.<event>`, and the *draw* code is the bare `<kind>` name: the one `Paratrooper.draw` in the corpus is a procedure
-- [ ] 4.11 Implement the global blob (running before all board blobs) and the per-player semiglobal blob, and verify ordering and isolation
+- [x] 4.11 Implement the global blob (running before all board blobs) and the per-player semiglobal blob, and verify ordering and isolation — the whole step is **one** `beginGleichzeitig()` window, so the semiglobal running last still reads the beginning-of-step world through `@`
 - [ ] 4.12 Implement `bonus`, `message`, `explode`, `lose` and `sound`, and verify each effect reaches the correct player
 - [ ] 4.13 Wire compile of all levels into the build gate so an unimplemented construct fails the build with file, line and construct, and verify by temporarily removing a construct
 
