@@ -40,6 +40,46 @@ themselves on a fresh clone now run. The artwork stays generated, and the check 
 enforces that now runs in CI too — it did not before, and the way that was found is
 written up in `ATTRIBUTION.md`.
 
+## Cutting a release
+
+The convention, and the reason for it.
+
+**Only a `release/*` branch merges to `main`, and that merge is the release.** Not a
+convention this repository can enforce on its own — GitHub branch protection can require
+pull requests, reviews and status checks, but it cannot restrict the _source_ branch's
+name, and anyone who can open a pull request can choose it. So the rule is checked in
+`.github/workflows/release.yml` instead: it looks up which pull request the commit came
+on, and refuses to tag if the answer is not `release/*`.
+
+That check is deliberately late. A status check that is red on every ordinary pull
+request teaches you to ignore red checks, and the point of a gate is that red means
+something. The release is the point where the mistake is expensive enough to be worth
+stopping for.
+
+**The steps, in order:**
+
+1. Work on a normal branch, as always. Merge it to `main` — that is not a release.
+2. When there is something worth shipping, branch `main` as `release/X.Y.Z`.
+3. In that branch, make the version real:
+   - bump `version` in `package.json`
+   - rename `## [Unreleased]` to `## [X.Y.Z]` in `CHANGELOG.md`, with the date
+   - `make check-version` — it fails with the exact edit needed if either is missing
+4. Merge `release/X.Y.Z` into `main`.
+5. `release.yml` checks the source branch, sees the tag does not exist, and creates
+   `vX.Y.Z` and the GitHub release, with the changelog section as the notes.
+
+**The version bump is not a formality, and that is the point.** Step 3 is two visible
+edits that say what is being released. A release cut by bumping a version automatically,
+with no other edit, is a release nobody decided to make — and this project's rule is that
+versions are cut when the app is _worth using_, which is a judgement, not a schedule.
+
+Re-running the release workflow is safe: it sees the tag exists and does nothing, so
+fixing a typo in the notes afterwards is not a broken pipeline.
+
+**Not enforced:** direct pushes to `main` are not blocked, only made useless — a direct
+push has no pull request behind it, so the workflow assumes a deliberate request and
+proceeds. Blocking that needs branch protection, which needs repository admin.
+
 ## What decides the order
 
 Two questions, asked of every candidate piece of work:

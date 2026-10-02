@@ -16,6 +16,20 @@
 # along with cuyo-web. If not, see <https://www.gnu.org/licenses/>.
 name: Code Quality
 
+# On enforcing "only release/* merges to main"
+#
+# `release.yml` checks that rule when a release is about to be cut, and refuses to tag if
+# the merge came from anywhere else. That is the enforcement, and it is late on purpose:
+# a status check that is red on every ordinary pull request teaches you to ignore red
+# checks, which is the opposite of what a gate is for.
+#
+# If you want it earlier as well — so a non-release branch cannot even be merged — add a
+# required status check to `main` whose backing job exits non-zero unless
+# `github.head_ref` matches `^release/`. There is no native GitHub setting for "only these
+# branches may merge"; branch protection can require pull requests, reviews and checks,
+# but not the source branch's name. That needs the repository to be configured by hand,
+# and this token has no admin rights on it.
+
 # One job per gate, so a failure says which one. `lint` and `test` are the two
 # that can hide a real defect; `docs` and `specs` catch drift in the
 # deliverables; `build` catches what only a bundle can; `agent-mode` keeps the

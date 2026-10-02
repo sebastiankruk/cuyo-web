@@ -14,6 +14,20 @@ export default tseslint.config(
       globals: { ...globals.browser, ...globals.node },
     },
   },
+  {
+    // Build-time scripts under `scripts/`, which are plain JavaScript run directly by
+    // Node rather than TypeScript. They are real code and get the same treatment —
+    // without this they fall through to the recommended config with no globals at all,
+    // so every `process` and `console` reads as an undefined variable.
+    //
+    // Node only, and deliberately not the browser globals the app gets: a script that
+    // reaches for `window` is a script that cannot run in the release workflow.
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      globals: { ...globals.node },
+      sourceType: "module",
+    },
+  },
 
   // ---------------------------------------------------------------------------
   // Engine boundary (design.md decision 1)

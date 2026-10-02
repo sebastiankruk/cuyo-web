@@ -1,0 +1,168 @@
+# Copyright (C) 2026 Sebastian Ryszard Kruk (dev@kruk.me)
+#
+# This file is part of the cuyo-web project.
+#
+# cuyo-web is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# cuyo-web is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with cuyo-web. If not, see <https://www.gnu.org/licenses/>.
+name: Release
+
+# Publishing a release is a consequence of landing on `main`, not a separate manual
+# step. The tag and the GitHub release are the same event, so making one manual and the
+# other automatic is how they end up disagreeing.
+#
+# On the rule that only `release/*` may merge to `main`:
+#
+# This workflow *checks* that rule rather than relying on it, because GitHub has no
+# setting for it. Branch protection can require a pull request, reviews and status
+# checks, but it cannot say "only branches matching this pattern may be merged" — that
+# would let anyone who can open a pull request choose the source branch, which is the
+# thing the rule exists to prevent. So the check lives here: if the merge that produced
+# this commit did not come from a `release/` branch, the release fails loudly and no tag
+# is made.
+#
+# That is deliberately later than a failing status check on the pull request. A required
+# check that is red on every non-release branch trains you to ignore red checks, and this
+# project's whole gate philosophy is that a red gate means something. The release is the
+# place where the mistake is expensive enough to be worth stopping for, so that is where it
+# stops it.
+#
+# To enforce it earlier as well, add a required check to `main` — see the comment in
+# `quality.yml`.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to check and report on, e.g. 0.3.0"
+        required: true
+
+# Only one release at a time, and a queued run should not be cancelled after the tag
+# exists — unlike the quality workflow, where cancelling is exactly right.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  release:
+    name: Tag and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # The version in package.json and the section in CHANGELOG.md are two sources of
+      # truth, and the failure this prevents is a tag on `0.3.0` whose changelog entry is
+      # still called [Unreleased] — a tag that points at something nobody can describe.
+      #
+      # So the release is not automatic until it is *possible*: getting one means
+      # renaming the [Unreleased] heading and bumping package.json, which are two visible
+      # edits in the same commit. That is the intent of the version being cut, made by a
+      # person.
+      - name: Check the version is consistent
+        run: node scripts/check-version.mjs
+
+      - name: Collect the changelog section
+        id: notes
+        run: |
+          NOTES="$(node scripts/check-version.mjs --notes)"
+          printf '%s\n' "$NOTES" > /tmp/notes.md
+          echo "Release notes: $(wc -l < /tmp/notes.md) lines"
+          head -3 /tmp/notes.md
+
+      - name: Read the version
+        id: version
+        run: echo "version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse unless the merge came from a release branch
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          # `commits/{sha}/pulls` is how you find out which pull request a commit arrived
+          # on, and it works on a push event — which is all this workflow has. A manual
+          # dispatch has no merge behind it and is skipped, on the grounds that a person
+          # deliberately asking for a release has already made that decision.
+          HEADS="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}/pulls" \
+            --jq '.[].head.ref' || true)"
+          if [ -z "$HEADS" ]; then
+            echo "::notice::No pull request found for ${SHA}; assuming a direct push."
+            exit 0
+          fi
+          echo "Merged from: $(echo "$HEADS" | tr '\n' ' ')"
+          if echo "$HEADS" | grep -qv '^release/'; then
+            echo "::error::This commit came from a branch that is not release/*."
+            echo "::error::Merged from: $(echo "$HEADS" | tr '\n' ' ')"
+            echo "::error::Releases are cut by merging a release/* branch into main."
+            exit 1
+          fi
+
+      - name: Skip if the tag already exists
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # Idempotent on purpose. Re-running a release workflow must not fail, or the
+          # one legitimate rerun — after fixing a typo in the notes — is indistinguishable
+          # from a broken pipeline and gets ignored next time.
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${VERSION}" >/dev/null 2>&1; then
+            echo "already-released=true" >> "$GITHUB_OUTPUT"
+            echo "v${VERSION} already exists; nothing to do."
+          else
+            echo "already-released=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create the tag and the release
+        if: steps.existing.outputs.already-released != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # The tag is created against the commit that triggered this run, not against
+          # whatever `main` happens to be by the time the job gets a runner. Otherwise two
+          # quick merges produce two releases claiming the same version from different
+          # commits, and the tag silently points at the wrong one.
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --notes-file /tmp/notes.md \
+            --target "${GITHUB_SHA}" \
+            --verify-tag=false
+          echo "Released v${VERSION} at ${GITHUB_SHA}"
+
+      - name: Report
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          SKIPPED: ${{ steps.existing.outputs.already-released }}
+        run: |
+          if [ "$SKIPPED" = "true" ]; then
+            echo "::notice::v${VERSION} was already released; no tag created."
+          else
+            echo "::notice::Published https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${VERSION}"
+            echo
+            echo "The README version badge will render from the next commit, because"
+            echo "shields.io caches. If it still says 'no releases', that is the cache"
+            echo "and not a missing release - it resolves within a few minutes."
+          fi
