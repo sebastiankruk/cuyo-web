@@ -60,6 +60,28 @@ export type BinaryOperator =
 /** Operators that take one operand. */
 export type UnaryOperator = "!" | "-";
 
+/**
+ * Which half of a cell a position refers to, for hex levels.
+ *
+ * `parser.yy`'s `haelften_spez`, whose four spellings are `=`, `!`, `<` and `>` inside the
+ * parentheses of an `@(x, y; SPEC)`. Only meaningful when both coordinates are given.
+ */
+export type Half = "here" | "opposite" | "left" | "right";
+
+/**
+ * A blob's address, `parser.yy`'s `Ort`.
+ *
+ * Four shapes rather than one, because the grammar has four and they mean different things:
+ * `global` and `semiglobal` name blobs, `fall` selects one of the two falling pieces by
+ * `0` or `1`, and `feld` is a board cell by `(x, y)`. `half` is set only where the grammar
+ * allows it, which is inside parentheses and after a `;`.
+ */
+export type Ort =
+  | { readonly kind: "global" }
+  | { readonly kind: "semiglobal" }
+  | { readonly kind: "fall"; readonly which: Expr }
+  | { readonly kind: "feld"; readonly x: Expr; readonly y: Expr; readonly half: Half | null };
+
 /** Everything an expression can be. */
 export type Expr =
   | { readonly kind: "number"; readonly value: number }
@@ -80,7 +102,15 @@ export type Expr =
       readonly left: Expr;
       readonly right: Expr;
     }
-  | { readonly kind: "call"; readonly name: "rnd" | "gcd"; readonly args: readonly Expr[] };
+  | { readonly kind: "call"; readonly name: "rnd" | "gcd"; readonly args: readonly Expr[] }
+  /**
+   * A variable at an explicit address: `name@(x, y)`, `name@@(x, y)`, `name@()`, and so on.
+   *
+   * Split from the bare `variable` case because `parser.yy` has them as two productions
+   * (`variable: lokale_variable | wort ort`), and because a bare variable takes no address
+   * while this one always does. Evaluating it is task 4.7.
+   */
+  | { readonly kind: "positioned"; readonly name: string; readonly position: Ort };
 
 /** How one operator associates. A parsing rule, kept beside the operator it applies to. */
 export type Associativity = "left" | "nonassoc";
@@ -170,6 +200,10 @@ export function evaluate(expr: Expr, ctx: EvalContext): number {
       // Task 3.10. In the tree because the grammar can already produce it, and a missing
       // case here would read as a wrong answer rather than an unimplemented one.
       throw new CualError(`neighbour patterns are not implemented yet (${expr.pattern})`);
+
+    case "positioned":
+      // Task 4.7, for the same reason.
+      throw new CualError(`addressed variables are not implemented yet (${expr.name})`);
 
     case "range":
       return evaluateRange(expr, ctx);
