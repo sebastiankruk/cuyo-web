@@ -15,7 +15,8 @@
 import { describe, expect, it } from "vitest";
 import { tokenize } from "../level-format/lexer.ts";
 import type { Token } from "../level-format/lexer.ts";
-import { CualSyntaxError, parseCode, parseExpression } from "./parse.ts";
+import { CualSyntaxError, parseExpression } from "./parse.ts";
+import { parseCode } from "./code.ts";
 import { evaluate, type EvalContext, type Expr } from "./expr.ts";
 
 /** Lex a snippet the way a Cual block's contents arrive. */
@@ -394,28 +395,143 @@ describe("half-integers", () => {
   });
 });
 
-describe("statements are not written yet", () => {
-  // `parseCode` exists so that "the parser does not handle this" is a clear error rather
-  // than a wrong tree. Each of these is task 3.5's other half.
+describe("statements parse, and did not used to", () => {
+  // This block used to assert that each of these threw "task 3.5", because a stub
+  // `parseCode` in `parse.ts` rejected them by name. That stub is gone - the statement parser
+  // is `code.ts` - and these forms all parse. They are kept as positive assertions because
+  // they are the shortest complete list of what task 3.5 promised, and if a production is
+  // dropped this is the test that says so before the corpus test does.
   const statements: readonly [string, string][] = [
-    ["var x = 1;", "var"],
-    ["x = 1;", "assignment"],
-    ["x += 1;", "compound assignment"],
-    ["if (x) *;", "if"],
+    ["var xc = 1;", "var"],
+    ["xc = 1;", "assignment"],
+    ["xc += 1;", "compound assignment"],
+    ["if xc -> *;", "if"],
     ["switch { 1 -> *; };", "switch"],
     ["busy", "busy"],
     ["*", "draw command"],
     ["bonus(50);", "effect command"],
-    ["default 3;", "default"],
+    ["default inhibit = 3;", "default"],
+    ["[xc = 1] *;", "scoped block"],
+    ["A, B, C;", "comma sequence"],
   ];
 
   for (const [source, what] of statements) {
-    it(`refuses ${what} by name`, () => {
-      expect(() => parseCode(lex(source)), source).toThrow(/task 3\.5/);
+    it(`parses ${what}`, () => {
+      expect(parseCode(lex(source)), source).toHaveLength(1);
     });
   }
 
   it("refuses an empty block", () => {
     expect(() => parseCode(lex("   "))).toThrow(/empty/);
+  });
+});
+
+describe("half specifiers", () => {
+  // `absort: '(' absort_geklammert ';' haelften_spez ')'`, and `absort_geklammert` has an
+  // empty alternative - so the `;` can be the first thing inside the brackets, with no
+  // address in front of it at all. `@@(;!)`, `@@(;>)`, `@@(;<)` and `@@(;<=` are in
+  // augen.ld, bonimali.ld, dungeon.ld, kachelnR.ld, jahreszeiten.ld and labskaus.ld.
+  const cases: [string, string][] = [
+    ["! ", "opposite"],
+    [">", "right"],
+    ["<", "left"],
+    ["=", "here"],
+  ];
+
+  for (const [spec, half] of cases) {
+    it(`reads a semiglobal with no address and the half specifier '${spec}'`, () => {
+      expect(parse(`drehpos@@(;${spec})`)).toMatchObject({
+        kind: "positioned",
+        position: { kind: "semiglobal", half },
+      });
+    });
+
+    it(`reads a global with no address and the half specifier '${spec}'`, () => {
+      expect(parse(`drehpos@(;${spec})`)).toMatchObject({
+        kind: "positioned",
+        position: { kind: "global", half },
+      });
+    });
+  }
+
+  it("puts the half on a falling piece too, which is not a feld", () => {
+    // `@@(ziel-2;!)` in augen.ld. `setzeHaelfte` is on `Ort` itself upstream, so every
+    // variant carries one; with the half on `feld` alone this would not have parsed.
+    expect(parse("drehpos@@(ziel-2;!)")).toMatchObject({
+      kind: "positioned",
+      position: { kind: "fall", half: "opposite" },
+    });
+  });
+
+  it("puts the half on a feld", () => {
+    // `@@(xp/2,yp/2;>)` in dungeon.ld.
+    expect(parse("drehpos@@(xp/2,yp/2;>)")).toMatchObject({
+      kind: "positioned",
+      position: { kind: "feld", half: "right" },
+    });
+  });
+
+  it("refuses a half specifier with nothing to attach it to", () => {
+    expect(() => parse("drehpos@@(;)")).toThrow(CualSyntaxError);
+  });
+
+  it("leaves the half null when none is written", () => {
+    expect(parse("drehpos@@()")).toMatchObject({ position: { kind: "semiglobal", half: null } });
+  });
+});
+
+describe("open range bounds", () => {
+  // `intervall: ausdruck BIS_TOK | BIS_TOK ausdruck | ausdruck BIS_TOK ausdruck`. Upstream
+  // substitutes +/-VIEL for a missing bound *in the parser*, which is why the bound is null
+  // in the tree rather than 32767.
+  it("reads an open upper bound", () => {
+    expect(parse("size == 4..")).toMatchObject({
+      kind: "range",
+      lower: { kind: "number", value: 4 },
+      upper: null,
+    });
+  });
+
+  it("reads an open lower bound", () => {
+    expect(parse("size == .. 4")).toMatchObject({
+      kind: "range",
+      lower: null,
+      upper: { kind: "number", value: 4 },
+    });
+  });
+
+  it("decides openness by whether an expression follows, not from a list of closers", () => {
+    // `size == 4.. -> 3` in darken.ld and `size == 8.. -> E` in explosive.ld. An arrow is
+    // not a statement-closing token, which is why enumerating closers missed it: the `..`
+    // has to be read as open whenever nothing that can start an expression follows, and an
+    // arrow is such a case.
+    // A comparison only reaches the parser as a `switch` case or an `if` condition; a bare
+    // one at statement level is not Cual. darken.ld's shape, verbatim:
+    expect(JSON.stringify(parseCode(lex("switch { size == 4.. -> 3; };")))).toContain(
+      '"upper":null',
+    );
+    // explosive.ld's, where the body is a letter rather than a number.
+    expect(parseCode(lex("switch { size == 8.. -> E; };"))).toHaveLength(1);
+    // The same comparison as an `if` condition, which is the other place one appears.
+    expect(JSON.stringify(parseCode(lex("if size == 4.. -> *;")))).toContain('"upper":null');
+  });
+
+  it("still reads a closed range", () => {
+    expect(parse("size == 4 .. 9")).toMatchObject({
+      kind: "range",
+      lower: { kind: "number", value: 4 },
+      upper: { kind: "number", value: 9 },
+    });
+  });
+
+  it("refuses a second '..' after a finished range", () => {
+    // `1 == 1 .. == 2 .. 4`. This used to be rejected only by accident - `parseUpperBound`
+    // demanded an operand after the `..` and found the `==`. Letting an open upper bound be
+    // genuinely open removed the accident, and without an explicit check the input built
+    // `1 == (1.. == (2..4))` in silence.
+    expect(() => parse("1 == 1 .. == 2 .. 4")).toThrow(/cannot be chained/);
+    // The second shape is refused by `parseExpr`'s own leftover check, which is why there is
+    // no separate `..`-after-a-range rule: the one below would never be reached.
+    expect(() => parse("1 == 1 .. 2 .. 4")).toThrow(CualSyntaxError);
   });
 });

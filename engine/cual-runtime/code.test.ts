@@ -316,7 +316,7 @@ describe("draw commands", () => {
     expect(stmt.value).toEqual({
       kind: "positioned",
       name: "drehpos",
-      position: { kind: "global" },
+      position: { kind: "global", half: null },
     });
   });
 });

@@ -419,10 +419,10 @@ function parseCode1(cursor: SharedCursor): Stmt {
   const parts: Stmt[] = [first];
   while (cursor.takePunct(",")) {
     // An empty member is legal on either side of a comma, since `code_1` may be empty:
-    // `{,,,,,busy}` in aliens.ld. Checking only for the end of the block here missed the
-    // leading ones and failed on the second comma.
-    if (isEmptyMemberAhead(cursor)) break;
-    parts.push(parseCode1Single(cursor));
+    // `{,,,,,version=rnd(3)}` in aliens.ld and bunt.ld. It has to be *pushed*, not treated
+    // as the end of the sequence - stopping there left four commas and a statement behind,
+    // and the enclosing `{` then asked for a `}` that had already gone past.
+    parts.push(isEmptyMemberAhead(cursor) ? { kind: "nothing" } : parseCode1Single(cursor));
   }
   return { kind: "commaSequence", parts };
 }

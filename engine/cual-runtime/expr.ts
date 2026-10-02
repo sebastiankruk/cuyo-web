@@ -77,9 +77,13 @@ export type Half = "here" | "opposite" | "left" | "right";
  * allows it, which is inside parentheses and after a `;`.
  */
 export type Ort =
-  | { readonly kind: "global" }
-  | { readonly kind: "semiglobal" }
-  | { readonly kind: "fall"; readonly which: Expr }
+  // `half` is on every variant, not just `feld`, because upstream's is on `Ort` itself:
+  // `setzeHaelfte` is called on whatever `absort_geklammert` produced, and that production
+  // can be empty. `@@(;!)` - a semiglobal half a step to the right - and `@@(ziel-2;!)` -
+  // a falling piece, half a step - are both in the corpus, and neither is a `feld`.
+  | { readonly kind: "global"; readonly half: Half | null }
+  | { readonly kind: "semiglobal"; readonly half: Half | null }
+  | { readonly kind: "fall"; readonly which: Expr; readonly half: Half | null }
   | { readonly kind: "feld"; readonly x: Expr; readonly y: Expr; readonly half: Half | null };
 
 /** Everything an expression can be. */
