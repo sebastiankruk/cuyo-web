@@ -19,7 +19,9 @@
 #
 # See the "AiOps Environment Mode Directive" in .agents/rules/cuyo-standards.md.
 .PHONY: help init dev dev-lan check lint lint-code lint-types lint-docs \
-        lint-specs lint-shell check-art check-levels-upstream check-version \
+        lint-workflows \
+        lint-specs lint-shell lint-workflows check-art check-levels-upstream \
+        check-version \
         fetch-corpus test test-engine build \
         preview preview-host clean distclean
 
@@ -99,6 +101,7 @@ help:
 	@echo "  make lint-code    - ESLint, including the engine/ boundary rule"
 	@echo "  make lint-types   - tsc --noEmit"
 	@echo "  make lint-docs    - markdownlint-cli2 over the hand-written docs"
+	@echo "  make lint-workflows - actionlint over .github/workflows"
 	@echo "  make lint-specs   - openspec validate --strict over the change"
 	@echo "  make lint-shell   - shellcheck over scripts/"
 	@echo "  make check-art    - Assert no upstream artwork reached dist/"
@@ -226,7 +229,7 @@ check-level-index:
 check-art-manifest:
 	@bash scripts/check-art-manifest.sh
 
-lint: lint-code lint-types lint-docs lint-specs
+lint: lint-code lint-types lint-docs lint-specs lint-workflows
 
 # ESLint. The engine/ boundary rule lives in eslint.config.js, so this is also the
 # check that `engine/` stays runnable in plain Node.
@@ -243,6 +246,13 @@ lint-types:
 lint-docs:
 	$(AI_ECHO) "Linting documentation..."
 	@$(NPM) $(NPM_RUN) run lint:docs
+
+# The workflows are linted because a broken one does not fail: GitHub refuses to run a
+# file it cannot parse, producing a run with zero jobs and no log. `release.yml` shipped
+# with a missing action owner that way - eight green CI jobs, and no releases published.
+lint-workflows:
+	$(AI_ECHO) "Linting workflows..."
+	@$(NPM) $(NPM_RUN) run lint:workflows
 
 # `--no-install`, so this can never quietly fetch a different version of the spec
 # validator than the one this repository pins. A check that resolves its own tool is a
