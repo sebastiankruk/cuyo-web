@@ -48,9 +48,10 @@ been wrong twice.
   and that merge is what creates the tag. GitHub cannot enforce this — branch protection
   can require pull requests, reviews and status checks, but not the source branch's name
   — so `release.yml` looks up the commit's pull request and refuses to tag if the head
-  branch is not `release/*`. Cutting the release also means renaming `## [Unreleased]`
-  to `## [X.Y.Z]` and bumping `package.json`; `make check-version` fails with the exact
-  edit if either is missing. Full procedure in `docs/roadmap.md`.
+  branch is not `release/*`. A merge is only treated as a release when it changed the
+  version, so ordinary merges finish green and untouched. Cutting it also means renaming
+  `## [Unreleased]` to `## [X.Y.Z]` and bumping `package.json`; `make check-version`
+  fails with the exact edit if either is missing. Full procedure in `docs/roadmap.md`.
 - Versions follow semver with a `0.` major, and are cut when the app is worth _using_
   rather than when a group of tasks closes. `CHANGELOG.md` says what a player can do in
   each version, because "42 tasks done" is not something a player can tell.

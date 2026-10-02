@@ -56,6 +56,13 @@ request teaches you to ignore red checks, and the point of a gate is that red me
 something. The release is the point where the mistake is expensive enough to be worth
 stopping for.
 
+**What counts as a release is the version changing, not the tag being missing.** The
+workflow compares `package.json` against its parent commit and does nothing if the
+version is the same, so an ordinary merge to `main` finishes green and untouched. The
+alternative — keying on “has this version got a tag” — would be simpler and wrong here: no
+version has ever been tagged, so it would read every merge, including the one that merges
+the release workflow itself, as an attempt to release.
+
 **The steps, in order:**
 
 1. Work on a normal branch, as always. Merge it to `main` — that is not a release.
@@ -65,8 +72,9 @@ stopping for.
    - rename `## [Unreleased]` to `## [X.Y.Z]` in `CHANGELOG.md`, with the date
    - `make check-version` — it fails with the exact edit needed if either is missing
 4. Merge `release/X.Y.Z` into `main`.
-5. `release.yml` checks the source branch, sees the tag does not exist, and creates
-   `vX.Y.Z` and the GitHub release, with the changelog section as the notes.
+5. `release.yml` sees the version changed, checks the source branch, sees the tag does
+   not exist, and creates `vX.Y.Z` and the GitHub release, with the changelog section as
+   the notes.
 
 **The version bump is not a formality, and that is the point.** Step 3 is two visible
 edits that say what is being released. A release cut by bumping a version automatically,
@@ -76,9 +84,13 @@ versions are cut when the app is _worth using_, which is a judgement, not a sche
 Re-running the release workflow is safe: it sees the tag exists and does nothing, so
 fixing a typo in the notes afterwards is not a broken pipeline.
 
-**Not enforced:** direct pushes to `main` are not blocked, only made useless — a direct
-push has no pull request behind it, so the workflow assumes a deliberate request and
-proceeds. Blocking that needs branch protection, which needs repository admin.
+**Direct pushes that bump the version fail.** There is no pull request to check, and a
+push that changes the version is exactly the one that would put a tag somewhere nobody
+reviewed, so it is refused rather than assumed deliberate.
+
+**Not enforced:** pushes to `main` that leave the version alone are not blocked — they
+just do nothing. Blocking those needs branch protection on `main`, which needs repository
+admin, so it is not configured from here.
 
 ## What decides the order
 

@@ -26,15 +26,19 @@ name: Release
 # setting for it. Branch protection can require a pull request, reviews and status
 # checks, but it cannot say "only branches matching this pattern may be merged" — that
 # would let anyone who can open a pull request choose the source branch, which is the
-# thing the rule exists to prevent. So the check lives here: if the merge that produced
-# this commit did not come from a `release/` branch, the release fails loudly and no tag
-# is made.
+# thing the rule exists to prevent. So the check lives here: if the merge that bumped the
+# version did not come from a `release/` branch, the release fails loudly and no tag is
+# made.
 #
 # That is deliberately later than a failing status check on the pull request. A required
 # check that is red on every non-release branch trains you to ignore red checks, and this
 # project's whole gate philosophy is that a red gate means something. The release is the
 # place where the mistake is expensive enough to be worth stopping for, so that is where it
 # stops it.
+#
+# A merge is only *tried* as a release when it changed the version, so an ordinary
+# merge finishes green and untouched. See the "Is this merge a release?" step for why
+# keying on "this version has no tag" instead would be wrong for the first release.
 #
 # To enforce it earlier as well, add a required check to `main` — see the comment in
 # `quality.yml`.
@@ -66,6 +70,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The version bump is the thing that declares a release, and the way to know
+          # whether this merge made one is to compare against the commit before it. That
+          # comparison needs the parent, and when the merge commit has two parents the
+          # shallow default of one commit will not supply it — so this fetches the whole
+          # history. The repository is small enough that the clone is not worth
+          # optimising, and a release gate that silently reads the wrong parent because
+          # of a clone depth is exactly the kind of gate nobody trusts afterwards.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: setup-node@v7
@@ -95,8 +108,39 @@ jobs:
         id: version
         run: echo "version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
 
-      - name: Refuse unless the merge came from a release branch
+      # A merge to main is a release only if it changed the version. Keying on "this
+      # version has no tag" instead would be simpler and wrong for the first release:
+      # nothing has ever been tagged here, so it would read every merge — including the
+      # one that merges this file — as an attempt to release, and main would be red
+      # before a release existed.
+      #
+      # Comparing against the parent commit also makes the rule self-maintaining. After
+      # 0.3.0 is tagged, an ordinary feature merge leaves the version alone, so there is
+      # nothing to do and the run is green. Only the merge that bumps the version tries
+      # again, and only that one is subject to the branch gate below.
+      - name: Is this merge a release?
+        id: release
         if: github.event_name == 'push'
+        run: |
+          BEFORE="$(git show "${GITHUB_SHA}^:package.json" \
+            | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).version')"
+          AFTER="${VERSION_CURRENT}"
+          echo "previous: ${BEFORE}"
+          echo "current:  ${AFTER}"
+          if [ "$BEFORE" = "$AFTER" ]; then
+            echo "is-release=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::${AFTER} did not change; nothing to release."
+          else
+            echo "is-release=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::${BEFORE} -> ${AFTER}: this merge is a release."
+          fi
+        env:
+          VERSION_CURRENT: ${{ steps.version.outputs.version }}
+
+      # Everything below only concerns an actual release. An ordinary merge stops here,
+      # green, having done nothing.
+      - name: Refuse unless the merge came from a release branch
+        if: steps.release.outputs.is-release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.sha }}
@@ -108,8 +152,9 @@ jobs:
           HEADS="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}/pulls" \
             --jq '.[].head.ref' || true)"
           if [ -z "$HEADS" ]; then
-            echo "::notice::No pull request found for ${SHA}; assuming a direct push."
-            exit 0
+            echo "::error::A version was bumped by a direct push, not by a pull request."
+            echo "::error::Releases are cut by merging a release/* branch into main."
+            exit 1
           fi
           echo "Merged from: $(echo "$HEADS" | tr '\n' ' ')"
           if echo "$HEADS" | grep -qv '^release/'; then
@@ -121,6 +166,7 @@ jobs:
 
       - name: Skip if the tag already exists
         id: existing
+        if: steps.release.outputs.is-release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -136,7 +182,7 @@ jobs:
           fi
 
       - name: Create the tag and the release
-        if: steps.existing.outputs.already-released != 'true'
+        if: steps.release.outputs.is-release == 'true' && steps.existing.outputs.already-released != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -153,6 +199,7 @@ jobs:
           echo "Released v${VERSION} at ${GITHUB_SHA}"
 
       - name: Report
+        if: always() && steps.release.outputs.is-release == 'true'
         env:
           VERSION: ${{ steps.version.outputs.version }}
           SKIPPED: ${{ steps.existing.outputs.already-released }}
@@ -161,8 +208,4 @@ jobs:
             echo "::notice::v${VERSION} was already released; no tag created."
           else
             echo "::notice::Published https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${VERSION}"
-            echo
-            echo "The README version badge will render from the next commit, because"
-            echo "shields.io caches. If it still says 'no releases', that is the cache"
-            echo "and not a missing release - it resolves within a few minutes."
           fi
