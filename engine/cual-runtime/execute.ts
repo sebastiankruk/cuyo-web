@@ -101,10 +101,23 @@ export function runStatement(node: Stmt, ctx: ExecutionContext): boolean {
       // all. A walker where nothing is ever busy would satisfy every rule vacuously.
       return true;
 
-    case "nothing":
     case "number":
-      // "Normal statements like assignments are never busy." `zahl_code` sets `file` and
-      // does nothing else, which task 4.4 will fill in.
+      // `zahl_code`: `b.setVariable(spezvar_file, mZahl, set_code);` - a number in statement
+      // position is a draw *index*, not a value. `9;` in aliens.ld is the ninth frame. Not
+      // busy, per "Normal statements like assignments are never busy".
+      ctx.store.setSystem("file", node.value);
+      return false;
+
+    case "letterDraw":
+      // `buchstabe_code`: `b.setVariable(spezvar_pos, mZahl, set_code);` - a letter selects
+      // the position *within* the frame that `file` chose.
+      //
+      // The drawing itself is `mal_code`, which is task 4.9 and reads `file`, `pos` and `qu`
+      // together. This is the `buchstabe_code` half only, so a test can see `pos` move.
+      ctx.store.setSystem("pos", node.letter);
+      return false;
+
+    case "nothing":
       return false;
 
     case "procedureDef":
@@ -289,7 +302,6 @@ export function notYet(kind: string): never {
     scoped: "4.7",
     call: "4.6",
     draw: "4.9",
-    letterDraw: "4.9",
     effect: "4.12",
   };
   throw new Error(

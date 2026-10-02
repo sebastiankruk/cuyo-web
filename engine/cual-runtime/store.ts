@@ -246,6 +246,32 @@ export const SPECIAL_VARIABLES: readonly {
 export const SPECIAL_VARIABLE_COUNT = SPECIAL_VARIABLES.length;
 
 /**
+ * The system variables, by name.
+ *
+ * A name-to-slot lookup rather than a switch, because the two unnamed slots have to stay
+ * unnameable and a `findIndex` that skips them is the whole difficulty. `kind` and `version`
+ * are here as well as the rest: they are `da_keinblob` so they are not *initialised* from
+ * their defaults, but they are ordinary variables as far as Cual is concerned and levels read
+ * `kind` constantly.
+ */
+export const SYSTEM_VARIABLE_SLOTS: Readonly<Record<string, number>> = Object.freeze(
+  Object.fromEntries(
+    SPECIAL_VARIABLES.flatMap((variable, slot) => (variable.name === "" ? [] : [[variable.name, slot]])),
+  ),
+);
+
+/** The five variables `initSchritt` resets, with the values it resets them to. */
+export const PER_STEP_RESETS: readonly (readonly [number, number])[] = [
+  // `mDaten[spezvar_file] = 0; mDaten[spezvar_pos] = 0; mDaten[spezvar_quarter] = viertel_alle;`
+  [specialVariableSlot("file"), 0],
+  [specialVariableSlot("pos"), 0],
+  [specialVariableSlot("qu"), VIERTEL_ALLE],
+  // `mDaten[spezvar_out1] = spezvar_out_nichts; mDaten[spezvar_out2] = ...;`
+  [specialVariableSlot("out1"), SPEZVAR_OUT_NICHTS],
+  [specialVariableSlot("out2"), SPEZVAR_OUT_NICHTS],
+];
+
+/**
  * The slot of a named special variable, or -1.
  *
  * Deliberately linear over a fourteen-entry table. A map would be tidier and would also
@@ -329,6 +355,43 @@ export class BlobStore {
       }
       this.data[entry.slot] = entry.value;
     }
+  }
+
+  /**
+   * `Blop::initSchritt`: the per-step resets, before any of the blob's own code runs.
+   *
+   * `merkeAlteVarWerte()` first, then five assignments written *directly* into `mDaten`.
+   * Upstream's comment says why it does not go through `setVariable`: that would call
+   * `merkeAlteVarWerte()` a second time. The order is the point - taking the shadow first is
+   * what makes the resets themselves visible to a `@` read in this step, so a blob can see that
+   * `file` is now 0 rather than reading last step's file number.
+   *
+   * Only these five. `kind`, `version`, `weight`, `inhibit`, `behaviour` and the two falling
+   * speeds keep their values across steps; a level writing them means it.
+   */
+  beginStep(): void {
+    this.preserve();
+    for (const [slot, value] of PER_STEP_RESETS) this.data[slot] = value;
+  }
+
+  /** Read a system variable by name. Throws for a name that is not one. */
+  getSystem(name: string): number {
+    const slot = SYSTEM_VARIABLE_SLOTS[name];
+    if (slot === undefined) throw new Error(`Cual: no system variable named '${name}'`);
+    return this.data[slot];
+  }
+
+  /**
+   * Write a system variable by name.
+   *
+   * Goes through `preserve` like any other write, so a system variable a `@` read can see is
+   * shadowed like any other. Upstream's `setVariable` special-cases `kind` - it range-checks
+   * it and calls `setKindIntern` - and that is task 4.8, not here.
+   */
+  setSystem(name: string, value: number): void {
+    const slot = SYSTEM_VARIABLE_SLOTS[name];
+    if (slot === undefined) throw new Error(`Cual: no system variable named '${name}'`);
+    this.set(slot, value);
   }
 
   /** `Blop::getVariable`. */
