@@ -213,7 +213,9 @@ describe("what this task refuses", () => {
     expect(() => notYet("switchCase")).toThrow(/task 4\.2/);
     expect(() => notYet("scoped")).toThrow(/task 4\.7/);
     expect(() => notYet("call")).toThrow(/task 4\.6/);
-    expect(() => notYet("effect")).toThrow(/task 4\.12/);
+    // `effect` left the list in 4.12; `notYet("effect")` now says "?" and that is the
+    // point of the record being explicit rather than a default.
+    expect(() => notYet("effect")).toThrow(/task \?/);
     // Every kind the walker still refuses, so a new one cannot be added without a task. The
     // draw statements left this list in 4.9; `notYet("draw")` now says "?" and that is the
     // point of the record being explicit rather than a default.
@@ -229,7 +231,10 @@ describe("what this task refuses", () => {
     // The draw statements were in this list until 4.9 and are not any more, so they are not
     // here. Their refusal moved to `draw.test.ts`, where it is by name ("a draw needs a
     // context with a board") rather than by task number.
-    for (const source of ["{ explode; }", "{ 5; if 1 -> { explode; } }"]) {
+    // `tor_1;` is a call to an undefined procedure, which is the still-refused `call`
+    // statement; `{ 5, 7; 8; }` puts one in the *then* branch of a taken `if`, so the test
+    // proves the walker reaches a refused construct rather than skipping over it.
+    for (const source of ["{ tor_1; }", "{ 5; if 1 -> { tor_1; } }"]) {
       const statements = parseCode(lex(source));
       const allocation = allocateSlots(statements);
       const ctx: ExecutionContext = {

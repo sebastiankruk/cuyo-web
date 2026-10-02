@@ -17,6 +17,8 @@ import { resolveOrt, writeAddressed } from "./access.ts";
 import type { AccessField, ResolvedOrt } from "./access.ts";
 import { canDrawAt, isPaintable, PictureStack } from "./draw.ts";
 import type { DrawContext } from "./draw.ts";
+import { applyEffect } from "./effects.ts";
+import type { EffectContext } from "./effects.ts";
 import { divv, modd } from "./divmod.ts";
 
 /** What the walker needs from the blob it is running. */
@@ -39,6 +41,8 @@ export interface ExecutionContext {
   readonly field?: AccessField;
   /** The window deferred writes queue onto. */
   readonly slices?: TimeSlices;
+  /** `bonus`, `message`, `explode`, `sound` and `lose`. */
+  readonly effects?: EffectContext;
   /** The three draw statements need a board and a place to queue pictures. */
   readonly draw?: {
     /** `mMalenErlaubt` and the blob's own `file`/`pos`/`quarter`. */
@@ -123,6 +127,9 @@ export function runStatement(node: Stmt, ctx: ExecutionContext): boolean {
     case "draw":
       return runDraw(node, ctx);
 
+    case "effect":
+      return runEffect(node, ctx);
+
     case "busy":
       // `busy_code` is the one leaf that *is* busy: `case busy_code: busy = true;`. It is
       // how a level says "I am still working on this" without any machinery of its own, and
@@ -161,6 +168,36 @@ export function runStatement(node: Stmt, ctx: ExecutionContext): boolean {
     default:
       return notYet(node.kind);
   }
+}
+
+/**
+ * The five effects.
+ *
+ * `bonus` and `sound` take an expression and a loaded sample respectively; `message` and
+ * `sound` take a *name*, which upstream resolves in the grammar action — so by the time a
+ * `sound` reaches here its sample number is already known, and an unknown name failed at load
+ * time rather than at this line.
+ *
+ * Every effect is "not busy", as `getStapelHoehe`'s single `return 0` for all five says.
+ */
+function runEffect(node: Extract<Stmt, { kind: "effect" }>, ctx: ExecutionContext): boolean {
+  const effects = ctx.effects;
+  if (!effects) {
+    throw new Error("Cual: an effect needs a context to act on");
+  }
+  // `bonus` carries an expression to evaluate; `message` and `sound` carry a *name* and have
+  // no expression at all, which is why the argument object is built from both fields rather
+  // than from `node.argument` alone. Reading only the expression gave `message` an empty text.
+  const value = node.argument === null ? undefined : ctx.evaluate(node.argument);
+  const hasArgument = node.argument !== null || node.filename !== null;
+  applyEffect(
+    node.name,
+    hasArgument
+      ? { value, name: node.filename ?? undefined, sample: node.sampleNumber ?? undefined }
+      : null,
+    effects,
+  );
+  return false;
 }
 
 /**
@@ -452,13 +489,15 @@ export function notYet(kind: string): never {
   // "refused until then" tests that had to move rather than disappear. What is still refused
   // is a `switch` shape, a builtin call, and the effects (`bonus`, `message`, `explode`,
   // `lose`, `sound`).
+  // The effects left this list in 4.12 and the draw statements in 4.9; both were "refused until
+  // then" tests that had to move rather than disappear. What is still refused is a `switch`
+  // shape, a scoped block, and a builtin call.
   const task: Record<string, string> = {
     if: "4.2",
     switch: "4.2",
     switchCase: "4.2",
     scoped: "4.7",
     call: "4.6",
-    effect: "4.12",
   };
   throw new Error(
     `Cual: a '${kind}' statement is not implemented yet (task ${task[kind] ?? "?"})`,
