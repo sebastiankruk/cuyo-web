@@ -6,14 +6,14 @@ reasoning behind the sequence.
 
 ## Where we are
 
-97 of 166 tasks. Two groups are done, and the difference matters:
+99 of 166 tasks. Two groups are done, and the difference matters:
 
 | Group           |       | What it means                                                       |
 | --------------- | ----- | ------------------------------------------------------------------- |
 | 1. Toolchain    | done  | Node, TypeScript, `make check` as the single gate, CI.              |
 | 2. Level format | done  | The `.ld` language, parsed and compiled against all 79 real levels. |
 | 5. Game core    | 20/20 | The rules: falling, connections, explosions, greys, border.         |
-| 14. Lint and CI | 15/20 | Code, docs, shell, spec and workflow linting; nine CI jobs.         |
+| 14. Lint and CI | 16/20 | Code, docs, shell, spec and workflow linting; ten CI jobs.          |
 | 13. Coverage    | 5/8   | Floors set and measured; DOM-environment tests outstanding.         |
 | 6. Catalogue    | 7/12  | Loadable, gated, tracked, introduced — and now visible.             |
 
@@ -40,9 +40,11 @@ a component's percentage measures how much JSX it has rather than whether it wor
 set to today's figure would move with every regression and so could never catch one. Two
 things about them are worth knowing before trusting a green run: the floors only bite under
 `make coverage`, not `make test`, because vitest evaluates thresholds only when coverage is
-enabled — measured, not assumed — and no coverage run is in CI yet, which is 14.17. So
-`make check` passing is not a statement about coverage, and the README says so in those
-words.
+enabled — measured, not assumed. So `make check` passing is not a statement about coverage,
+and the README says so in those words. **CI does enforce them, as a job of its own** (14.17):
+a coverage breach reports every test green and then exits 1, so folding it into the `test`
+job would read as "the suite is broken" and point at an assertion instead of at the
+percentage.
 
 **0.2.0 is cut and playable.** All 79 levels, real rules, playable on a phone. That is
 the honest description of where this is: not a game yet, but the game underneath one.

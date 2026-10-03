@@ -87,8 +87,11 @@ mechanism, not by reading the config: with `render/` floored at 99% against 91.7
 no test into `engine/` moved it from 93.7% to 93.6%. What that also showed is that **vitest
 evaluates `coverage.thresholds` only when coverage is enabled** — the same raised floor under a
 plain `vitest run` exits 0. So `make check` does not enforce the floors, `make coverage` does,
-and putting a coverage run in CI is 14.17, which is where the remaining half belongs. The
+and putting a coverage run in CI was 14.17, which is where the remaining half belonged. The
 README says so in those words rather than leaving a reader to assume `make check` guards it.
+**14.17 closes that half**, as its own job rather than a flag on the test run: a coverage
+breach reports every test green and then exits 1, so inside the `test` job it would read as
+"the suite is broken" and point at an assertion instead of at the percentage.
 
 **12.8's premise was wrong in a way that mattered.** It said the corpus-absence skip in
 `render/palette.test.ts` could go because "the level files are committed" — but that suite
@@ -457,5 +460,5 @@ this project is worked on by an agent that pays for every line of tool output, s
 - [ ] 14.14 Add a formatter check, and record why no formatter was adopted earlier: the code is hand-formatted at 80 columns with aligned tables, and running one now would rewrite every file for no rule that catches a defect
 - [ ] 14.15 Add a licence-header check over source and scripts, and verify `ATTRIBUTION.md` and the GPL notices are named from it
 - [ ] 14.16 Add a CI job that runs `npm audit` and fails on a high or critical advisory, with a documented allow-list and an expiry date for each entry
-- [ ] 14.17 Add coverage reporting to CI once 13.6 sets the floors, so a drop below them fails the build rather than appearing in a diff
+- [x] 14.17 Add coverage reporting to CI once 13.6 sets the floors, so a drop below them fails the build rather than appearing in a diff
 - [ ] 14.18 Add a scheduled weekly job that re-fetches the corpus and re-runs the level-format suite, so an upstream release is noticed rather than discovered

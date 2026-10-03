@@ -230,8 +230,12 @@ single number for the whole run and the floors are per tier — "Statements:
 evaluates `coverage.thresholds` only when coverage is enabled, which was measured
 rather than assumed: with `render/` floored at 99% against 91.7% achieved, a plain
 `vitest run` still exits 0. So `make test` cannot catch a coverage regression and
-this target can. Putting a coverage run in CI is task 14.17; until that lands,
-`make coverage` is the only thing that enforces them.
+this target can.
+
+**CI enforces them too, in a job of its own.** A coverage threshold failing is not
+a failing test — `vitest run --coverage` reports every test green and then exits 1
+— so folding it into the `test` job would read as "the suite is broken" and send
+you looking for a bad assertion instead of at the percentage.
 
 The floors are a decision, not a measurement, and they are lower than what is
 achieved on purpose. A floor set to today's figure cannot catch a regression,
@@ -293,6 +297,7 @@ for `--reporter=verbose` — and forcing `--reporter=dot` makes it _larger_, at
 | `shell`      | shellcheck, pinned to 0.10.0                                                  |
 | `specs`      | `openspec validate --strict --all`                                            |
 | `test`       | vitest, with the upstream corpus fetched first                                |
+| `coverage`   | vitest under the v8 instrumenter, so a tier under its floor fails the build   |
 | `build`      | production bundle, plus an assertion that no upstream artwork reached `dist/` |
 | `agent-mode` | runs the gates with `CUYO_AI_MODE=1` and asserts the output is terse          |
 | `human-mode` | asserts the banners are still there                                           |
