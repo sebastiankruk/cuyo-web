@@ -165,6 +165,66 @@ the test rather than in a test that reads `.context/upstream-cuyo`: CI has no up
 a test would skip there and the check would exist on one machine only. Provenance is in the comments,
 values are asserted in CI, and neither half pretends to be the other.
 
+**12.3 turned up the largest gap in the project, and it is not a gap in the test.**
+`engine/game-core/scenarios.test.ts` plays `paratroopers.ld` end to end through the real
+`LevelLoader` over the committed `levels/upstream`, the real `Simulation`, and the same four actions
+`app/gestures.ts` calls. Nothing reaches inside: no test sets `goalCount`, `board`, `borderPx` or
+`phase`. One key press is the whole difference between the two endings:
+
+- **rotate every step → won at step 447.** The piece falls in column 4, lands on the 2x2 `Cannon`
+  goal block at columns 4-5, joins it, and the group explodes with the goals in it.
+- **moveLeft every step → lost at step 1744.** Every piece is walked to column 0, nothing ever
+  connects to the block, all four goals are still on their starting squares, and the border rises
+  until a piece cannot be introduced.
+
+Same level, same seed, same step count. That is the strongest statement available that the input
+path is wired: a test where the input did nothing could not produce two endings.
+
+**The finding: no level's Cual programme is ever executed, anywhere.** `loader.ts` does not import
+the Cual compiler at all — its private `compile()` builds kinds, settings and the start layout and
+nothing else. `LevelDef` has no field for a compiled program, and `Simulation` has no phase that runs
+one. Group 2 compiled all 79 levels and group 3 built the whole runtime, and **the two have never
+been joined**: no test loads a real level and runs its code, and `compile-corpus.test.ts` compiles
+every level then throws the trees away. So the blobs in these scenarios, and in the game, only fall,
+stack and explode — they never pull themselves.
+
+Measured, not asserted: driving all 79 levels with no input and a 2500-step cap gives **9 won, 69
+lost, 1 unfinished**, and a goal blob is ever removed in exactly those 9. For the other 70,
+upstream's own logic is what pulls blobs together; without it the board silts up and the border
+wins. `ParatroopersInvers` was chosen *because* it survives the limitation in both directions, so
+the file does not flatter it.
+
+**This needs its own task and does not have one.** Wiring it means `LevelDef` carrying a compiled
+program, the loader keeping it, and `Simulation` running each blob's draw code at the right point
+in the phase order — which is upstream's `BlopGitter::animiere()` and therefore the same ordering
+question as design decision 6, still unimplemented. It is recorded here rather than absorbed,
+because 12.3 asked for tests and this is an engine change.
+
+**Two mutations found that the file's most elegant assertion was worth nothing.** The time-bonus
+check was first `score === scoreAtBonus + POINTS_PER_TIME_BONUS * GRY`, which puts the constant on
+both sides — doubling the payout satisfies it exactly. Rewritten as
+`(score - scoreAtBonus) / bonusSteps`, which reads better and *also* passes, because the measured
+rate is whatever the constant says. Only an absolute number pins it: 96 before the bonus, 296
+after, 20 steps at `punkte_fuer_zeitbonus` = 10. Two attempts, two green files, and the third
+caught both that and a doubled `POINTS_PER_NORMAL`.
+
+**Two of my assertions were wrong and measurement caught them before they became tests.** I claimed
+`rotate` leaves the piece's column alone; it does not — the piece is two blobs wide and turning it
+changes which blob is the anchor, so the winning run visits column 5 as well as 4. And I asserted
+the loss run's `Gray` blobs sat where they started; they do not — something lifts them, and the
+winning run ends with ten of them on row 0 having begun on rows 18-19. Neither mechanism is claimed
+in the file, because neither is understood.
+
+**One mutation is not caught, and is recorded rather than papered over.** Removing `rotate`'s
+blob-order swap leaves this file green, because both blobs of the falling piece are the same kind
+here and the swap is invisible in board state. It is unverified rather than verified-and-fine.
+
+**One earlier result was an artefact and is not in the file.** A first survey used a constant-value
+`ScriptedPrng` and appeared to show `Baggis` flipping between won and lost on one `moveLeft` per
+step. With the real `Prng` it loses under every policy: the goals are `chainGrass`, so they need a
+chain reaction, and with no Cual nothing ever joins a group big enough to produce one. The
+`ScriptedPrng` result was real arithmetic on a game that cannot occur.
+
 **7.4, 7.6 and 7.7 were implemented and unverified; they are now verified against the
 renderer's real draw calls, in `render/presentation.test.ts`.** Every assertion names a
 position rather than a count — the lesson this project's tests were written after, where
@@ -491,7 +551,7 @@ long enough that scrolling to the bottom is the only way to see what exists.
 
 - [x] 12.1 Encode the man page's worked examples as tests: division/modulo table, neighbour pattern, six `@`-assignment cases, busy switch, apple/orange kind constants, and `startdist` rows
 - [x] 12.2 Encode the source-derived constants as a single documented module and assert each value against `src/spielfeld.cpp`, `src/leveldaten.h` and `src/code.h` in comments
-- [ ] 12.3 Add engine scenario tests driving real input sequences and asserting board state for one level end to end, including a win and a loss
+- [x] 12.3 Add engine scenario tests driving real input sequences and asserting board state for one level end to end, including a win and a loss
 - [ ] 12.4 Make the build gate compile all bundled levels and verify `npm run build` fails on any level that does not parse or compile
 - [ ] 12.5 Measure frame time with the development overlay on a mid-range device profile and verify the board stays within budget with a full board and active animations
 - [ ] 12.6 Verify the Standard track is playable end to end on a real phone, including touch controls, orientation change and offline start
