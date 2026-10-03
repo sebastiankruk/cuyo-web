@@ -94,22 +94,41 @@ describe("the card draws a tile", () => {
 });
 
 describe("the tile is styled as a tile", () => {
-  it("is given a size rather than left to its intrinsic one", () => {
-    // An SVG with a viewBox and no width has an intrinsic aspect ratio but no intrinsic
-    // size, and in a grid cell that resolves against the content — which for 79 cards of
-    // different description lengths means 79 different tile sizes.
-    expect(CSS).toMatch(/\.levelCard__tile \.tile\b/);
-    expect(CSS).toMatch(/\.levelCard__tile \.tile\b[^{]*\{[^}]*width:\s*100%/);
-    expect(CSS).toMatch(/\.levelCard__tile \.tile\b[^{]*\{[^}]*height:\s*auto/);
+  it("is given a fixed height, so no card is taller than its text", () => {
+    // Height rather than width, because the crops vary: 3 rows to 14 across the corpus.
+    // A fixed *width* made the tall ones 134 pixels tall — taller than the name and author
+    // they sat beside — which is what a screenshot showed. Fixed height bounds it at
+    // 2.4rem, and the width follows the viewBox's aspect ratio: 27 to 128 pixels.
+    const rule = CSS.slice(CSS.indexOf(".levelCard__tile .tile"));
+    expect(rule.slice(0, rule.indexOf("}"))).toMatch(/height:\s*2\.4rem/);
+    // `auto` is what lets the width come from the aspect ratio; a percentage here would
+    // re-introduce the per-card size the fixed height exists to remove.
+    expect(rule.slice(0, rule.indexOf("}"))).toMatch(/width:\s*auto/);
+    // Guard, not design: if `auto` ever failed to resolve against the intrinsic ratio, the
+    // replaced-element default is far wider than the card.
+    expect(rule.slice(0, rule.indexOf("}"))).toMatch(/max-width:\s*100%/);
   });
 
-  it("is laid out beside the card's text, and goes above it on a narrow screen", () => {
-    // Below the breakpoint a fixed column would leave the description about twenty
-    // characters wide, and the card becomes taller than it is informative.
-    expect(CSS).toMatch(/\.levelCard\b[^{]*\{[^}]*grid-template-columns:/);
-    expect(CSS).toMatch(/@media \(max-width: 30rem\)/);
-    const narrow = CSS.slice(CSS.indexOf("@media (max-width: 30rem)"));
-    expect(narrow).toMatch(/grid-template-columns:\s*1fr/);
+  it("sits on the right of the card's text, at every width", () => {
+    // A screenshot showed the tile above the level's name, which is a row the card cannot
+    // do without: the name and author are about 45 pixels tall, so a 38-pixel tile beside
+    // them adds no height at all. There was a breakpoint that moved it above the text on a
+    // narrow screen, and it is gone — a tile that changes sides with the viewport is a tile
+    // whose position has to be checked twice.
+    expect(CSS).not.toMatch(/@media[^{]*\{[^}]*levelCard__tile/);
+    expect(CSS).toMatch(/\.levelCard\b[^{]*\{[^}]*grid-template-areas:/);
+    expect(CSS).toMatch(/"body\s+tile"/);
+    expect(CSS).toMatch(/"act\s+act"/);
+    expect(CSS).toMatch(/\.levelCard__tile\b[^{]*\{[^}]*justify-self:\s*end/);
+  });
+
+  it("is placed by grid area, not by source order", () => {
+    // The tile comes *after* the body in the JSX, because the body is what a screen reader
+    // reads first and the tile is aria-hidden. So the placement has to come from the
+    // stylesheet, and these two rules are the only thing tying the element to its area.
+    expect(CSS).toMatch(/\.levelCard__body\b[^{]*\{[^}]*grid-area:\s*body/);
+    expect(CSS).toMatch(/\.levelCard__tile\b[^{]*\{[^}]*grid-area:\s*tile/);
+    expect(CSS).toMatch(/\.levelCard__actions\b[^{]*\{[^}]*grid-area:\s*act/);
   });
 
   it("does not draw a marker, because at this size it cannot be seen", () => {

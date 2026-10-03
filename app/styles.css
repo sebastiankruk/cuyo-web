@@ -646,56 +646,59 @@ button::-moz-focusring {
 }
 
 /*
- * The tile: the level's board, small.
+ * The tile: the level's board, small, on the right of the card's text.
  *
- * Laid out as a two-column grid so the card is the tile beside the text rather than the
- * tile above it. Above would push the level's name below the fold of a card that is
- * mostly whitespace above the blobs anyway — the board's own start layout leaves its top
- * half empty — and 79 cards is a long scroll to get worse.
+ * On the right because that is the only place it costs nothing. The name and author are
+ * about 45 pixels tall together, so a tile of the same height sits beside them and adds
+ * no height at all — where above the text it was a row the card could not do without, and
+ * the catalogue is 79 cards long. That was the first attempt's mistake and a screenshot
+ * showed it: every card had a picture sat above its own name.
  *
- * The tile crops to the rows a level actually occupies — the board is 88.3% empty at the
- * start, so a tile of the whole board is mostly the background colour. What is left is a
- * landscape strip: a median of 3.5 rows out of 20, and at most 14. The width is therefore
- * set for a strip rather than for a portrait board: 6rem makes the common case about
- * 96 × 34 pixels, which is small enough to sit beside the text and large enough to read.
- *
- * The width is fixed rather than left to the grid because a `1fr` column beside text of
- * varying length would give every card a differently sized picture, and a catalogue whose
- * tiles do not line up is much harder to scan than one whose pictures differ.
+ * **Height is fixed and width follows the aspect ratio**, which is the other half of
+ * keeping it short. The tile crops to the rows a level occupies, and those rows vary from
+ * 3 to 14 across the corpus, so a fixed *width* gave tiles from 29 to 134 pixels wide —
+ * and the tall ones 134 pixels of height, which is taller than the text beside them. A
+ * fixed height bounds both: every tile is 2.4rem tall, and its width is that height times
+ * the crop's aspect, so a level that fills the board is a narrow tall strip and a level
+ * with one row of blobs is a wide short one. Nothing is scaled to fit and nothing is
+ * clipped, so the tile is still the board it claims to be.
  */
 .levelCard {
-  grid-template-columns: 6rem 1fr;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "body tile"
+    "act  act";
   column-gap: 1rem;
   align-items: start;
 }
 
+.levelCard__body {
+  grid-area: body;
+}
+
 .levelCard__tile {
-  grid-column: 1;
-  grid-row: 1 / span 3;
+  grid-area: tile;
+  justify-self: end;
+}
+
+.levelCard__actions {
+  grid-area: act;
 }
 
 .levelCard__tile .tile {
   display: block;
-  width: 100%;
-  height: auto;
+  height: 2.4rem;
+  /*
+   * `auto` so the SVG takes its width from the viewBox's aspect ratio, which is what
+   * makes a fixed height possible. `max-width` as a guard rather than as a design: if a
+   * browser ever failed to resolve `auto` against the intrinsic ratio, the default
+   * replaced-element width would be far wider than the card and the grid would let it
+   * push the text off the side.
+   */
+  width: auto;
+  max-width: 100%;
   border: 1px solid var(--line);
   border-radius: 3px;
-}
-
-/*
- * Below the two-column threshold the tile goes back above the text rather than beside it,
- * because at that width a 4.5rem column leaves the description about 20 characters
- * wide and the card becomes taller than it is informative.
- */
-@media (max-width: 30rem) {
-  .levelCard {
-    grid-template-columns: 1fr;
-  }
-
-  .levelCard__tile {
-    grid-row: 1;
-    width: 6rem;
-  }
 }
 
 /*

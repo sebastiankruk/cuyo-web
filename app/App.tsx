@@ -311,11 +311,15 @@ function LevelCard({
       {/*
         The level's board, as a tile.
 
-        First in the card so it is the first thing the eye lands on, and before the body
-        text in the DOM for the same reason: the tile is how the catalogue is meant to be
-        read, by shape rather than by name. It follows the *chosen* difficulty, because
-        that is the question it answers — "what am I about to play" — and a tile that
-        always showed `normal` would quietly contradict the button next to it.
+        Placed on the right of the name by the stylesheet's grid areas rather than by
+        source order — the grid names the areas, so moving the tile in the DOM would not
+        move it on screen. It is *after* the body here on purpose even so: the body is what
+        a screen reader reads first, and the tile is `aria-hidden`, so having it earlier in
+        the document would only put a picture between the reader and the level's name.
+
+        It follows the *chosen* difficulty, because that is the question it answers — "what
+        am I about to play" — and a tile that always showed `normal` would quietly
+        contradict the button next to it.
 
         `shown` is the resolved entry for the chosen difficulty, which can be undefined
         for a level that offers the difficulty but resolves to nothing; the tile is then
