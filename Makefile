@@ -24,6 +24,12 @@
         check-version \
         fetch-corpus test test-engine build \
         preview preview-host clean distclean
+# `coverage` is in .PHONY for a concrete reason rather than as routine: vitest's default
+# `reportsDirectory` is `coverage/`, so a target named `coverage` collides with the
+# directory its own first command creates, and make then reports the target "up to date"
+# on every later run. Without the declaration `make coverage` succeeds while doing nothing,
+# which is the worst available failure.
+.PHONY: coverage
 
 SHELL := /bin/bash
 
@@ -112,6 +118,7 @@ help:
 	@echo "Testing and building:"
 	@echo "  make test         - Vitest suite"
 	@echo "  make test-engine  - Vitest, verbose"
+	@echo "  make coverage     - Vitest under coverage, then the per-tier table"
 	@echo "  make build        - Typecheck + production bundle"
 	@echo "  make check        - lint + test + build, the same as CI"
 	@echo "  make clean        - Remove build output"
@@ -270,6 +277,25 @@ test:
 
 test-engine:
 	@$(NPM) $(NPM_RUN) test -- --reporter=verbose
+
+# Coverage, which is a separate run from `make test` on purpose: it re-executes the
+# whole suite under the v8 instrumenter, so putting it in `make check` would tax
+# every local run for a number that changes far less often than the code does.
+#
+# **The floors only bite here, not under `make test`.** Vitest evaluates
+# `coverage.thresholds` only when coverage is enabled, which was measured rather than
+# assumed: with `render/` floored at 99% against 91.7% achieved, plain `vitest run`
+# still exits 0. So `make test` cannot catch a coverage regression, `make coverage`
+# can, and 14.17 is what puts a coverage run in CI. Until that lands, this target is
+# the only thing that enforces them.
+#
+# The second command is what turns vitest's single total into the per-tier table the
+# README records, and it is a separate program so that a run of it can be read as a
+# check in its own right. It exits non-zero when a tier is under its floor.
+coverage:
+	$(AI_ECHO) "Running tests with coverage..."
+	@$(NPM) $(NPM_RUN) run test:coverage
+	@node scripts/coverage-tiers.mjs
 
 build: level-data
 	$(AI_ECHO) "Building..."

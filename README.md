@@ -205,6 +205,7 @@ make lint-docs     # markdownlint over the hand-written docs
 make lint-specs    # openspec validate --strict --all
 make lint-shell    # shellcheck over scripts/
 make test          # engine + level-format tests, Node environment
+make coverage      # the same suite under coverage, then the per-tier table
 make build         # typecheck + production bundle
 make help          # everything else
 ```
@@ -212,6 +213,50 @@ make help          # everything else
 `make` is a thin wrapper — every target runs one npm script, so `npm run lint`,
 `npm test` and `npm run build` are equivalent and neither way has to be learned
 twice. What the Makefile adds is `CUYO_AI_MODE`.
+
+### Coverage
+
+```sh
+make coverage
+```
+
+Two things happen. Vitest re-runs the suite under the v8 instrumenter and fails
+the run if a tier is under its floor. Then `scripts/coverage-tiers.mjs` reads the
+report it left and prints the per-tier table, because vitest's own summary is a
+single number for the whole run and the floors are per tier — "Statements:
+92.91%" says nothing about whether `engine/` met its own bar.
+
+**The floors bite under `make coverage`, and not under `make test`.** Vitest
+evaluates `coverage.thresholds` only when coverage is enabled, which was measured
+rather than assumed: with `render/` floored at 99% against 91.7% achieved, a plain
+`vitest run` still exits 0. So `make test` cannot catch a coverage regression and
+this target can. Putting a coverage run in CI is task 14.17; until that lands,
+`make coverage` is the only thing that enforces them.
+
+The floors are a decision, not a measurement, and they are lower than what is
+achieved on purpose. A floor set to today's figure cannot catch a regression,
+because it moves with it.
+
+| Tier      | Files | Statements | Branches | Floor                         |
+| --------- | ----: | ---------: | -------: | ----------------------------- |
+| `engine/` |    41 |     93.7 % |   87.4 % | ≥ 90 % stmts, ≥ 85 % branches |
+| `render/` |     4 |     91.7 % |   84.0 % | ≥ 80 % statements             |
+| `app/`    |     6 |     81.9 % |   84.8 % | none                          |
+
+Measured on the `coverage-floors` branch at 1445 passing tests. The test count is
+not part of the measurement: `coverage.test.ts` imports nothing under `engine/`,
+`render/` or `app/`, so adding tests to it does not move these figures — only code
+does.
+
+Re-measure and update this table when it moves. That is the point of recording it:
+a fall shows up in a review diff instead of being discovered later.
+
+`app/` has no floor on purpose: a React component is mostly JSX, so its percentage
+measures how much markup it has rather than whether it works, and it is held by
+behaviour tests and review instead. `levels-src/` is not measured at all — it is
+the index and manifest generators, which run under `make` and not under a unit
+test, so a coverage run would say "1.4%" about them, which is true and about the
+wrong thing.
 
 ### Agent output mode
 
