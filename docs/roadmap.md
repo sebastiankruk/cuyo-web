@@ -6,7 +6,7 @@ reasoning behind the sequence.
 
 ## Where we are
 
-103 of 166 tasks. Two groups are done, and the difference matters:
+104 of 166 tasks. Two groups are done, and the difference matters:
 
 |            Group |       | What it means                                                       |
 | ---------------- | ----- | ------------------------------------------------------------------- |
@@ -17,7 +17,7 @@ reasoning behind the sequence.
 |     13. Coverage |   5/8 | Floors set and measured; DOM-environment tests outstanding.         |
 |     6. Catalogue |  7/12 | Loadable, gated, tracked, introduced — and now visible.             |
 |  7. Presentation |  3/14 | Colours, hex, mirror and explosions verified; draw-op order is not. |
-| 12. Verification |   1/8 | The manual's examples; constants and scenarios to go.               |
+| 12. Verification |   2/8 | Every constant cites a source line; code.h contributes none.        |
 
 Everything else is untouched: 8 (art), 9 (shell), 10 (mobile), 11 (PWA).
 

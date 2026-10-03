@@ -127,6 +127,44 @@ with `busySet(slots.second, …)` and the recursive reset only reaches flags nes
 branch. Measured with the line removed and restored: identical output on every step. So that line
 is currently unverified rather than verified-and-fine, and this note is the only place that says so.
 
+**12.2's own premise is slightly off, and the off part is the finding.** `engine/game-core/constants.ts`
+already existed as one documented module, but its citations named a *file* and not an
+*identifier*, so a reader could not diff a value against its source without reading the C++. Every
+value now carries file, line and upstream's own name. Two of the citations were wrong:
+
+**`GREYS_PER_CHAIN_REACTION` was cited to `src/spielfeld.cpp` and is in `src/spielfeld.h:37`.** The
+value was right. So was the second one's value, but not for the stated reason.
+
+**`EXPLOSION_STEPS` is not a constant in upstream at all.** It was cited as "`src/spielfeld.cpp`:
+steps an exploding blob stays visible" and nothing in that file says it. The real mechanism is
+`src/blop.cpp:347` — an explosion ends when `spezvar_am_platzen` passes
+`ld->mExplosionBild.anzBildchen()`, and `anzBildchen()` is `(mBreite / gric) * (mHoehe / gric)`
+(`src/bilddatei.cpp:205`), so the length is **the picture count of the level's own explosion image**.
+`mExplosionBild` comes from the level's `explosionpic` word (`src/leveldaten.cpp:476`), and **two
+corpus levels override it** — `theater.ld:72` and `schemen.ld:37`, both to `ithDreckExpl.xpm`. So
+the fixed 8 is right for all 79 levels only because both image files are 128×64, which at `gric` 32
+is 4×2 = 8 frames each. Upstream's own comment agrees with the number (`src/knoten.cpp:48–49`,
+"0 = nicht am platzen; sonst 1 - 8"). The test now asserts that arithmetic from the two dimensions
+instead of repeating the 8, so the coincidence is visible rather than hidden.
+
+**`src/code.h` contributes no constant, so "a single module" cannot mean what 12.2 says.** It holds
+`divv` and `modd`, which are functions. They are transcribed in `engine/cual-runtime/divmod.ts`,
+which also records where upstream and `cual.6` disagree — `modd`'s fourth quadrant flips the
+quotient's sign and the man page wins. There are therefore **three** documented constant modules,
+one per source family (`game-core/constants.ts` from `layout.h`/`blop.h`/`sorte.h`/`leveldaten.h`/
+`spielfeld.*`/`knoten.cpp`, `level-format/cual-constants.ts` from `knoten.cpp`'s name tables,
+`cual-runtime/divmod.ts` from `code.h`), and merging them would put a level's distkey names in the
+same table as the board's width. Ticked on the reading that 12.2 wants a source citation to be a
+requirement; if it wanted one physical file, that is a different task.
+
+**The check that makes it a requirement is the reverse direction.** `constants.test.ts` holds each
+upstream line's own literal and compares it to the module, and then asserts that **every numeric
+export appears in the table** — so a constant added without a citation fails. A stale row fails the
+mirror check, so a rename cannot silently drop a citation. This is why the transcription lives in
+the test rather than in a test that reads `.context/upstream-cuyo`: CI has no upstream tree, so such
+a test would skip there and the check would exist on one machine only. Provenance is in the comments,
+values are asserted in CI, and neither half pretends to be the other.
+
 **7.4, 7.6 and 7.7 were implemented and unverified; they are now verified against the
 renderer's real draw calls, in `render/presentation.test.ts`.** Every assertion names a
 position rather than a count — the lesson this project's tests were written after, where
@@ -452,7 +490,7 @@ long enough that scrolling to the bottom is the only way to see what exists.
 ## 12. Verification
 
 - [x] 12.1 Encode the man page's worked examples as tests: division/modulo table, neighbour pattern, six `@`-assignment cases, busy switch, apple/orange kind constants, and `startdist` rows
-- [ ] 12.2 Encode the source-derived constants as a single documented module and assert each value against `src/spielfeld.cpp`, `src/leveldaten.h` and `src/code.h` in comments
+- [x] 12.2 Encode the source-derived constants as a single documented module and assert each value against `src/spielfeld.cpp`, `src/leveldaten.h` and `src/code.h` in comments
 - [ ] 12.3 Add engine scenario tests driving real input sequences and asserting board state for one level end to end, including a win and a loss
 - [ ] 12.4 Make the build gate compile all bundled levels and verify `npm run build` fails on any level that does not parse or compile
 - [ ] 12.5 Measure frame time with the development overlay on a mid-range device profile and verify the board stays within budget with a full board and active animations
