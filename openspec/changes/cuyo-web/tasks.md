@@ -93,6 +93,40 @@ README says so in those words rather than leaving a reader to assume `make check
 breach reports every test green and then exits 1, so inside the `test` job it would read as
 "the suite is broken" and point at an assertion instead of at the percentage.
 
+**12.1 was five-sixths done before this session and one sixth missing.** The division/modulo
+table is transcribed in `divmod.test.ts`, the neighbour pattern in `neighbours.test.ts` (with
+`1???0???` and its documented meaning quoted), the six `@`-assignments in `six-examples.test.ts`
+(the documented results verbatim, including the note that the manual's `X` cannot be typed because
+Cual refuses single-letter names), and the apple/orange distkeys and the version-offset example in
+`startdist.test.ts`. **The busy switch was absent**, and it is the only one of the six whose claim
+is about a *difference between two pieces of syntax* — so it is the one a plausible implementation
+could get backwards.
+
+`engine/cual-runtime/busy-switch.test.ts` drives the manual's example through the real evaluator
+and the real walker, and it passes — the latching behaviour is correct. The observable is a
+**draw count** rather than a picture, because `1:100` is `bool(random(100) < 1)` and so costs one
+draw per evaluation: a `=>` case spends no draws while its animation plays and re-tests only once
+the animation has terminated, while a `->` case is asked every step and abandons the animation on
+the very next step. That is the manual's "won't switch back to A until the animation has
+terminated" measured as a number, and it cannot be satisfied by a branch that draws the right
+pictures for the wrong reason.
+
+**Two mutations found two holes in my first version, and both holes were the subtleties the code
+comments warn about.** Assuming `otherwiseLatching` equals `latching`, and skipping the busy reset
+on the abandoned branch, each left the whole file green — because every default branch I first
+wrote was a single `*`, and a draw is never busy, so there was nothing for either to act on. The
+manual says that itself ("it doesn't matter if there's a `->` or a `=>` before the `A*`; `A*` isn't
+busy anyway"), which is why the example cannot pin it; `pacman.ld`'s `=> R,R,R,R,R,R,R; ->` can,
+because its default is a seven-command comma sequence and therefore busy. The file now tests that
+shape, and tests leaving the default as well as leaving the chance branch.
+
+**One mutation is still not caught, and it is recorded rather than papered over.** Removing
+`resetBusy(otherwise)` when the condition matches — the mirror of the reset that *is* tested —
+changes nothing observable, because `runCondition` clears the default's own flag unconditionally
+with `busySet(slots.second, …)` and the recursive reset only reaches flags nested inside the
+branch. Measured with the line removed and restored: identical output on every step. So that line
+is currently unverified rather than verified-and-fine, and this note is the only place that says so.
+
 **7.4, 7.6 and 7.7 were implemented and unverified; they are now verified against the
 renderer's real draw calls, in `render/presentation.test.ts`.** Every assertion names a
 position rather than a count — the lesson this project's tests were written after, where
@@ -417,7 +451,7 @@ long enough that scrolling to the bottom is the only way to see what exists.
 
 ## 12. Verification
 
-- [ ] 12.1 Encode the man page's worked examples as tests: division/modulo table, neighbour pattern, six `@`-assignment cases, busy switch, apple/orange kind constants, and `startdist` rows
+- [x] 12.1 Encode the man page's worked examples as tests: division/modulo table, neighbour pattern, six `@`-assignment cases, busy switch, apple/orange kind constants, and `startdist` rows
 - [ ] 12.2 Encode the source-derived constants as a single documented module and assert each value against `src/spielfeld.cpp`, `src/leveldaten.h` and `src/code.h` in comments
 - [ ] 12.3 Add engine scenario tests driving real input sequences and asserting board state for one level end to end, including a win and a loss
 - [ ] 12.4 Make the build gate compile all bundled levels and verify `npm run build` fails on any level that does not parse or compile
