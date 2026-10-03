@@ -233,11 +233,17 @@ describe("the two things 4.17 and 4.18 recorded, measured rather than believed",
     // wait for and the busy flag never propagates outward. `=>` latches, and does stay busy.
     //
     // Both shapes the man page writes, and both advance: `1 0 1 2 0` with the `*` stripped.
+    // A global replace, not `replace("*", "")`: CodeQL flagged the string form, and it is right to
+    // — that replaces the first occurrence only, which happens to be enough here and reads as
+    // though it were not.
+    const withoutBusy = (frames: readonly string[]): string[] =>
+      frames.map((f) => f.replace(/\*/g, ""));
+
     for (const source of [
       "anim = { A, B, C }; if 7 -> anim;",
       "anim = { A, B, C }; switch { 7 -> anim; }",
     ]) {
-      expect(frames(source).map((f) => f.replace("*", "")), source).toEqual(["0", "0", "1", "2", "0"]);
+      expect(withoutBusy(frames(source)), source).toEqual(["0", "0", "1", "2", "0"]);
     }
     // The latching arrow is what restores the busy steps.
     expect(frames("anim = { A, B, C }; if 7 => anim;")).toEqual(frames("anim = { A, B, C }; anim;"));
