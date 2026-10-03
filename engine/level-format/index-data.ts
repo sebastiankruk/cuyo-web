@@ -144,7 +144,69 @@ export interface DifficultyEntry {
   readonly kinds: number;
   /** How many rows of `startdist` the level declares. */
   readonly startRows: number;
+  /**
+   * The level's start layout, resolved, so the catalogue can show it.
+   *
+   * **This is one legal start, not the next one.** A `startdist` cell can be a pool
+   * draw rather than a named kind, and the loader resolves those against a PRNG seeded
+   * from `Date.now()` — on purpose, so that a restart is not the board the player has
+   * already seen. Across the corpus 6.6% of cells are draws and 88 of 187 compiled
+   * difficulty rows contain no named kind at all, so no tile could equal the board a
+   * card actually opens. What this *is* guaranteed to be: the exact background, and the
+   * exact arrangement and colours of every cell the level fixes. The drawn cells are one
+   * of the draws the level permits. See `TILE_REFERENCE_SEED`.
+   */
+  readonly tile: LevelTile;
 }
+
+/**
+ * A resolved start layout, as the catalogue's tile draws it.
+ *
+ * **No marker.** The real board marks a goal blob with a dot and a grey with a square,
+ * at `MARKER_RADIUS` = 0.075 of a cell. A catalogue tile's cell is about four pixels, so
+ * that marker would be 0.3 pixels across — invisible. So the tile does not carry one:
+ * a field nothing can render is a field that will be read as "the tile distinguishes
+ * goals" when it does not. The tile's goal/ordinary distinction is the goal *colour*,
+ * which is a constant across levels by construction and so is recognisable anyway.
+ */
+export interface LevelTile {
+  /** The board's background, from the level's `bgcolor`, as CSS. */
+  readonly background: string;
+  /**
+   * The cells that are *not* empty, as two parallel arrays: `at[i]` is the cell index
+   * and `kind[i]` the index into the level's kind table.
+   *
+   * Sparse rather than a full 200-cell grid because 88.3% of the corpus's cells are
+   * empty — a dense grid would be mostly the encoding of its own absences, in a file
+   * every catalogue view pays to download. Row-major, top row first: `at` is
+   * `row * GRX + column`.
+   */
+  readonly at: readonly number[];
+  readonly kind: readonly number[];
+  /**
+   * Which entry of the index's shared {@link LevelIndex.palettes} this tile's kinds are
+   * coloured by, indexed by kind constant.
+   *
+   * A reference rather than a copy, and it has to be: the palette is the bulk of the
+   * file. Inlined per difficulty it came to 95 kB of the index's 234 kB, because 187
+   * difficulty rows share only **40** distinct palettes — every level with the same kind
+   * roles on the same background lands on the same colours. Deduplicated, the same
+   * palettes cost 21 kB.
+   */
+  readonly palette: number;
+}
+
+/**
+ * The seed the level index resolves `startdist` pool draws against.
+ *
+ * A fixed number, and that is the point: a tile has to be the *same* tile on every
+ * visit and in every build, or the catalogue would show a different board each time it
+ * opened and there would be nothing to verify. It is not the seed the game plays with —
+ * `app/levels.ts` uses `Date.now()` deliberately, so a restart differs — and this number
+ * must not become that one. Changing it changes every tile, which is a reviewable diff
+ * rather than a silent change.
+ */
+export const TILE_REFERENCE_SEED = 0x6375796f;
 
 /** One level, as the catalogue needs it. */
 export interface LevelIndexEntry {
@@ -209,6 +271,15 @@ export interface LevelIndex {
    * and it is the one the plan cites for the Standard track.
    */
   readonly authoredCounts: ReadonlyMap<Track, number>;
+  /**
+   * Every distinct kind palette the catalogue's tiles need, one `|`-joined colour string
+   * per palette, indexed by kind constant within it.
+   *
+   * Shared rather than per level because 187 compiled difficulty rows use only 40 of
+   * them, and the index is downloaded before a single tile is drawn. See
+   * {@link LevelTile.palette}.
+   */
+  readonly palettes: readonly string[];
 }
 
 /** Every track named by an index, for the catalogue's filter row. */

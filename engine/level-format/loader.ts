@@ -23,9 +23,8 @@ import { LdLexError } from "./lexer.ts";
 import { Version } from "./version.ts";
 import { DefinitionScope, rootScope } from "./scope.ts";
 import { buildKinds, UNDEFINED_EXPLODE } from "./kinds.ts";
-import { kindDefaultsFrom, readLevelSettings } from "./settings.ts";
+import { cssColour, kindDefaultsFrom, readLevelSettings } from "./settings.ts";
 import type { LevelSettings } from "./settings.ts";
-import type { Colour } from "./scope.ts";
 import { readStartDist } from "./startdist.ts";
 import { buildStartLayout } from "./startlayout.ts";
 import type { LayoutBoard, LayoutCell } from "./startlayout.ts";
@@ -369,20 +368,6 @@ function coloursFor(settings: LevelSettings): LevelColours {
     top: cssColour(settings.top),
     text: cssColour(settings.text),
   };
-}
-
-/**
- * A colour as CSS, clamped and rounded.
- *
- * Upstream stores r, g and b as numbers it never range-checks, and a level that wrote
- * 300 would otherwise produce `rgb(300,...)`, which the browser clamps silently -
- * so the value on screen would differ from the value on the level, which is exactly
- * the kind of divergence that is hard to notice and hard to explain.
- */
-function cssColour(colour: Colour): string {
-  const channel = (n: number): number =>
-    Math.max(0, Math.min(255, Math.round(Number.isFinite(n) ? n : 0)));
-  return `rgb(${channel(colour.r)},${channel(colour.g)},${channel(colour.b)})`;
 }
 
 /** Resolved layout cells to the rows `LevelDef` carries, with empties as null. */

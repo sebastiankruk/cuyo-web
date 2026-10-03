@@ -99,6 +99,29 @@ export interface LevelSettings {
 /** A colour, re-exported so callers need not reach into `scope.ts`. */
 export type { Colour };
 
+/**
+ * A colour as CSS, clamped and rounded.
+ *
+ * Upstream stores r, g and b as numbers it never range-checks, and a level that wrote
+ * 300 would otherwise produce `rgb(300,...)`, which the browser clamps silently — so the
+ * value on screen would differ from the value on the level, which is exactly the kind of
+ * divergence that is hard to notice and hard to explain.
+ *
+ * **One function, because there were two.** It lived in `loader.ts`, and the level index
+ * grew a copy for the catalogue's tiles — which differed in both respects that matter:
+ * the copy did not clamp, and it wrote `rgb(r, g, b)` where this writes `rgb(r,g,b)`. So
+ * a level writing an out-of-range channel produced a tile whose background string was not
+ * the string the game paints, and the two were equal as colours and unequal as text. It
+ * lives here now because `settings.ts` owns `Colour` and both callers want it, and the
+ * alternative — two readers of one setting that can disagree — is the failure
+ * `readLevelSettings` exists to prevent for every other value.
+ */
+export function cssColour(colour: Colour): string {
+  const channel = (n: number): number =>
+    Math.max(0, Math.min(255, Math.round(Number.isFinite(n) ? n : 0)));
+  return `rgb(${channel(colour.r)},${channel(colour.g)},${channel(colour.b)})`;
+}
+
 /** The default chase-border colour, `Color(200, 200, 200)`. */
 export const DEFAULT_TOP_COLOUR: Colour = { r: 200, g: 200, b: 200 };
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PlayScreen } from "./PlayScreen.tsx";
 import { catalogue, loadLevel } from "./levels.ts";
 import {
@@ -6,6 +6,7 @@ import {
   describeDifficulty,
   levelsInTrack,
 } from "../engine/level-format/index-data.ts";
+import { tileSvg } from "../render/tile.ts";
 import type { LevelDef } from "../engine/level-format/level-data.ts";
 import type {
   Difficulty,
@@ -249,6 +250,17 @@ function LevelCard({
   // one: the interesting sentence is `normal`'s — "the level as its author wrote it" — and it is
   // also the answer to "what does this button do", which a label alone cannot say.
   const described = describeDifficulty(chosen);
+  // Memoised on `shown`, which is an object out of the generated index and so is stable
+  // for as long as the catalogue is. Without this every re-render of the list — and
+  // choosing a difficulty re-renders all of it — would rebuild 79 SVG strings to produce
+  // markup React then diffs as unchanged.
+  const tile = useMemo(
+    () =>
+      shown === undefined
+        ? ""
+        : tileSvg(shown.tile, catalogue().palettes[shown.tile.palette] ?? ""),
+    [shown],
+  );
   return (
     <div className="levelCard">
       {/*
@@ -275,11 +287,53 @@ function LevelCard({
           {entry.unsupportedReason}
         </span>
       )}
-      <span className="levelCard__body">
+      {/*
+        The tile, before the text, so the grid's source order and reading order agree.
+
+        It follows the *chosen* difficulty, because that is the question it answers — "what
+        am I about to play" — and a tile that always showed `normal` would quietly
+        contradict the button next to it. `shown` is the resolved entry for that choice,
+        which can be undefined for a level that offers the difficulty but resolves to
+        nothing; the tile is then omitted rather than drawn empty, since an empty board is
+        not the level.
+      */}
+      {shown !== undefined && (
+        <div
+          className="levelCard__tile"
+          // The SVG arrives as a string rather than as elements. React elements for 79
+          // cards' worth of rectangles would be reconciled on every render of a list
+          // whose pictures never change, and `dangerouslySetInnerHTML` is the one place
+          // that risk is acceptable: the string comes from `tileSvg`, whose only inputs
+          // are the generated index, and it filters both its colours through a pattern
+          // before interpolating them into an attribute.
+          dangerouslySetInnerHTML={{ __html: tile }}
+        />
+      )}
+      {/*
+        The card's text, in two groups rather than one, and that split is the whole layout.
+
+        The tile goes beside the *name*, and everything else runs the full width of the
+        card. When the text was a single group the only two ways to place the tile were
+        both wrong: a grid column made the column as wide as the tile for the card's
+        entire height, so the description and the tags were squeezed beside empty space
+        they were nowhere near; and a `float` was supposed to say "beside this for a
+        while, then full width", which depends on whether a float intrudes into a
+        `display: grid` container — and it does not, so the text either ignored the tile or
+        was narrowed by something subtler. Two screenshots and no browser to measure with
+        is a poor place to be relying on that.
+
+        Naming the areas removes the question. `head` is beside the tile, `rest` spans both
+        columns, `act` spans both. The description is full width because the stylesheet says
+        `rest rest` in two places, not because of how a float happens to interact with a
+        grid.
+      */}
+      <span className="levelCard__head">
         <span className="levelCard__name">{entry.name}</span>
         {entry.author !== "" && (
           <span className="levelCard__author">{entry.author}</span>
         )}
+      </span>
+      <span className="levelCard__rest">
         {entry.description !== "" && (
           <span className="levelCard__desc">{entry.description}</span>
         )}
@@ -289,12 +343,23 @@ function LevelCard({
           {shown?.chainGrass === true && <span>chain grass</span>}
         </span>
         {/*
-          The chosen difficulty's sentence. In the body rather than on the button, because a
-          `title` is a tooltip and this project's first platform is a phone. It names the
-          difficulty rather than the level, so a screen reader reads it as the answer to
-          "what does this control do".
+          What the chosen difficulty does — but only when it is not the default.
+
+          It was on every card, and for `normal` it is the same sentence 79 times: "The
+          level as its author wrote it, with no difficulty qualifier." Repeated that often
+          it stops being information and becomes furniture, and it was two lines of a card
+          that did not need them — a screenshot showed Octopi's wrapping to two lines
+          beside a third of the card left empty.
+
+          So it appears when the choice is not the default, which is the only time it
+          answers a question. `normal` is the level as written, which the card already says
+          by not qualifying it; `easy` and `hard` change the level, and that is worth a
+          sentence. Task 6.3 asked for these descriptions and they are still here — the
+          change is when they are shown, not whether they exist.
         */}
-        <span className="levelCard__difficultyNote">{described.description}</span>
+        {chosen !== "normal" && (
+          <span className="levelCard__difficultyNote">{described.description}</span>
+        )}
       </span>
       <span className="levelCard__actions">
         {entry.supported && offered.length > 1 && (

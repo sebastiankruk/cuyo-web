@@ -98,6 +98,38 @@ likely accident, because a glob list is silent and a file that stops matching is
 missing, it just stops being counted and the percentage goes **up**. `levels-src/` is excluded on
 purpose: it is the generators, which run under `make` rather than under a test, so a coverage run
 would say "1.4%" about them — true, and about the wrong thing.
+
+**6.7's verification clause cannot be met as written, and the reason is an existing decision
+rather than an oversight.** It asks to "verify a tile matches the level it opens", but
+`app/levels.ts` seeds the game's PRNG from `Date.now()` — deliberately, so a restart is not the
+board the player has already seen — and `startlayout.ts` resolves every pool-draw cell against it.
+Measured over the corpus: **6.6% of cells are draws, and 88 of 187 compiled difficulty rows
+contain no named kind at all**, so no tile could equal the board a card actually opens. The tile
+is therefore *one legal start*: the exact background, and the exact arrangement and colours of
+every cell the level fixes. What it is verified to be is the strongest thing that is true —
+`tile-corpus.test.ts` drives the real `LevelLoader` over the committed level files at
+`TILE_REFERENCE_SEED` and compares cell by cell, for all 187 rows, which catches a tile on the
+wrong level or difficulty, one left behind by a `.ld` edit, a layout the engine's neighbour
+heuristic would never produce, and colours chosen against the wrong background. The drawn cells
+are checked separately against the level's own pools.
+
+**The measurement changed two things about the design, and both were surprises.** The start
+layout is **88.3% empty** (median 3 rows of 20), so the tile's distinctiveness is mostly its
+**32 distinct `bgcolor` values**, not its palette — median **one** kind is drawn per tile. And
+because the board is 10 wide by 20 tall, the tile is unavoidably portrait. Separately, the
+catalogue tile needs its colours *baked into the index*: measured cold, `buildPalette` costs
+1.8 ms at a median 6 kinds and 23.6 ms at 154, so building 79 at catalogue open is a
+142 ms–1.9 s stall. Inlined per difficulty the palettes were 95 kB of a 234 kB file; 187 rows
+share only 40 palettes, so they are interned into a shared table and the index is 151 kB raw and
+**7 kB → 12 kB gzipped**.
+
+**Two things found by writing the verification, both fixed in the same change.** The loader had
+a private `cssColour` and the generator grew a second copy that neither clamped out-of-range
+channels nor matched its spacing, so a level writing `bgcolor = 300 0 0` produced a tile whose
+background string was not the string the game paints — the same colour to a browser, a different
+claim in a diff. It is one function in `settings.ts` now. And `scripts/check-level-index.sh`
+restored the committed file *before* printing its diff, so the diff was always empty and a stale
+catalogue looked like a no-op; found because 6.7 hit exactly that.
 -->
 
 ## 1. Project Setup and Toolchain
@@ -199,7 +231,7 @@ Recorded from a play session, not designed in advance. The seven tracks do not s
 79 levels: a player cannot find a level they half-remember the name of, and the list is
 long enough that scrolling to the bottom is the only way to see what exists.
 
-- [ ] 6.7 Give every level card a small rendered tile — a miniature of its actual board,
+- [x] 6.7 Give every level card a small rendered tile — a miniature of its actual board,
   background and kinds — so the catalogue is scannable by eye rather than by name, and verify a tile matches the level it opens
 - [ ] 6.8 Group the catalogue into collapsible sections within a track, so a track of 20 is
   navigable, and remember which sections were open

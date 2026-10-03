@@ -34,13 +34,23 @@ import {
   unsupportedNeighbourReason,
 } from "../engine/game-core/constants.ts";
 import { readStartDist } from "../engine/level-format/startdist.ts";
+import type { StartDist } from "../engine/level-format/startdist.ts";
+import { buildStartLayout } from "../engine/level-format/startlayout.ts";
+import type { KindTable } from "../engine/level-format/kinds.ts";
+import type { LevelSettings } from "../engine/level-format/settings.ts";
+import { cssColour } from "../engine/level-format/settings.ts";
+import { createPrng } from "../engine/prng.ts";
+import { buildPalette } from "../render/palette.ts";
+import { GRX } from "../engine/game-core/constants.ts";
 import type {
   Difficulty,
   DifficultyEntry,
   LevelIndex,
   LevelIndexEntry,
+  LevelTile,
   Track,
 } from "../engine/level-format/index-data.ts";
+import { TILE_REFERENCE_SEED } from "../engine/level-format/index-data.ts";
 import {
   readVendoredSummary,
   contribSummary,
@@ -260,12 +270,88 @@ function compile(
       neighbours: settings.neighbours,
       kinds: table.count,
       startRows: dist.rows.length,
+      tile: tileFor(dist, table, settings),
     },
     description: level.ownWord("description", "") ?? "",
     goalKinds: table.kinds.filter((k) => k.role === "grass").map((k) => k.name),
     greyKinds: table.kinds.filter((k) => k.role === "grey").length,
   };
 }
+
+/**
+ * The catalogue tile for one compiled difficulty: the start layout, resolved.
+ *
+ * Built with the engine's own `buildStartLayout` rather than from `placeRows`, and that
+ * is the whole reason the tile can be trusted. `placeRows` gives the cells the level
+ * *declared*; `buildStartLayout` is what `LevelLoader` calls to get the cells it
+ * *plays*, with the pool draws resolved and the neighbour-avoidance heuristic applied.
+ * A tile built from the declared cells would show a board that could never occur — the
+ * level declares a start, the engine improves on it, and the difference is exactly the
+ * part a player sees.
+ *
+ * The randomness is seeded with `TILE_REFERENCE_SEED` rather than anything from the
+ * clock, because a tile that changed between two visits to the catalogue would be
+ * worse than no tile: there would be nothing left to verify. The game itself seeds from
+ * `Date.now()` so that a restart differs, and that difference is deliberate — see the
+ * note on `LevelTile`.
+ */
+function tileFor(
+  dist: StartDist,
+  table: KindTable,
+  settings: LevelSettings,
+): LevelTile {
+  const hex = { enabled: false, flip: settings.hexFlip };
+  const rows = buildStartLayout(dist, {
+    table,
+    random: createPrng(TILE_REFERENCE_SEED),
+    neighbours: settings.neighbours,
+    hex,
+  }).cells;
+
+  // Sparse, not a 200-cell grid: 88.3% of the corpus's cells are empty, and a dense grid
+  // would spend most of a downloaded file on the encoding of its own absences.
+  const at: number[] = [];
+  const kind: number[] = [];
+  for (let y = 0; y < rows.length; y++) {
+    for (let x = 0; x < GRX; x++) {
+      const cell = rows[y]?.[x];
+      if (cell === undefined || cell.kind === table.emptyKind) continue;
+      at.push(y * GRX + x);
+      kind.push(cell.kind);
+    }
+  }
+
+  const background = cssColour(settings.background);
+  const built = buildPalette(
+    table.kinds.map((k) => ({ role: k.role })),
+    { background },
+  );
+  const colours: string[] = [];
+  for (let i = 0; i < table.count; i++) {
+    // A kind the palette does not know falls back to the background rather than to
+    // black. The blob is then invisible against its own board, which is visible as a
+    // missing cell — whereas a black blob on a dark board looks like a blob of a
+    // different kind, which is a lie.
+    colours.push(built.get(i)?.colour ?? background);
+  }
+
+  // Interned, so two difficulty rows with the same roles and background share one
+  // string. `joined` rather than `JSON.stringify` of an array because Prettier puts one
+  // array element per line, which for 187 difficulties is the file's whole size.
+  const joined = colours.join("|");
+  let index = paletteIntern.get(joined);
+  if (index === undefined) {
+    index = palettes.length;
+    palettes.push(joined);
+    paletteIntern.set(joined, index);
+  }
+
+  return { background, at, kind, palette: index };
+}
+
+/** The distinct palettes emitted, and where each was first seen. Order is first use. */
+const palettes: string[] = [];
+const paletteIntern = new Map<string, number>();
 
 function main(): void {
   const upstreamSummary = readVendoredSummary();
@@ -504,6 +590,7 @@ function main(): void {
     byId: new Map(levels.map((l) => [l.id, l])),
     tracks: trackOrder,
     authoredCounts: authored,
+    palettes,
   };
 
   mkdirSync(dirname(OUT), { recursive: true });
@@ -620,6 +707,7 @@ export const LEVEL_INDEX: LevelIndex = {
   authoredCounts: new Map(
     ${JSON.stringify([...index.authoredCounts])} as const,
   ) as Map<Track, number>,
+  palettes: ${JSON.stringify(index.palettes)},
 };
 `;
 }
