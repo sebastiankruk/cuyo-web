@@ -23,10 +23,20 @@
 
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 import config, { COVERAGE_FLOORS } from "./vite.config.ts";
 
 const ROOT = import.meta.dirname;
+
+/**
+ * The README, read once at module scope.
+ *
+ * At the top rather than inside a `describe`, because two of the blocks below read it and a
+ * `const` inside the first one is not in scope for the second. That is not a hypothetical:
+ * it is exactly what happened when the CI block was added and failed with
+ * `ReferenceError: README is not defined`.
+ */
+const README = readFileSync(join(ROOT, "README.md"), "utf8");
 
 /** The coverage section of the vitest config, typed as far as this file needs it. */
 function coverage(): {
@@ -162,8 +172,6 @@ describe("the README records what was measured", () => {
   // `npm test` — the same trap `events-corpus.test.ts` fell into by reading an untracked
   // directory. So the table's shape is pinned and the numbers are left to a person, which is
   // also the only arrangement in which the numbers can be wrong without anything going red.
-  const README = readFileSync(join(ROOT, "README.md"), "utf8");
-
   it("names every tier the coverage set measures", () => {
     const tiers = new Set(
       (coverage().include ?? []).map((glob) => glob.slice(0, glob.indexOf("/**"))),
@@ -199,6 +207,56 @@ describe("the README records what was measured", () => {
     // whole suite twice, and the fact was measured instead — see 13.6 in the change.
     expect(README).toMatch(/only when coverage is enabled/i);
     expect(README).toMatch(/`make test` cannot catch a coverage regression/i);
-    expect(README).toMatch(/14\.17/);
+    // And it says CI does enforce them, since that is now true (14.17). Without this the
+    // README would read as "nothing checks these", which is the sentence a reader takes
+    // away from "make test cannot" and stops reading.
+    expect(README).toMatch(/CI enforces them too/i);
+  });
+});
+
+describe("CI enforces the floors", () => {
+  // 14.17. The point of a floor is that it fails something, and until this job existed
+  // there was nowhere for it to fail: `npm test` does not evaluate thresholds at all.
+  const WORKFLOW = readFileSync(
+    resolve(import.meta.dirname, ".github/workflows/quality.yml"),
+    "utf8",
+  );
+
+  /** Just the `coverage` job's text, up to the next top-level job. */
+  function coverageJob(): string {
+    const start = WORKFLOW.indexOf("\n  coverage:\n");
+    expect(start, "the coverage job is missing").toBeGreaterThan(-1);
+    const rest = WORKFLOW.slice(start + 1);
+    const next = rest.slice(1).search(/^ {2}\S/m);
+    return next < 0 ? rest : rest.slice(0, next + 1);
+  }
+
+  it("runs the suite under coverage, in a job of its own", () => {
+    // Its own job, because a coverage breach reports every test green and then exits 1.
+    // Inside the `test` job that reads as "the suite is broken", which points the reader at
+    // an assertion instead of at the percentage.
+    expect(WORKFLOW).toMatch(/^ {2}coverage:$/m);
+    expect(coverageJob()).toMatch(/npm run test:coverage/);
+  });
+
+  it("checks each tier as well as vitest's aggregate", () => {
+    // Two readers of one claim. `thresholds` globs and this script read the same numbers,
+    // and the script is the one whose table the README quotes.
+    expect(coverageJob()).toMatch(/node scripts\/coverage-tiers\.mjs/);
+  });
+
+  it("without fetching the upstream corpus, which no test reads any more", () => {
+    // Measured rather than copied from the `test` job: with `.context/upstream-cuyo` moved
+    // away entirely, all 1490 tests still pass. Asserted because the obvious "copy the test
+    // job and drop the coverage flag" reintroduces the fetch, and a network step in a gate
+    // that does not need one is a gate that fails for unrelated reasons. Scoped to *this*
+    // job — the later `agent-mode` and `human-mode` jobs legitimately fetch.
+    expect(coverageJob()).not.toMatch(/fetch-cuyo/);
+  });
+
+  it("and the README counts the jobs it added", () => {
+    // The README's CI table is the only place the job count is written down, so a new job
+    // that is not added there leaves the documentation quietly wrong.
+    expect(README).toMatch(/^\| `coverage`\s+\|.*fails the build/m);
   });
 });

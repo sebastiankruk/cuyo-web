@@ -188,6 +188,48 @@ jobs:
       - name: Vitest
         run: npm test
 
+  # The coverage floors, as their own job rather than a flag on the test run above.
+  #
+  # Two reasons it is separate, and the first is the whole point of the task. A coverage
+  # threshold failing is not a failing test: `vitest run --coverage` reports every test
+  # green and then exits 1. Folded into the `test` job, that reads as "the suite is
+  # broken" — which sends you looking for a bad assertion instead of at the percentage.
+  #
+  # The second is that a floor you can only check by running the suite under an
+  # instrumenter is a floor nobody runs. `npm test` does not evaluate
+  # `coverage.thresholds` — measured, not assumed: with `render/` floored at 99% against
+  # 91.7% achieved, a plain `vitest run` still exits 0. So until this job existed, the
+  # floors could not fail anything anywhere.
+  #
+  # No corpus fetch, deliberately. It was measured rather than copied from the `test` job:
+  # with `.context/upstream-cuyo` moved away entirely, all 1490 tests still pass. No test
+  # reads the gitignored tree — `render/palette.test.ts` did, and 12.8 moved it to the
+  # committed `levels/upstream`.
+  coverage:
+    name: Coverage floors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Vitest with coverage
+        run: npm run test:coverage
+
+      # The floors are also checked per tier rather than only by vitest's aggregate, and
+      # this prints the table the README quotes. It exits non-zero on a breach, so it is a
+      # second opinion rather than a report: vitest's `thresholds` glob and this script
+      # read the same numbers, and two readers of one claim is the point.
+      - name: Per-tier table
+        run: node scripts/coverage-tiers.mjs
+
   build:
     name: Build
     runs-on: ubuntu-latest
