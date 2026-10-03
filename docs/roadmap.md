@@ -6,18 +6,19 @@ reasoning behind the sequence.
 
 ## Where we are
 
-105 of 166 tasks. Two groups are done, and the difference matters:
+106 of 173 tasks. Two groups are done, and the difference matters:
 
-|            Group |       | What it means                                                       |
-| ---------------- | ----- | ------------------------------------------------------------------- |
-|     1. Toolchain |  done | Node, TypeScript, `make check` as the single gate, CI.              |
-|  2. Level format |  done | The `.ld` language, parsed and compiled against all 79 real levels. |
-|     5. Game core | 20/20 | The rules: falling, connections, explosions, greys, border.         |
-|  14. Lint and CI | 16/20 | Code, docs, shell, spec and workflow linting; ten CI jobs.          |
-|     13. Coverage |   5/8 | Floors set and measured; DOM-environment tests outstanding.         |
-|     6. Catalogue |  7/12 | Loadable, gated, tracked, introduced — and now visible.             |
-|  7. Presentation |  3/14 | Colours, hex, mirror and explosions verified; draw-op order is not. |
-| 12. Verification |   3/8 | One real level played to a win and a loss; Cual still unwired.      |
+|                  Group |       | What it means                                                       |
+| ---------------------- | ----- | ------------------------------------------------------------------- |
+|           1. Toolchain |  done | Node, TypeScript, `make check` as the single gate, CI.              |
+|        2. Level format |  done | The `.ld` language, parsed and compiled against all 79 real levels. |
+|           5. Game core | 20/20 | The rules: falling, connections, explosions, greys, border.         |
+|        14. Lint and CI | 16/20 | Code, docs, shell, spec and workflow linting; ten CI jobs.          |
+|           13. Coverage |   5/8 | Floors set and measured; DOM-environment tests outstanding.         |
+|           6. Catalogue |  7/12 | Loadable, gated, tracked, introduced — and now visible.             |
+|        7. Presentation |  3/14 | Colours, hex, mirror and explosions verified; draw-op order is not. |
+|       12. Verification |   3/8 | One real level played to a win and a loss; Cual still unwired.      |
+| 15. Wiring the runtime |   1/7 | The program's code is extracted; it is not yet run.                 |
 
 Everything else is untouched: 8 (art), 9 (shell), 10 (mobile), 11 (PWA).
 

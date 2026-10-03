@@ -75,6 +75,20 @@ export interface Allocation {
   readonly boolCount: number;
   /** How many slots declared variables took. */
   readonly declaredCount: number;
+  /**
+   * Where each declared variable landed, by name.
+   *
+   * Added for task 15.1 and the reason it is here rather than computed beside it: a user
+   * variable reaches the evaluator as `{ kind: "variable", name }` and is resolved at *run*
+   * time through `EvalContext.variable(name)`, so the runtime needs a name to hand back. The
+   * allocator is the only thing that knows which index each declaration took, and a second
+   * walk in the same order would be a second source of truth for the same numbering.
+   *
+   * One entry per name, which upstream agrees with: `neueVarDefinition` always takes a fresh
+   * slot from `neueVariable`, and `speicherDefinition` throws `"x" already defined.` for a
+   * second declaration of the same name, so a name cannot end up with two slots.
+   */
+  readonly declaredSlots: ReadonlyMap<string, number>;
   /** `getDatenLaenge`: the length of a blob's variable array. */
   readonly slotCount: number;
 }
@@ -118,6 +132,9 @@ export class SlotAllocator {
   #boolCount = 0;
   #declaredCount = 0;
 
+  /** The last slot {@link allocateDeclaredVariable} took, for the name-to-slot table. */
+  #lastVariableSlot = 0;
+
   /** `DefKnoten::neueVariable`: one `int`, appended to the blob's array. */
   allocateVariable(): number {
     return this.#nextSlot++;
@@ -126,7 +143,14 @@ export class SlotAllocator {
   /** One slot per declared variable, which is what `neueVarDefinition` does — exactly one. */
   allocateDeclaredVariable(): number {
     this.#declaredCount += 1;
-    return this.allocateVariable();
+    const slot = this.allocateVariable();
+    this.#lastVariableSlot = slot;
+    return slot;
+  }
+
+  /** The index the last {@link allocateDeclaredVariable} handed out. */
+  get lastVariableSlot(): number {
+    return this.#lastVariableSlot;
   }
 
   /**
@@ -204,6 +228,7 @@ export function slotOf(bit: number): number {
 export function allocateSlots(statements: readonly Stmt[]): Allocation {
   const allocator = new SlotAllocator();
   const busySlots = new Map<Stmt, BusySlots>();
+  const declaredSlots = new Map<string, number>();
 
   /**
    * A case is a `bedingung_code` with two flags, and the rest of the switch hangs off its
@@ -223,7 +248,11 @@ export function allocateSlots(statements: readonly Stmt[]): Allocation {
       case "varDecl":
         // One slot per declaration, which is all `neueVarDefinition` ever takes.
         for (let i = 0; i < node.declarations.length; i += 1) {
+          const name = node.declarations[i]?.name ?? "";
           allocator.allocateDeclaredVariable();
+          // The empty name is a Spez-Var: upstream still allocates it ("nur die Variable
+          // erzeugen, aber keine Definition abspeichern") and nothing can read it by name.
+          if (name !== "") declaredSlots.set(name, allocator.lastVariableSlot);
         }
         return;
       case "commaSequence":
@@ -282,6 +311,7 @@ export function allocateSlots(statements: readonly Stmt[]): Allocation {
     busySlots,
     boolCount: allocator.boolCount,
     declaredCount: allocator.declaredCount,
+    declaredSlots,
     slotCount: allocator.slotCount,
   };
 }

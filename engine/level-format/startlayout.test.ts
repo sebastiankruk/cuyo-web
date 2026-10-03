@@ -421,6 +421,7 @@ describe("accidentalPairs", () => {
           greyProb: 0,
           goalProb: 1,
           distKey: null,
+          defaultCode: null,
         },
       ],
     };

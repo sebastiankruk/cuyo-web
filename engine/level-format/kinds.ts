@@ -389,6 +389,11 @@ function makeKind(
     ? (ownPics.runs[0] as ResolvedRun).word
     : picture;
 
+  // `src/sorte.cpp:98-131`, transcribed. Read here because this is the last place the picture
+  // list exists in full: `artKey` above kept only its first entry, so the file count and the
+  // first file's icon count had to be taken before they were dropped.
+  const defaultCode = defaultCodeFor(ownPics?.runs, role);
+
   const distKeyDefault = role === "grass" ? DEFAULT_DIST_KEY : "";
   const distKeyWord = own?.ownWord("distkey", distKeyDefault) ?? distKeyDefault;
   const distKey = distKeyWord === "" ? null : distKeyWord;
@@ -406,7 +411,33 @@ function makeKind(
     greyProb,
     goalProb,
     distKey,
+    defaultCode,
   };
+}
+
+/**
+ * Which default draw code a kind with this picture list runs.
+ *
+ * `src/sorte.cpp:104-130`, in the order upstream tests it: more than one file is `default3`,
+ * otherwise a first file with more than one icon is `default2` — `default2g` for grass, which
+ * is the only difference between them — and a single-icon file is `default1`. A kind with no
+ * picture list gets `null`, because upstream's condition starts `mBilddateien.size() > 0` and
+ * a kind with no pictures has no code to run and nothing to draw.
+ *
+ * The counts are a run's `count` rather than its length: `pics = apple * 3` is one file with
+ * three icons, which is `default2`, while `pics = apple, pear` is two files, which is
+ * `default3`. Reading the run count as a file count would make every repeated kind look
+ * multi-file and pick the wrong default.
+ */
+export function defaultCodeFor(
+  runs: readonly ResolvedRun[] | undefined,
+  role: KindRole,
+): string | null {
+  if (runs === undefined || runs.length === 0) return null;
+  if (runs.length > 1) return "default3";
+  const icons = runs[0]?.count ?? 1;
+  if (icons > 1) return role === "grass" ? "default2g" : "default2";
+  return "default1";
 }
 
 /**

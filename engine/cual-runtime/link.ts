@@ -76,12 +76,38 @@ export interface LinkResult {
  * in a statement list is something the parser produced on the way past, never something
  * upstream would run. The walker already ignores them; here they are dropped, because a spliced
  * body must not drag the whole declaration list into every call site.
+ *
+ * ## `selfName`, and why the recursion guard has to be more than source order
+ *
+ * Registering a definition only *after* rewriting its body is enough to stop `tor_1 = { tor_1; }`
+ * linking, and it is what the first version relied on. It is **not** enough once the tree is
+ * built by splicing, because the callee's stored body is re-rewritten at every call site — and by
+ * then `tor_1` *is* in scope. Found by task 15.1 driving a real level: `bolzer = {tor_1;}` where
+ * `tor_1` calls itself spliced `tor_1`'s raw body, re-rewrote the self-call against a scope
+ * containing `tor_1`, spliced again, and blew the stack.
+ *
+ * Upstream cannot have this problem because it never re-parses: the self-call was substituted
+ * with `undefiniert_code` in the grammar, so the stored `Code` already holds a dead node and
+ * splicing copies the dead node. Our tree keeps the live `call` instead, so the equivalent is to
+ * carry the expansion stack: `selfName` is hidden while its own body is rewritten, and hiding it
+ * extends to every nested splice of it. A call to a name on the stack is left unresolved, which
+ * is precisely "this procedure did not exist when that body was read".
+ *
+ * Each call site still expands the callee's body *from source*, so a plain call keeps its own
+ * busy numbers — `neueBusyNummern` — rather than sharing the definition's.
  */
-export function linkCalls(statements: readonly Stmt[], procedures: Procedures): LinkResult {
+export function linkCalls(
+  statements: readonly Stmt[],
+  procedures: Procedures,
+  selfName?: string,
+): LinkResult {
   const unresolved: { name: string; position: "copied" | "shared" }[] = [];
   // A local copy, so a caller's `ReadonlyMap` is not mutated and two links of the same level
   // cannot see each other's definitions.
   const known: Map<string, readonly Stmt[]> = new Map(procedures);
+  // The procedures whose expansion is in progress, and so cannot be seen by the body being
+  // rewritten. Seeded with `selfName`; a splice adds the callee for the nested rewrite only.
+  const hidden: ReadonlySet<string> = new Set(selfName === undefined ? [] : [selfName]);
 
   /**
    * Rewrite `nodes` against `known`, registering any definition *as it is reached*.
@@ -95,20 +121,25 @@ export function linkCalls(statements: readonly Stmt[], procedures: Procedures): 
    *
    * So a body sees only what was defined before it, and a call after a definition sees it.
    */
-  const rewrite = (nodes: readonly Stmt[], scope: Map<string, readonly Stmt[]>): Stmt[] => {
+  const rewrite = (
+    nodes: readonly Stmt[],
+    scope: Map<string, readonly Stmt[]>,
+    hidden: ReadonlySet<string> = new Set(),
+  ): Stmt[] => {
     const out: Stmt[] = [];
     for (const node of nodes) {
       switch (node.kind) {
         case "procedureDef": {
           // Its body is rewritten against the scope *so far*, then it joins the scope — and the
           // node itself is dropped, because upstream keeps a definition as a definition rather
-          // than as code.
-          rewrite([node.body], scope);
+          // than as code. The name is hidden while its own body is rewritten, which is what
+          // stops a self-call; see the header.
+          rewrite([node.body], scope, hiddenWith(hidden, node.name));
           scope.set(node.name, [node.body]);
           break;
         }
         case "call": {
-          const body = scope.get(node.name);
+          const body = hidden.has(node.name) ? undefined : scope.get(node.name);
           if (!body) {
             unresolved.push({
               name: node.name,
@@ -128,7 +159,12 @@ export function linkCalls(statements: readonly Stmt[], procedures: Procedures): 
           } else {
             // A plain `name` is a splice: the body becomes these statements, so `allocateSlots`
             // gives each call site its own busy numbers. `neueBusyNummern` was true.
-            for (const spliced of rewrite(body, scope)) out.push(spliced);
+            // The callee joins the hidden set for its own expansion only: a call *inside* it
+            // may legitimately reach it again through a path upstream would also allow, and
+            // only the cycle back to a procedure already on the stack is forbidden.
+            for (const spliced of rewrite(body, scope, hiddenWith(hidden, node.name))) {
+              out.push(spliced);
+            }
           }
           break;
         }
@@ -138,14 +174,19 @@ export function linkCalls(statements: readonly Stmt[], procedures: Procedures): 
           // registers the definition. See the doc comment.
           break;
         default:
-          out.push(rebuild(node, (nodes) => rewrite(nodes, scope)));
+          out.push(rebuild(node, (nodes) => rewrite(nodes, scope, hidden)));
           break;
       }
     }
     return out;
   };
 
-  return { statements: rewrite(statements, known), unresolved };
+  return { statements: rewrite(statements, known, hidden), unresolved };
+}
+
+/** The hidden set with one more name on it. */
+function hiddenWith(hidden: ReadonlySet<string>, name: string): ReadonlySet<string> {
+  return new Set([...hidden, name]);
 }
 
 /** Rebuild `node` with its children rewritten, or `node` itself if it has none. */

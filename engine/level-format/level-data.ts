@@ -43,6 +43,21 @@ export interface Kind {
   readonly goalProb: number;
   /** `startdist` key letter for this kind, if it has one. */
   readonly distKey: string | null;
+  /**
+   * The default draw code this kind falls back to, or null when it has none.
+   *
+   * `src/sorte.cpp:98-131`. A kind's draw code is the procedure *named after the kind*, and a
+   * kind that defines none runs a default chosen by how many picture files it has and how many
+   * icons are in the first — `default3` for more than one file, `default2` (or `default2g` for
+   * grass) for a single multi-icon file, `default1` for a single single-icon one. `null` when
+   * the kind has no pictures at all, which upstream also treats as drawing nothing, and which
+   * the global and semiglobal blobs never get a default for.
+   *
+   * Recorded here rather than recomputed by the runtime because `kinds.ts` is where the picture
+   * list is read: it kept `pics`' first entry as `artKey` and discarded the rest, which is why
+   * the file count was unavailable and this had to be settled at the point it is still in hand.
+   */
+  readonly defaultCode: string | null;
 }
 
 /** One cell of a `startdist` row. */
