@@ -6,7 +6,7 @@ reasoning behind the sequence.
 
 ## Where we are
 
-99 of 166 tasks. Two groups are done, and the difference matters:
+102 of 166 tasks. Two groups are done, and the difference matters:
 
 | Group           |       | What it means                                                       |
 | --------------- | ----- | ------------------------------------------------------------------- |
@@ -16,9 +16,25 @@ reasoning behind the sequence.
 | 14. Lint and CI | 16/20 | Code, docs, shell, spec and workflow linting; ten CI jobs.          |
 | 13. Coverage    | 5/8   | Floors set and measured; DOM-environment tests outstanding.         |
 | 6. Catalogue    | 7/12  | Loadable, gated, tracked, introduced — and now visible.             |
+| 7. Presentation | 3/14  | Colours, hex, mirror and explosions verified; draw-op order is not. |
 
-Everything else is untouched: 7 (presentation), 8 (art), 9 (shell),
-10 (mobile), 11 (PWA), 12 (verification).
+Everything else is untouched: 8 (art), 9 (shell), 10 (mobile), 11 (PWA),
+12 (verification).
+
+**Group 7 is 3/14 and the number understates the code, not the work.** The reconciliation
+note called it "honestly 0/14 by that bar", and three of those tasks turned out to be
+implemented with nothing checking them — `render/presentation.test.ts` now asserts them
+against the renderer's real draw calls. Two could not be closed at all, and both are
+findings. **7.2** asks for per-cell draw-op aggregation ordered own-cell, then before-pass,
+then after-pass; `render/board.ts` draws from `sim.board` and has no aggregation and no
+before/after pass, so design decision 6's ordering rule — kept "because levels depend on
+it" — is not implemented where it would matter. **7.14** asks for a fallback icon for an
+out-of-range `pos`, but `draw.ts` deliberately throws on one, because a bad `pos` would blit
+whatever is at that offset in the image file: a silently wrong picture rather than an error.
+And **7.6 is verified only as far as the renderer can be**: `hexflip` never reaches it.
+Eleven levels are hex and the only one declaring it uses `hexflip=2`, which for a
+single-player left half means the same as `0` — so nothing in the corpus is affected, and
+the gap is latent rather than active.
 
 **Level cards have pictures now, and the corpus said what a tile can honestly be.** 6.7
 asked for "a miniature of its actual board" verified against "the level it opens", and the

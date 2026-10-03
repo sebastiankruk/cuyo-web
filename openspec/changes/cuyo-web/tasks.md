@@ -93,6 +93,47 @@ README says so in those words rather than leaving a reader to assume `make check
 breach reports every test green and then exits 1, so inside the `test` job it would read as
 "the suite is broken" and point at an assertion instead of at the percentage.
 
+**7.4, 7.6 and 7.7 were implemented and unverified; they are now verified against the
+renderer's real draw calls, in `render/presentation.test.ts`.** Every assertion names a
+position rather than a count — the lesson this project's tests were written after, where
+"26 fills happened, all inside the canvas" passed while every blob sat in one corner. Three
+things the writing turned up, none of which a reading of the renderer would have shown:
+
+- **A hex cell's centre is in the *next* row.** The offset is half a cell down, so "which
+  cell is this fill in" cannot answer the question 7.6 asks. The first version of the test
+  looked cells up by centre and reported four missing blobs on a board that draws all of
+  them. The hex assertions are in pixels, which is the space the offset lives in.
+- **A goal blob is drawn twice** — the body and a marker on top of it — so a row of goal
+  blobs fills the band twice and every count comes out double. `blobsInRow` filters on width
+  to separate them, and says why.
+- **The explosion is already past frame 1 when `step()` returns**, because one call runs the
+  whole phase loop: `testExplosions` sets them to 1 and `continue`s, then the same call
+  reaches the `exploding` case and advances them. Asserting `1` would have been asserting
+  that a step does one thing. The test now drives from wherever the sequence lands and
+  asserts one step per frame from there — which is also what makes it immune to the bug that
+  loop once had.
+
+**Two group-7 tasks are not closeable as written, and both are findings rather than gaps I
+can quietly finish.** 7.2 asks for per-cell draw-op aggregation ordered own-cell, then
+before-pass, then after-pass (design decision 6). The engine has `PictureStack` per blob and
+`render/board.ts` draws from `sim.board` — there is **no per-cell aggregation and no
+before/after pass at the render layer at all**, so the ordering rule decision 6 keeps "because
+levels depend on it" is not implemented where it would matter. And 7.14 asks for a fallback
+icon for an out-of-range `pos`, but `draw.ts` **deliberately throws** on one, documented:
+a bad `pos` "would blit whatever happens to be in the image file at that offset — a silently
+wrong picture rather than an error". Implementing a fallback would contradict a decision
+someone made on purpose. Both are recorded here rather than forced.
+
+**And 7.6 is verified only as far as the renderer can be.** `hexflip` is **dropped on the way
+to the renderer**: `LevelDef` has no such field and `board.ts` calls
+`hexGeometry(level.neighbours)` with no flip argument. Measured: 11 levels are in a hex mode
+and the only one declaring `hexflip` is `hexkugeln.ld` with `hexflip=2` — and since
+`columnShift` reads `flip & 1` for the left half and every hex board in this port is
+single-player, `2` and the default `0` agree. So **no level in the corpus is affected and the
+gap is latent**, but a two-player hex board or a single-player `hexflip=1` level would render
+with the wrong parity. Asserting the flip would mean asserting that a field the renderer
+never receives changes the output, so the test says what is true and the gap is written down.
+
 **12.8's premise was wrong in a way that mattered.** It said the corpus-absence skip in
 `render/palette.test.ts` could go because "the level files are committed" — but that suite
 read `.context/upstream-cuyo/data`, which is **gitignored**. So the skip was live: on CI and
@@ -259,10 +300,10 @@ long enough that scrolling to the bottom is the only way to see what exists.
 - [ ] 7.1 Implement the canvas board layout that fits the largest centred 1:2 rectangle in the available area and disables image smoothing, and verify on phone and tablet viewport sizes
 - [ ] 7.2 Implement per-cell draw-op aggregation ordered own-cell, then before-pass, then after-pass, and verify the composited result for a cross-cell drawing case
 - [ ] 7.3 Implement icon decoding into reusable drawable objects with no per-frame allocation, and verify a frame-time measurement stays within budget on a mid-range device profile
-- [ ] 7.4 Implement level-consistent background, text and chase-border colours, and verify a level's declared `bgcolor` and `topcolor` are used
+- [x] 7.4 Implement level-consistent background, text and chase-border colours, and verify a level's declared `bgcolor` and `topcolor` are used
 - [ ] 7.5 Implement the chase border rendering including `toppic`, `topoverlap` and `topstop`, and verify the artwork offset matches `topoverlap`
-- [ ] 7.6 Implement hex and mirrored rendering, and verify odd columns are offset and a mirrored level is drawn upside down
-- [ ] 7.7 Implement the 8-step explosion animation rendering, and verify the effect advances over 8 steps and the cell then draws empty
+- [x] 7.6 Implement hex and mirrored rendering, and verify odd columns are offset and a mirrored level is drawn upside down
+- [x] 7.7 Implement the 8-step explosion animation rendering, and verify the effect advances over 8 steps and the cell then draws empty
 - [ ] 7.8 Implement the HUD: score, level name, grey count, goal count, and verify each updates as specified
 - [ ] 7.9 Implement the next-piece preview using the same rendering path, and verify it matches the piece that enters play and reports `informational` true
 - [ ] 7.10 Implement the informational indicators for grey count, goal count, connection mode and chain reaction, and verify the connection-mode and chain-reaction indicators reflect the level
