@@ -38,6 +38,70 @@ export type Difficulty = "easy" | "normal" | "hard";
  */
 export const DIFFICULTIES: readonly Difficulty[] = ["easy", "normal", "hard"];
 
+/** One difficulty, as the player reads it. */
+export interface DescribedDifficulty {
+  /** The word on the button. Capitalised, because it starts one. */
+  readonly name: string;
+  /**
+   * A sentence saying what picking this one does.
+   *
+   * **Not** a promise that the level gets easier or harder, because that is the level author's
+   * decision and not ours. 6.3 measured all 108 difficulty variants in the corpus:
+   *
+   * | field        | variants that change it |
+   * | ------------ | ----------------------: |
+   * | `numExplode` |                      15 |
+   * | `startRows`  |                       7 |
+   * | `kinds`      |                       6 |
+   * | `chainGrass` |                       3 |
+   * | `topTime`    |                       0 |
+   * | `neighbours` |                       0 |
+   *
+   * Every one of the fifteen `numExplode` changes but one is an `easy` one, and every one of
+   * those *lowers* the threshold — a bigger group before it detonates, which is the gentler
+   * direction. `hard` changes anything at all in only **7 of its 44** variants, and only two of
+   * those touch `numexplode`; the rest change the start layout or the kind count. And **no level
+   * anywhere varies the chase border's rate or its connection mode by difficulty**, which is worth
+   * knowing because it is the obvious thing to assume.
+   *
+   * So a difficulty is *a different set of numbers the author wrote*, usually the same level with
+   * the thresholds moved, and the descriptions say that rather than something the corpus does not
+   * support.
+   */
+  readonly description: string;
+}
+
+/** The three difficulties, as the player reads them. */
+export const DESCRIBED_DIFFICULTIES: Readonly<Record<Difficulty, DescribedDifficulty>> = {
+  easy: {
+    name: "Easy",
+    description:
+      "The author's gentler numbers. Usually a bigger group before it detonates, so a mistake " +
+      "has more room to be walked back out of.",
+  },
+  normal: {
+    name: "Normal",
+    description: "The level as its author wrote it, with no difficulty qualifier.",
+  },
+  hard: {
+    name: "Hard",
+    description:
+      "The author's tougher numbers, where they wrote any. Most hard variants change the start " +
+      "layout or the kinds rather than the explosion size.",
+  },
+};
+
+/**
+ * One difficulty's described form.
+ *
+ * A lookup rather than an `at(0)` because `Difficulty` is a closed union, so there is no
+ * "not one of the three" case to handle — and a function that cannot be handed a bad name
+ * cannot be asked to invent one.
+ */
+export function describeDifficulty(difficulty: Difficulty): DescribedDifficulty {
+  return DESCRIBED_DIFFICULTIES[difficulty];
+}
+
 /** One difficulty's resolved rules for a level. */
 export interface DifficultyEntry {
   readonly difficulty: Difficulty;

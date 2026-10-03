@@ -6,7 +6,7 @@ lagged. On review, a task counts as done only when the implementation exists AND
 the verification it names exists and passes. That is a stricter bar than
 "the code is written", and several items fall short of it.
 
-Fully done and verified: 5.1-5.5, 5.9, 5.10, 5.14, 5.20.
+Fully done and verified: 5.1-5.5, 5.9, 5.10, 5.14, 5.20, 6.3.
 
 Implemented but the named verification is missing (the code is present; the test
 is not). These are cheap to close and should be done before new features:
@@ -169,7 +169,7 @@ reach every expression while skipping a third of them is a gate nobody can trust
 
 - [x] 6.1 Model the three version dimensions (player count, difficulty, track) with their exclusion and exhaustiveness rules, and verify resolution against the spec's examples
 - [x] 6.2 Implement the seven tracks from the level summary and verify Standard has 48 levels and All has 70
-- [ ] 6.3 Implement the three difficulty settings with descriptions and verify a difficulty change alters `numexplode` where the level defines it
+- [x] 6.3 Implement the three difficulty settings with descriptions and verify a difficulty change alters `numexplode` where the level defines it — **they already existed; what was missing was the text and the check.** `DIFFICULTIES`, a `difficulty` per resolved version and `numExplodeAt(entry, difficulty)` came with 6.1. Upstream has **no user-facing difficulty text at all** — only the specifiers `easy` and `hard` — so the descriptions are ours to write, and they had to be written from the measurement rather than from an assumption about what a difficulty is. All 108 difficulty variants in the corpus, compared field by field against `normal`: `numExplode` differs in **15**, `startRows` in 7, `kinds` in 6, `chainGrass` in 3, and `topTime` and `neighbours` in **none**. Three facts follow, and the descriptions say only these: 14 of the 15 `numExplode` changes are `easy` and **every one lowers** the threshold, so `easy` is the side that moves the number a player feels; `hard` changes anything at all in only **7 of 44** variants and only two touch `numExplode`, so its sentence says "where they wrote any"; and no level anywhere varies the chase border's rate or its connection mode, which is asserted as an absence because it is the obvious thing to assume and a description assuming it would be wrong about all 79. The catalogue now labels the control with the described name and shows the chosen difficulty's sentence in the card — a sentence, in the body rather than a `title`, because a tooltip is not reachable by touch and this project's first platform is a phone. **Before this the button said `easy` and the play suffix said `hard`**: the version tokens, printed where a player sees them. 66 of 79 levels offer a variant, and 13 offer none, which is why the control only appears when a level has more than one
 - [x] 6.4 Implement availability gating so levels requiring unsupported modes are skipped rather than failing to load, and verify they are not listed as playable
 - [x] 6.5 Implement per-level, per-difficulty progress records (completed flag, best score) with first-completion unlocking the next level in the track, and verify unlock and record-retention behaviour
 - [x] 6.6 Implement the level introduction screen data (name, author, description) and the seen-level skip option, and verify both

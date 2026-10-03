@@ -164,6 +164,24 @@ button::-moz-focusring {
   color: var(--muted);
 }
 
+/*
+ * What the chosen difficulty does, in a sentence.
+ *
+ * Not a pill like the tags above, because it is prose rather than a label and a pill would
+ * clip it. Muted and small so it reads as an aside to the tags, and with a left rule to hang
+ * off the card's own edge - which is also what distinguishes it from the level's description
+ * directly above without needing another colour.
+ */
+.levelCard__difficultyNote {
+  display: block;
+  margin-top: 0.35rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--panel-2);
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
 .shell__footer {
   display: grid;
   gap: 0.5rem;
