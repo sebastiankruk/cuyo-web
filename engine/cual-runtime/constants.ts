@@ -67,7 +67,20 @@ export function isReadOnlyConstant(name: string): boolean {
 /** Where a blob is, in the terms `absort_*` uses. Which answer a constant gets depends on it. */
 export type BlobPosition =
   /** `absort_feld`: a cell on the board. */
-  | { readonly kind: "cell"; readonly x: number; readonly y: number }
+  | {
+      readonly kind: "cell";
+      readonly x: number;
+      readonly y: number;
+      /**
+       * `mOrt.rechts` — **and a cell blob has one**, which this did not until 5.20.
+       *
+       * `absort_feld` carries `rechts` exactly as `absort_fall` does; it says which of the two
+       * fields the blob is on, and `loc_p` is `return mOrt.rechts ? 2 : 1;` with no `art` test at
+       * all. Without it here, `loc_p` could only be answered for a falling piece, and a blob
+       * standing on the right-hand field of a two-player game reported 1.
+       */
+      readonly right: boolean;
+    }
   /**
    * `absort_fall`: between cells. `right` is `mOrt.rechts`, which `loc_p` reports and which
    * decides which of the fall's two blobs is asking — `Fall::getSpezConst` reads
@@ -188,12 +201,25 @@ export function readConstant(name: string, subject: ConstantSubject): number | n
       // `mOrt.art == absort_info || (mOrt.art == absort_fall && mOrt.y)`
       return position.kind === "info" || (position.kind === "fall" && position.y !== 0) ? 1 : 0;
     case "loc_p":
-      // Throws upstream for the global and semiglobal blobs: they have no left or right.
-      if (position.kind === "global" || position.kind === "semiglobal") {
-        throw new Error("Cual: `loc_p` is not defined for the global or semiglobal blob");
+      // Upstream throws for the global, semiglobal **and nowhere** blobs: they have no left or
+      // right. `absort_nirgends` was missing here and is with them now.
+      if (position.kind === "global" || position.kind === "semiglobal" || position.kind === "nowhere") {
+        throw new Error(
+          `Cual: 'loc_p' is not defined for the global, semiglobal or nowhere blob`,
+        );
       }
       // `return mOrt.rechts ? 2 : 1;`
-      return position.kind === "fall" && position.right ? 2 : 1;
+      //
+      // **Every** place with an `Ort` that has a `rechts`, which is a cell and a fall — so the
+      // check belongs *above* this line, where the three that have none are refused. This read
+      // `position.kind === "fall" && position.right` until 5.20 checked it, so a blob standing
+      // on the **right-hand field of a two-player game** reported 1.
+      //
+      // `absort_info` is the one left: it has no side of its own, so its `mOrt.rechts` is false.
+      if (position.kind === "cell" || position.kind === "fall") {
+        return position.right ? 2 : 1;
+      }
+      return 1;
     case "loc_x":
     case "loc_y":
       // Only answered here for a blob actually on a cell; `break` otherwise.
