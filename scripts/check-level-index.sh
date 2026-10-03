@@ -51,9 +51,13 @@ node --experimental-transform-types --disable-warning=ExperimentalWarning \
 npx --no-install prettier --write "$TMP" "$COMMITTED" >/dev/null 2>&1 || true
 
 if ! diff -u "$TMP" "$COMMITTED" > /dev/null; then
+  # Diff *before* restoring, not after. The order was the reverse, and because the restore
+  # makes the two files identical the printed diff was always empty — so the one thing the
+  # message exists to show never appeared, and a stale catalogue looked like a no-op.
+  # The restore still happens, because this is a check and not a generator.
+  diff -u "$TMP" "$COMMITTED" | head -40 >&2 || true
   cp "$TMP" "$COMMITTED"
   echo "check-level-index: the committed catalogue is stale." >&2
-  diff -u "$TMP" "$COMMITTED" | head -40 >&2 || true
   echo "check-level-index: run 'make level-index' and commit the result." >&2
   exit 1
 fi

@@ -12,11 +12,38 @@ something a player can tell.
 
 ### Added
 
+- **Every level in the catalogue now has a picture of its own board.** The card shows a
+  small tile of the level's start layout — its background colour, and its blobs in their
+  real colours — so the list can be scanned by eye instead of read as 79 names. The
+  tile follows the difficulty you have selected, so it answers "what am I about to
+  play" rather than always showing the level as its author first wrote it.
+
+  The tile is the level's _own_ board, not an illustration of it: the catalogue and the
+  game resolve it through the same code, and a test loads all 79 levels and compares
+  every cell. What it cannot be is a prediction of your next game — Cuyo deliberately
+  starts each attempt differently, so the drawn blobs are one of the arrangements the
+  level allows. The fixed ones, the background, and the colours are exact.
+
 - Progress tracking, unlocking and the level introduction are implemented and
   tested (tasks 6.5 and 6.6), but nothing on screen shows them yet: the catalogue
   screen that would display locked levels, best scores and the skip-introductions
   setting is task 9.4, which arrives with the menus. Nothing here changes what the
   game looks like, so per this file's own rule it is not a release note.
+
+### Fixed
+
+- A level writing a background colour outside 0–255 now paints the same colour in the
+  game as it does in the catalogue. Both readers clamped it before; only the game's
+  did, so the two could disagree about a level's own colour.
+
+### Changed
+
+- `make coverage` reports coverage per tier and fails when a tier falls under its
+  floor. The floors are `engine/` at 90% of statements and 85% of branches, and
+  `render/` at 80% of statements; `app/` has none, because a component's percentage
+  measures how much markup it has rather than whether it works. Note that
+  **`make check` does not enforce them** — that needs a coverage run, which CI does
+  not do yet.
 
 ## [0.3.0] - 2026-10-02
 

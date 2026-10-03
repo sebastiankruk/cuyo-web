@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PlayScreen } from "./PlayScreen.tsx";
 import { catalogue, loadLevel } from "./levels.ts";
 import {
@@ -6,6 +6,7 @@ import {
   describeDifficulty,
   levelsInTrack,
 } from "../engine/level-format/index-data.ts";
+import { tileSvg } from "../render/tile.ts";
 import type { LevelDef } from "../engine/level-format/level-data.ts";
 import type {
   Difficulty,
@@ -249,6 +250,17 @@ function LevelCard({
   // one: the interesting sentence is `normal`'s — "the level as its author wrote it" — and it is
   // also the answer to "what does this button do", which a label alone cannot say.
   const described = describeDifficulty(chosen);
+  // Memoised on `shown`, which is an object out of the generated index and so is stable
+  // for as long as the catalogue is. Without this every re-render of the list — and
+  // choosing a difficulty re-renders all of it — would rebuild 79 SVG strings to produce
+  // markup React then diffs as unchanged.
+  const tile = useMemo(
+    () =>
+      shown === undefined
+        ? ""
+        : tileSvg(shown.tile, catalogue().palettes[shown.tile.palette] ?? ""),
+    [shown],
+  );
   return (
     <div className="levelCard">
       {/*
@@ -296,6 +308,31 @@ function LevelCard({
         */}
         <span className="levelCard__difficultyNote">{described.description}</span>
       </span>
+      {/*
+        The level's board, as a tile.
+
+        First in the card so it is the first thing the eye lands on, and before the body
+        text in the DOM for the same reason: the tile is how the catalogue is meant to be
+        read, by shape rather than by name. It follows the *chosen* difficulty, because
+        that is the question it answers — "what am I about to play" — and a tile that
+        always showed `normal` would quietly contradict the button next to it.
+
+        `shown` is the resolved entry for the chosen difficulty, which can be undefined
+        for a level that offers the difficulty but resolves to nothing; the tile is then
+        omitted rather than drawn empty, since an empty board is not the level.
+      */}
+      {shown !== undefined && (
+        <div
+          className="levelCard__tile"
+          // The SVG arrives as a string rather than as elements. React elements for 79
+          // cards' worth of rectangles would be reconciled on every render of a list
+          // whose pictures never change, and `dangerouslySetInnerHTML` is the one place
+          // that risk is acceptable: the string comes from `tileSvg`, whose only inputs
+          // are the generated index, and it filters both its colours through a pattern
+          // before interpolating them into an attribute.
+          dangerouslySetInnerHTML={{ __html: tile }}
+        />
+      )}
       <span className="levelCard__actions">
         {entry.supported && offered.length > 1 && (
           <span

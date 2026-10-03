@@ -6,7 +6,7 @@ reasoning behind the sequence.
 
 ## Where we are
 
-96 of 166 tasks. Two groups are done, and the difference matters:
+97 of 166 tasks. Two groups are done, and the difference matters:
 
 | Group           |       | What it means                                                       |
 | --------------- | ----- | ------------------------------------------------------------------- |
@@ -15,9 +15,24 @@ reasoning behind the sequence.
 | 5. Game core    | 20/20 | The rules: falling, connections, explosions, greys, border.         |
 | 14. Lint and CI | 15/20 | Code, docs, shell, spec and workflow linting; nine CI jobs.         |
 | 13. Coverage    | 5/8   | Floors set and measured; DOM-environment tests outstanding.         |
+| 6. Catalogue    | 7/12  | Loadable, gated, tracked, introduced — and now visible.             |
 
-Everything else is untouched: 6 (catalogue), 7 (presentation), 8 (art), 9 (shell),
+Everything else is untouched: 7 (presentation), 8 (art), 9 (shell),
 10 (mobile), 11 (PWA), 12 (verification).
+
+**Level cards have pictures now, and the corpus said what a tile can honestly be.** 6.7
+asked for "a miniature of its actual board" verified against "the level it opens", and the
+second half is not achievable: the game seeds its PRNG from `Date.now()` on purpose, so a
+restart is not the board you have just seen, and 6.6% of the corpus's start cells are pool
+draws resolved against that seed. **88 of 187 compiled difficulty rows contain no named kind
+at all** — their entire start layout is a draw. So a tile is _one legal start_: the fixed
+cells, the background and the colours are exact and are verified cell-by-cell against the real
+`LevelLoader` for all 79 levels; the drawn cells are one of the arrangements the level allows.
+Worth knowing before designing 6.8–6.12 on top of it: the start layout is **88.3% empty**
+(median 3 rows filled of 20), so what makes two tiles tellable apart is mostly the **32
+distinct `bgcolor` values** — a median of **one** kind is drawn per tile. The board is 10 wide
+by 20 tall, so the tile is unavoidably portrait, and 79 portrait tiles in a scrolling list is
+a constraint the next few catalogue tasks inherit.
 
 **The coverage floors exist and are below the measurement on purpose.** `engine/` is at
 93.7% against a 90% floor, `render/` at 91.7% against 80%, and `app/` has no floor because

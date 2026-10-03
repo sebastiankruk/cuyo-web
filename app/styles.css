@@ -646,6 +646,59 @@ button::-moz-focusring {
 }
 
 /*
+ * The tile: the level's board, small.
+ *
+ * Laid out as a two-column grid so the card is the tile beside the text rather than the
+ * tile above it. Above would push the level's name below the fold of a card that is
+ * mostly whitespace above the blobs anyway — the board's own start layout leaves its top
+ * half empty — and 79 cards is a long scroll to get worse.
+ *
+ * The tile crops to the rows a level actually occupies — the board is 88.3% empty at the
+ * start, so a tile of the whole board is mostly the background colour. What is left is a
+ * landscape strip: a median of 3.5 rows out of 20, and at most 14. The width is therefore
+ * set for a strip rather than for a portrait board: 6rem makes the common case about
+ * 96 × 34 pixels, which is small enough to sit beside the text and large enough to read.
+ *
+ * The width is fixed rather than left to the grid because a `1fr` column beside text of
+ * varying length would give every card a differently sized picture, and a catalogue whose
+ * tiles do not line up is much harder to scan than one whose pictures differ.
+ */
+.levelCard {
+  grid-template-columns: 6rem 1fr;
+  column-gap: 1rem;
+  align-items: start;
+}
+
+.levelCard__tile {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+}
+
+.levelCard__tile .tile {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+
+/*
+ * Below the two-column threshold the tile goes back above the text rather than beside it,
+ * because at that width a 4.5rem column leaves the description about 20 characters
+ * wide and the card becomes taller than it is informative.
+ */
+@media (max-width: 30rem) {
+  .levelCard {
+    grid-template-columns: 1fr;
+  }
+
+  .levelCard__tile {
+    grid-row: 1;
+    width: 6rem;
+  }
+}
+
+/*
  * The hit target: covers the card, sits under the visible content.
  *
  * Transparent rather than `display: none` or a zero-size box, because it has to stay
