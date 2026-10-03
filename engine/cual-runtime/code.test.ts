@@ -313,6 +313,75 @@ describe("scoped blocks", () => {
   });
 });
 
+describe("where a definition is recognised", () => {
+  // Task 4.17, which recorded a gap here. There is not one, and these are the measurements that
+  // say so — the task is closed against them rather than deleted, because "we checked and it
+  // works" is worth more than "we stopped thinking about it".
+  //
+  // Upstream's rule is `code_modus: code_modus code_zeile`, where a `code_zeile` is a procedure
+  // definition, a `var` line or a `default` line — and nothing else. So a definition is a zeile
+  // *wherever* it falls in the list, which is what `parseCodeLine` does: it probes for one at
+  // every statement boundary in the block.
+  it("recognises a definition at any zeile boundary", () => {
+    // The shapes that must work, and do. Two in a row is the one 4.17 named as broken, and it was
+    // never broken — the test that said so used `a` as the name, which upstream refuses.
+    const cases: [string, string[]][] = [
+      ["tor_1 = { xx += 1 };", ["tor_1"]],
+      ["var xx; tor_1 = { xx += 1 };", ["tor_1"]],
+      ["default xx = 1; tor_1 = { xx += 1 };", ["tor_1"]],
+      ["var xx; aa = { xx += 1 }; tor_1 = { xx += 1 };", ["aa", "tor_1"]],
+      [
+        "var xx; aa = { xx += 1 }; bb = { xx += 2 }; cc = { xx += 3 };",
+        ["aa", "bb", "cc"],
+      ],
+    ];
+    for (const [source, names] of cases) {
+      const stmts = parse(source);
+      expect(
+        stmts.filter((s) => s.kind === "procedureDef").map((s) => s.name),
+        source,
+      ).toEqual(names);
+    }
+  });
+
+  it("refuses a single-letter name by name, at all four sites", () => {
+    // `var_def_wort` and `proc_def_wort` each have a `BUCHSTABE_TOK` production whose only action
+    // is to throw, and `lokale_variable` has a third. The *use* site already said so; the three
+    // declaration sites did not, and `x = { .. }` was refused as "cannot start a statement here",
+    // which is true and useless — the thing written is a procedure one letter long.
+    expect(() => parse("var x;")).toThrow(/Variable names can't be single letters/);
+    expect(() => parse("default x = 3;")).toThrow(/Variable names can't be single letters/);
+    expect(() => parse("xx += x;")).toThrow(/Variable names can't be single letters/);
+    expect(() => parse("x = { xx += 1 };")).toThrow(/Procedure names can't be single letters/);
+    // And a scoped block's name is a `lokale_variable` too.
+    expect(() => parse("var xx; [x = 1] busy")).toThrow(
+      /Variable names can't be single letters/,
+    );
+  });
+
+  it("refuses the three shapes 4.17 named, and upstream refuses them too", () => {
+    // Each is a correct refusal, for a reason upstream's grammar gives as well — which is the
+    // whole finding. None of them is a `code_zeile` upstream either.
+    //
+    // A definition after a call: `tor_1;` at the top of a `<< >>` is not a zeile, so upstream
+    // rejects the *call*. Ours gets as far as the `=` and finds a `{` where an expression belongs.
+    expect(() => parse("var xx; tor_1; tor_1 = { xx += 1 };")).toThrow();
+    // A definition inside a block: `'{' code '}'` is a `code`, and a `code` holds no zeilen.
+    expect(() => parse("var xx; if 7 -> { tor_1 = { xx += 1 }; }")).toThrow();
+    // A definition after an ordinary statement, for the same reason as the call.
+    expect(() => parse("var xx; xx += 1; tor_1 = { xx += 1 };")).toThrow();
+  });
+
+  it("still links one definition per block, which is every level's shape", () => {
+    // Upstream's convention, and the reason the refusals above cost nothing: a `<< >>` block
+    // holds **one** definition. `anim = {1; A,B,C,D; *};` is its own block, and the level's
+    // `var`s are in another. The corpus census has 835 `procedureDef`s over 339 blocks, which is
+    // the two-and-a-bit per block that "mostly one, sometimes two" produces.
+    const statements = parse("var xx; anim = { xx += 1 }; xx += 1;");
+    expect(statements.map((s) => s.kind)).toEqual(["varDecl", "procedureDef", "assign"]);
+  });
+});
+
 describe("a switch's case list", () => {
   /** Every case in a `switch`, head first, as its condition's literal value. */
   function chain(source: string): number[] {

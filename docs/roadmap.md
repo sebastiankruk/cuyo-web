@@ -206,13 +206,23 @@ but a gate that skips a third of a level's arithmetic cannot be trusted to say t
 fine. So the gate now asserts the list is empty _and_ takes a census of what the corpus
 contains, which is what stops _"no gaps"_ from also meaning _"did not look"_.
 
-**Two tasks the checklist did not have**, found while reading upstream rather than while
-running the corpus: 4.17, where a procedure definition is only recognised at a `code_zeile`
-boundary, and 4.18, where a comma sequence inside a spliced body runs to completion instead
-of advancing a frame. No level in the corpus does either, so neither is on the critical
-path — but 4.18 is why `cual.6`'s two ampersand examples are structurally right and
-arithmetically wrong, and that is the sort of thing that is much cheaper to record now than
-to rediscover.
+**Two tasks the checklist did not have, and both of them were wrong.** They were found while
+reading upstream rather than while running the corpus, and both recorded a gap that was never
+measured:
+
+- 4.17 said a procedure definition is only recognised at a `code_zeile` boundary, so three
+  shapes do not parse. Two definitions in a row parses; and the other three are refused for
+  the same reasons upstream refuses them, because none of them is a `code_zeile` there either.
+- 4.18 said a comma sequence inside a spliced body runs to completion instead of advancing a
+  frame. A spliced body's frames are a bare sequence's frames, member for member and busy step
+  for busy step.
+
+Both are closed against the measurements rather than deleted, because a task asserting the
+opposite would fail the day someone re-read the man page and believed it again. One smaller
+question is left open and written down: `cual.6` also claims a spliced animation _restarts_ on a
+branch switch where a shared one _continues_, which is about flag scope rather than advance, and
+`resetBusy` has no `sharedCall` case. No corpus level uses `&name` at all, so nothing in the
+game depends on it.
 
 ### 5. Menus, pause, settings (group 9) — _0.5.0_
 
