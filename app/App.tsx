@@ -3,6 +3,7 @@ import { PlayScreen } from "./PlayScreen.tsx";
 import { catalogue, loadLevel } from "./levels.ts";
 import {
   DIFFICULTIES,
+  describeDifficulty,
   levelsInTrack,
 } from "../engine/level-format/index-data.ts";
 import type { LevelDef } from "../engine/level-format/level-data.ts";
@@ -244,6 +245,10 @@ function LevelCard({
   const offered = DIFFICULTIES.filter((d) => entry.difficulties.has(d));
   const shown =
     entry.difficulties.get(chosen) ?? entry.difficulties.get("normal");
+  // What the chosen difficulty does, in words. Shown always rather than only for a non-default
+  // one: the interesting sentence is `normal`'s — "the level as its author wrote it" — and it is
+  // also the answer to "what does this button do", which a label alone cannot say.
+  const described = describeDifficulty(chosen);
   return (
     <div className="levelCard">
       {/*
@@ -283,6 +288,13 @@ function LevelCard({
           <span>{neighbourLabel(shown)}</span>
           {shown?.chainGrass === true && <span>chain grass</span>}
         </span>
+        {/*
+          The chosen difficulty's sentence. In the body rather than on the button, because a
+          `title` is a tooltip and this project's first platform is a phone. It names the
+          difficulty rather than the level, so a screen reader reads it as the answer to
+          "what does this control do".
+        */}
+        <span className="levelCard__difficultyNote">{described.description}</span>
       </span>
       <span className="levelCard__actions">
         {entry.supported && offered.length > 1 && (
@@ -299,7 +311,7 @@ function LevelCard({
                 aria-pressed={difficulty === chosen}
                 onClick={() => onChoose(difficulty)}
               >
-                {difficulty}
+                {describeDifficulty(difficulty).name}
               </button>
             ))}
           </span>
@@ -313,7 +325,10 @@ function LevelCard({
           <span className="levelCard__play" aria-hidden="true">
             Play
             {chosen !== "normal" && (
-              <span className="levelCard__playSuffix"> {chosen}</span>
+              <span className="levelCard__playSuffix">
+                {" "}
+                {describeDifficulty(chosen).name}
+              </span>
             )}
           </span>
         )}
