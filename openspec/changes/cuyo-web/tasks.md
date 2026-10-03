@@ -79,6 +79,25 @@ of them), an assignment's *target* (354 addressed ones, three expressions each),
 `sharedCall`'s body, which 4.14 added without teaching the walk about. None of them hid a
 construct, because a coordinate cannot hold a neighbour pattern — but a gate claiming to
 reach every expression while skipping a third of them is a gate nobody can trust.
+
+**13.6 is only half a floor, and the half that is missing is the half that catches anything.**
+The thresholds went in at decision 12's numbers and both were verified by running the real
+mechanism, not by reading the config: with `render/` floored at 99% against 91.7% achieved,
+`vitest run --coverage` reported 1441 tests passed and still exited 1, and dropping a file with
+no test into `engine/` moved it from 93.7% to 93.6%. What that also showed is that **vitest
+evaluates `coverage.thresholds` only when coverage is enabled** — the same raised floor under a
+plain `vitest run` exits 0. So `make check` does not enforce the floors, `make coverage` does,
+and putting a coverage run in CI is 14.17, which is where the remaining half belongs. The
+README says so in those words rather than leaving a reader to assume `make check` guards it.
+
+**The floors are deliberately below the measurement** (engine 93.7 against 90, render 91.7
+against 80). A floor set to today's figure cannot catch a regression, because it moves with it.
+`coverage.test.ts` therefore pins the *configuration* — that the numbers are decision 12's, that
+`app/` has no floor, and that no source file has slipped outside `coverage.include`, which is the
+likely accident, because a glob list is silent and a file that stops matching is not reported as
+missing, it just stops being counted and the percentage goes **up**. `levels-src/` is excluded on
+purpose: it is the generators, which run under `make` rather than under a test, so a coverage run
+would say "1.4%" about them — true, and about the wrong thing.
 -->
 
 ## 1. Project Setup and Toolchain
@@ -342,8 +361,8 @@ untested files; the per-table tests are what protect fidelity, so both are neede
 - [x] 13.3 Extract the renderer's pure geometry, colour derivation and cell-origin maths into canvas-free functions and unit-test them in Node, verifying hex column offsets and mirrored cell origins
 - [ ] 13.4 Drive the frame loop's accumulator with an injected clock and verify it executes one step per 80 ms, clamps a long backlog rather than fast-forwarding, and honours pause
 - [ ] 13.5 Add behaviour tests for input timing under a DOM environment: immediate move, delayed repeat, repeat rate, and cancellation on the opposite direction
-- [ ] 13.6 Set coverage thresholds in the test config at the levels in design.md decision 12 and verify the suite fails when a file is left untested
-- [ ] 13.7 Record the achieved coverage per tier in the README whenever it is measured, so regressions are visible in review rather than discovered later
+- [x] 13.6 Set coverage thresholds in the test config at the levels in design.md decision 12 and verify the suite fails when a file is left untested
+- [x] 13.7 Record the achieved coverage per tier in the README whenever it is measured, so regressions are visible in review rather than discovered later
 - [ ] 13.8 Mount `PlayScreen` in a DOM environment and verify it sizes the canvas from the space its parent actually offers, so the component cannot re-introduce the four-times-too-tall board that `render/board.test.ts` cannot catch from outside
 
 ## 14. Linting and continuous integration

@@ -105,6 +105,19 @@ const buildStampPlugin = {
       : undefined,
 };
 
+/**
+ * The floors, as numbers, in one place.
+ *
+ * Exported so `engine/coverage-floors.test.ts` can assert that what is *configured* is what
+ * decision 12 says, without reading a markdown file to find out. Duplicated in design.md
+ * deliberately: a table that is generated from the config is a table that changes when the
+ * config is wrong, and this is the record of what was decided.
+ */
+export const COVERAGE_FLOORS = {
+  engine: { statements: 90, branches: 85 },
+  render: { statements: 80 },
+} as const;
+
 export default defineConfig({
   plugins: [react(), buildStampPlugin],
   server: {
@@ -128,5 +141,60 @@ export default defineConfig({
     // directory - currently the licence, which has to agree across the README, the
     // badge, the script headers and the prose, and which no per-directory test can see.
     include: ["{app,engine,levels-src,render}/**/*.test.ts", "*.test.ts"],
+
+    /**
+     * The coverage floors, which are design.md decision 12's and not mine.
+     *
+     * | tier       | floor                                    |
+     * | ---------- | ---------------------------------------- |
+     * | `engine/`  | ≥ 90% statements, ≥ 85% branches         |
+     * | `render/`  | ≥ 80% statements                         |
+     * | `app/`     | none — covered by behaviour tests, review |
+     *
+     * A ratchet and not a goal: `coverage.floor` is the number the suite enforces, and 13.7
+     * records what is actually achieved so a fall shows up in a review diff. **The two must
+     * not be the same number.** A floor set to today's measurement cannot catch a regression,
+     * because it moves with it — and that is the whole function of a floor. So the floor is
+     * below the achieved figure and the README says which is which.
+     *
+     * `app/` has no floor on purpose and the omission is deliberate: decision 12 puts it under
+     * review rather than a percentage, because a component is mostly JSX and its percentage
+     * says how much markup it has rather than whether it works. A file listed there with a
+     * threshold would be a claim nobody made.
+     *
+     * `perFile: false` because a per-file floor would demand that every *file* be well covered,
+     * and decision 12 says the percentage's job is "to catch whole untested files" — which is a
+     * job for the aggregate plus the census-style tests, not for sixty thresholds.
+     */
+    coverage: {
+      provider: "v8",
+      // **Exactly the tiers decision 12 floors**, which is `engine/`, `render/` and `app/`.
+      //
+      // `levels-src/` is excluded on purpose: it is the index and manifest *generators*, which
+      // run under `make level-index` and `make art-manifest` rather than in a unit test, and the
+      // only thing a unit-test coverage run would say about them is "1.4%", which is true and
+      // useless — it measures that a build script is a build script. Their verification is that
+      // they run and that what they emit passes the corpus tests, which is what 2.13 and 2.14 are.
+      // Including them would also mean inventing a fourth tier and a floor nobody decided on.
+      include: ["engine/**/*.ts", "render/**/*.ts", "app/**/*.ts"],
+      exclude: [
+        "**/*.test.ts",
+        "**/testing/**",
+        "app/build-stamp.d.ts",
+      ],
+      reporter: ["text-summary", "json-summary"],
+      // Where `coverage/coverage-summary.json` lands. Gitignored, and regenerated on demand
+      // rather than committed — a committed report is a diff on every run.
+      reportsDirectory: "coverage",
+      thresholds: {
+        "engine/**/*.ts": {
+          statements: COVERAGE_FLOORS.engine.statements,
+          branches: COVERAGE_FLOORS.engine.branches,
+        },
+        "render/**/*.ts": {
+          statements: COVERAGE_FLOORS.render.statements,
+        },
+      },
+    },
   },
 });
