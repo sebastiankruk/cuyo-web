@@ -90,6 +90,15 @@ plain `vitest run` exits 0. So `make check` does not enforce the floors, `make c
 and putting a coverage run in CI is 14.17, which is where the remaining half belongs. The
 README says so in those words rather than leaving a reader to assume `make check` guards it.
 
+**12.8's premise was wrong in a way that mattered.** It said the corpus-absence skip in
+`render/palette.test.ts` could go because "the level files are committed" — but that suite
+read `.context/upstream-cuyo/data`, which is **gitignored**. So the skip was live: on CI and
+on every fresh clone, `describe("the real corpus")` returned immediately and reported
+success. The property is that two kinds in one level are never the same colour, and it had
+never been checked anywhere but this machine. Its own census was `>= 65` against 70 measured
+— slack enough to hide 14 lost levels, which is the failure the task exists to prevent,
+sitting inside the task that fixes it.
+
 **The floors are deliberately below the measurement** (engine 93.7 against 90, render 91.7
 against 80). A floor set to today's figure cannot catch a regression, because it moves with it.
 `coverage.test.ts` therefore pins the *configuration* — that the numbers are decision 12's, that
@@ -371,7 +380,7 @@ long enough that scrolling to the bottom is the only way to see what exists.
 - [ ] 12.5 Measure frame time with the development overlay on a mid-range device profile and verify the board stays within budget with a full board and active animations
 - [ ] 12.6 Verify the Standard track is playable end to end on a real phone, including touch controls, orientation change and offline start
 - [ ] 12.7 Verify every track loads and each level reaches a running state without a runtime error in its first steps
-- [ ] 12.8 Delete the last corpus-absence skip, in `render/palette.test.ts`
+- [x] 12.8 Delete the last corpus-absence skip, in `render/palette.test.ts`
 
   The suite reads the level files and returns early when they are missing, which reads
   exactly like a pass. The level files are committed as of the `levels-in-tree` work, so
@@ -382,6 +391,27 @@ long enough that scrolling to the bottom is the only way to see what exists.
   branch that has it. It is recorded here rather than forced into either, because a test
   that silently checks nothing is a small thing that hides a large one — the whole point
   of the property is that two kinds in one level are never the same colour.
+
+  **Closed, and the task's premise was wrong in a way that mattered.** It said "the level
+  files are committed, so there is nothing left to guard against" — but this suite read
+  `.context/upstream-cuyo/data`, which is **gitignored** (`.context/.gitignore` is `*`, it
+  holds the upstream GPL sources). So the skip was live, not dead: on CI and on every fresh
+  clone the whole of `describe("the real corpus")` returned immediately and reported
+  success. The property is that two kinds in one level are never the same colour, and it
+  had never been checked anywhere but this machine.
+
+  Repointed at `levels/upstream` (83 committed files, every filename the catalogue names),
+  then the skip and `hasCorpus()` are gone. What it measures now: **79 levels examined,
+  70 with a pair to measure, 9 with fewer than two colour kinds.** The census was
+  `toBeGreaterThanOrEqual(65)`, which 70 satisfies and which a corpus that had quietly lost
+  14 of the levels that matter would also have satisfied — the failure this task exists to
+  prevent, sitting inside the task that fixes it. It is now exact in both directions:
+  every level in the catalogue is read, and every level with a pair contributes a row.
+
+  **And the mutation showed the one thing the test cannot catch by itself.** Pointing
+  `DATA_DIR` back at the gitignored tree leaves all 27 tests green *on this machine*,
+  because that tree exists here. Green and wrong, and only a CI run would notice — so the
+  constraint is asserted directly: the corpus must not come from `.context`.
 
 ## 13. Coverage
 

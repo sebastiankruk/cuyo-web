@@ -20,7 +20,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   MAX_SEPARABLE_KINDS,
@@ -32,7 +32,7 @@ import {
   maximinColours,
 } from "./palette.ts";
 import { deltaE, labOfHsl, rgbToLab } from "./perceptual.ts";
-import { LEVELS } from "../levels-src/generated/level-index.ts";
+import { LEVELS, LEVEL_INDEX } from "../levels-src/generated/level-index.ts";
 import type { KindRole } from "../engine/level-format/level-data.ts";
 import { parseLd } from "../engine/level-format/parser.ts";
 import { Version } from "../engine/level-format/version.ts";
@@ -391,9 +391,38 @@ describe("the perceptual metric itself", () => {
 });
 
 /** The level files the corpus oracle reads. */
-const DATA_DIR = resolve(import.meta.dirname, "../.context/upstream-cuyo/data");
+/**
+ * The committed level files.
+ *
+ * **Was `.context/upstream-cuyo/data`, which is gitignored** — `.context/.gitignore` is
+ * `*`, so that tree is local-only and absent from every fresh clone. Which made the
+ * `hasCorpus()` skip below live rather than dead: the whole of `describe("the real
+ * corpus")` returned immediately on CI and on anyone else's machine, and reported success.
+ * That is the worst shape a test can have — it reads exactly like a pass and it is the
+ * property that matters most here, that two kinds in one level are never the same colour.
+ *
+ * So the data comes from `levels/upstream`, which *is* committed (83 files), and holds
+ * every filename the catalogue names. The skip could then go, which is task 12.8.
+ */
+const DATA_DIR = resolve(import.meta.dirname, "../levels/upstream");
 
 describe("the real corpus", () => {
+  it("reads level files that are committed, not the local-only upstream tree", () => {
+    // Found by mutation: pointing `DATA_DIR` back at `.context/upstream-cuyo/data` leaves
+    // every test in this file **green on this machine**, because that tree happens to exist
+    // here. It is green and wrong, and the only thing that would notice is a CI run on a
+    // fresh clone where the directory is absent — where, now that the skip is gone, it
+    // would throw rather than quietly pass, which is the right failure but a late one.
+    //
+    // So the constraint is stated where it can be checked: the corpus must not come from
+    // `.context`, which is gitignored (`.context/.gitignore` is `*`) and holds the upstream
+    // GPL sources. `levels/upstream` is committed — 83 files — and is what a fresh clone has.
+    expect(DATA_DIR).not.toContain("/.context/");
+    expect(DATA_DIR.endsWith("/levels/upstream")).toBe(true);
+    // And the directory is really there, so a rename fails here rather than at the first
+    // `readFileSync` with an unrelated-looking ENOENT.
+    expect(existsSync(resolve(DATA_DIR, "globals.ld"))).toBe(true);
+  });
   it("tells every level's kinds apart, on every real level", () => {
     // The oracle, built through the parser rather than by reading the `pics` lines out
     // of the file text.
@@ -406,9 +435,10 @@ describe("the real corpus", () => {
     // statement about a third of the corpus, and the 14-colour level was never looked
     // at.
     //
-    // Skipped rather than failed when the corpus is absent, because a fresh clone has
-    // not fetched it and the other corpus tests already say so loudly.
-    if (!hasCorpus()) return;
+    // No skip. There used to be one — `if (!hasCorpus()) return;` — and it was live,
+    // because the corpus this read was the gitignored `.context` tree rather than the
+    // committed `levels/upstream`. So this test had never run on CI or on anyone else's
+    // machine. See {@link DATA_DIR}.
 
     const bad: string[] = [];
     const beyondColour: string[] = [];
@@ -489,9 +519,10 @@ describe("the real corpus", () => {
     // A test that only says "at least 20" leaves the actual value unknown, and the
     // actual value is what tells you how much headroom there is before a level gets
     // harder. Written as a passing test so the numbers are printed rather than lost.
-    if (!hasCorpus()) return;
     const rows: [string, number, number][] = [];
-    for (const [where, level] of realLevels()) {
+    const levels = realLevels();
+    let noPair = 0;
+    for (const [where, level] of levels) {
       const palette = buildPalette(level.kinds, {
         background: level.background,
       });
@@ -499,29 +530,39 @@ describe("the real corpus", () => {
         .map((k, i) => ({ role: k.role, colour: colourFor(palette, i) }))
         .filter((k) => k.role === "colour")
         .map((k) => k.colour);
-      if (colours.length < 2) continue;
+      if (colours.length < 2) {
+        // No pair exists, so there is nothing to measure. Said out loud below rather than
+        // folded into a total, because "9 levels were skipped" and "9 levels were silently
+        // dropped" look identical in a count.
+        noPair++;
+        continue;
+      }
       rows.push([where, colours.length, closestPair(colours).delta]);
     }
     rows.sort((a, b) => a[2] - b[2]);
     const tightest = rows
       .slice(0, 6)
       .map(([w, n, d]) => `${w}=${d.toFixed(0)}(${n})`);
+    // **The census is the point, and it is exact in both directions.**
+    //
+    // This was `toBeGreaterThanOrEqual(65)`, which 70 satisfies and which would also be
+    // satisfied by a corpus that had quietly lost 14 of the levels that matter — which is
+    // the failure this whole task exists to prevent, sitting inside the task that fixes it.
+    //
+    // Every level in the catalogue is examined, and every level with a pair to measure
+    // contributes a row. Measured: 79 levels examined, 70 measured, 9 with fewer than two
+    // colour kinds. No constant to tune and no slack to hide a lost level in.
     expect(
-      rows.length,
-      `tightest pairs: ${tightest.join(" ")}`,
-    ).toBeGreaterThanOrEqual(65);
+      levels.size,
+      "every level in the catalogue is read by this suite",
+    ).toBe(LEVEL_INDEX.levels.length);
+    expect(
+      rows.length + noPair,
+      `measured ${rows.length}, too few kinds to measure ${noPair}; ` +
+        `tightest pairs: ${tightest.join(" ")}`,
+    ).toBe(LEVEL_INDEX.levels.length);
   });
 });
-
-/** Whether the corpus is present, so a fresh clone skips rather than fails. */
-function hasCorpus(): boolean {
-  try {
-    readdirSync(DATA_DIR);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Every real level's kinds, built the way the game builds them.
