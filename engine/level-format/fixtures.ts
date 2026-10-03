@@ -28,6 +28,8 @@ interface KindSpec {
   readonly numexplode?: number;
   readonly weight?: number;
   readonly versions?: number;
+  /** The default draw code, when this fixture models a picture list. */
+  readonly defaultCode?: string | null;
 }
 
 function makeKinds(specs: readonly KindSpec[], chainGrass: boolean): Kind[] {
@@ -47,6 +49,10 @@ function makeKinds(specs: readonly KindSpec[], chainGrass: boolean): Kind[] {
       greyProb: role === "grey" ? 1 : 0,
       goalProb: role === "grass" ? 1 : 0,
       distKey: null,
+      // These fixtures model no `pics` list, and upstream's condition for a default starts
+      // `mBilddateien.size() > 0`, so `null` is what the transcription says. A spec that does
+      // model pictures sets it, because a kind with pictures and no code is not inert.
+      defaultCode: s.defaultCode ?? null,
     } satisfies Kind;
   });
 }

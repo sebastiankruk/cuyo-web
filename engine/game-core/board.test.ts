@@ -25,6 +25,7 @@ const COLOUR: Kind = {
   greyProb: 0,
   goalProb: 0,
   distKey: null,
+  defaultCode: null,
 };
 
 const OTHER: Kind = { ...COLOUR, id: 1, name: "other", artKey: "other" };

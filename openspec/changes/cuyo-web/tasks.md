@@ -225,6 +225,66 @@ step. With the real `Prng` it loses under every policy: the goals are `chainGras
 chain reaction, and with no Cual nothing ever joins a group big enough to produce one. The
 `ScriptedPrng` result was real arithmetic on a game that cannot occur.
 
+**15.1 found the recursion guard was not strong enough, and that is a change to shipped
+behaviour.** `linkCalls` refused a self-call by registering each definition only *after* rewriting
+its body — which stops `tor_1 = { tor_1; }` but **not** `bolzer = {tor_1;}`, because `tor_1`'s
+stored body is re-rewritten at that call site and by then `tor_1` *is* in scope. Driving a real
+level blew the stack on `Maximum call stack size exceeded`. Upstream cannot have the problem
+because it never re-parses: the self-call was substituted with `undefiniert_code` in the grammar,
+so the stored `Code` holds a dead node and splicing copies the dead node.
+
+The fix keeps `link.ts`'s existing contract — an unresolved call stays a `call` node, which
+`link.test.ts:90-97` deliberately pins so the run-time throw can name the procedure — and instead
+**threads the expansion stack**: `linkCalls` takes an optional `selfName`, and hiding it extends
+to every nested splice, so a call to a procedure already being expanded is left unresolved. That
+is exactly "this procedure did not exist when that body was read", carried transitively. A plain
+call still expands the callee's body *from source*, so it keeps its own busy numbers
+(`neueBusyNummern`) rather than sharing the definition's. `link.test.ts` passes unchanged.
+
+**My own first version of `codeBlocksOf` walked one level deep and found no kind's code at all.**
+A kind's `<< >>` sits inside the *level's* section — `Baggis={ … << level code >> sbKaese={ … <<
+sbKaese = {…} >> } }` — so `Baggis` reported 0 of 7 kinds with their own code when all 7 have. It
+failed quietly rather than loudly, which is the worse kind.
+
+**I had the corpus figures backwards, twice.** I wrote that "most kinds define no code of their
+own" and that the defaults were therefore the main path, from a probe whose classification was
+wrong: it counted a kind as "using a default" whenever its `defaultCode` was non-null, which is
+true of nearly every kind whether or not its own procedure won. Measured properly: of 556 kinds,
+**502 define a procedure of their own, 5 fall back to `default1`, none to `default3`, and 49 have
+no code at all**. The fallback is a tail. It is still implemented — five corpus kinds need it —
+but the module no longer claims to be arranged around it. The five are named in the test
+(`Pfeile/ipGrau`, `Ziehlen/gras`, `Embroidery/jsGruenGras`, `Darken/dnStart`,
+`Explosive/lbBlack`) rather than counted, so two of them silently changing default would fail.
+
+**`default2` and `default2g` are unreachable from the corpus**, because no level writes a kind
+with exactly one multi-icon picture file, and **no level uses `pics = name * count` at all**. That
+last one was a coverage hole mutation found: collapsing `runs.length > 1` into `sum(counts) > 1`
+left all 24 tests green while the two disagree on `pics = bolzer * 3`, which is one file with
+three icons (`default2`) and not three files (`default3`). `defaultCodeFor` is now exported and
+unit-tested on run lists written out by hand, because the loader cannot be used for it — the art
+manifest is keyed by **filename**, so a synthetic level cannot borrow another level's picture
+names and fails before the default is ever chosen.
+
+**`allocateSlots` discarded the index of each declared variable**, so a user variable could not
+be resolved at all: it reaches the evaluator as `{ kind: "variable", name }` and
+`EvalContext.variable(name)` is the only thing that turns a name into an array index. `Allocation`
+now carries `declaredSlots`, because the allocator is the only thing that knows the numbering and
+a second walk in the same order would be a second source of truth for it. One entry per name,
+which upstream agrees with: `neueVarDefinition` always takes a fresh slot and
+`speicherDefinition` throws `"x" already defined.` for a second one.
+
+**Baggis's variables are at slots 23-25, not 14-16.** The special variables take 0-13 and then
+`globals.ld`'s own `var` lines take theirs, because globals are read first and upstream numbers
+every configuration in one sequence. An earlier draft of the test asserted 14/15/16 on the
+reasonable-sounding ground that `SPECIAL_VARIABLE_COUNT` is where user variables start; they start
+*after globals'*.
+
+**One thing this task found that is not in its own scope.** The order *within* a step is upstream's
+and not a guess — `cuyo.cpp:422-542` runs the border, random greys, the falling piece, the row
+transfer and the explosion test, then `Spielfeld::spielSchritt`, and only then `animiere()` at
+`cuyo.cpp:473`, so **the rules run first and the blobs' code last**. That belongs to 15.6 and is
+recorded in group 15's preamble rather than here.
+
 **7.4, 7.6 and 7.7 were implemented and unverified; they are now verified against the
 renderer's real draw calls, in `render/presentation.test.ts`.** Every assertion names a
 position rather than a count — the lesson this project's tests were written after, where
@@ -635,3 +695,34 @@ this project is worked on by an agent that pays for every line of tool output, s
 - [ ] 14.16 Add a CI job that runs `npm audit` and fails on a high or critical advisory, with a documented allow-list and an expiry date for each entry
 - [x] 14.17 Add coverage reporting to CI once 13.6 sets the floors, so a drop below them fails the build rather than appearing in a diff
 - [ ] 14.18 Add a scheduled weekly job that re-fetches the corpus and re-runs the level-format suite, so an upstream release is noticed rather than discovered
+
+## 15. Wiring the runtime to the game
+
+Groups 2 and 3 built the reader and the runtime and the two were never joined, which task
+12.3's scenario tests made measurable rather than suspected: all 79 levels loaded, no input,
+2500-step cap, **9 won and 69 lost**, and a goal blob is ever removed in exactly those 9. Nothing
+runs a level's Cual. `loader.ts` does not import the Cual compiler, `LevelDef` has no field for
+a program, `Simulation` has no step that runs one, nothing implements `cual-runtime`'s
+`Animatable` or `AccessField`, and nothing calls `runStep` outside its own test. `Blob.vars` is
+allocated by `board.ts` and read by nobody — a placeholder left for exactly this.
+
+The order within a step is upstream's, not a guess. `cuyo.cpp:422-542` runs the border, random
+greys, the falling piece, the row transfer and the explosion test, then `Spielfeld::spielSchritt`,
+and only then `animiere()` at `cuyo.cpp:473` — **so the rules run first and the blobs' code last.**
+`Spielfeld::animiere()` (`spielfeld.cpp:885`) then visits the fixed grid column-major
+(`blopgitter.cpp:81`, `for x { for y { … } }`), the falling piece, the preview, the active info
+blobs and the semiglobal, and `runStep` in `global.ts` already encodes exactly that.
+
+Which code a kind runs is also settled upstream (`sorte.cpp:98-131`): **the procedure named after
+the kind**, and where a kind has none, a default chosen by its picture count — `default1`,
+`default2`, `default2g` for grass, `default3`, and never for the global or semiglobal. All of
+them live in `globals.ld`, which the loader already reads. So most kinds run no code of their own,
+and wiring without the defaults would leave the great majority of the corpus inert.
+
+- [x] 15.1 Extract a level's Cual program from its parsed `.ld` and `globals.ld` into a value — the level's procedures, and for every kind the resolved draw code, being its own named procedure or the default its picture count selects — as a pure function of the two parsed files, and verify it across all 79 levels
+- [ ] 15.2 Give `Kind` its draw code and `LevelDef` its program, and build both in `LevelLoader`, so a loaded level carries the code it is about to run
+- [ ] 15.3 Replace `Blob`'s unused `vars: Int32Array` with a real `BlobStore`, allocated per blob against one shared `TimeSlices` per board, so each cell has the variable array `AccessField.at` has to hand back
+- [ ] 15.4 Implement `AccessField` over the live `Board` — `at`, `global`, `semiglobal`, `here`, `hex`, `hexShift`, `mirrored`, `players`, `fallCount` — and verify each against what the addressed access already does on a hand-built field
+- [ ] 15.5 Implement `Animatable` for one blob: its kind's draw code, its own store, and `animate()` as `braucheLeereStapel` then `initSchritt` then the code
+- [ ] 15.6 Run the blobs' code at the end of `Simulation.step()`, through `runStep`, in the order `cuyo.cpp:473` uses — and with the picture stacks cleared and one window opened around it
+- [ ] 15.7 Verify the wiring against the corpus: re-run the 12.3 survey and record how many of the 79 levels' outcomes changed, and name a level whose blobs now move on their own

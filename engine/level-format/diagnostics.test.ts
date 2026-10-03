@@ -47,6 +47,7 @@ function kind(over: Partial<Kind> = {}): Kind {
     greyProb: 0,
     goalProb: 0,
     distKey: null,
+    defaultCode: null,
     ...over,
   };
 }
