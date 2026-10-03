@@ -287,6 +287,43 @@ function LevelCard({
           {entry.unsupportedReason}
         </span>
       )}
+      {/*
+        The tile, before the body, because it is a `float` and a float has to precede the
+        text it sits beside. That is the whole mechanism: the card is one column, the tile
+        floats right for the first line or two of text, and everything below it runs the
+        full width of the card.
+
+        It was a two-column grid, and that was wrong in a way only a screenshot showed. The
+        tile's column is as wide as the tile for the card's *whole* height, so the
+        description and the tags were squeezed into `1fr` beside 128 pixels of empty space
+        they were nowhere near — Octopi's description wrapped to three lines with a third of
+        the card blank to its right. Grid cannot say "beside this for a while, then full
+        width"; that is what a float is for.
+
+        Before the body in the DOM is therefore fine for reading order, and better than
+        where it was: the tile is `aria-hidden`, so it is not read at all, whereas in its
+        old position after the body it was the only thing separating the difficulty control
+        from the end of the card.
+
+        It follows the *chosen* difficulty, because that is the question it answers — "what
+        am I about to play" — and a tile that always showed `normal` would quietly
+        contradict the button next to it. `shown` is the resolved entry for that choice,
+        which can be undefined for a level that offers the difficulty but resolves to
+        nothing; the tile is then omitted rather than drawn empty, since an empty board is
+        not the level.
+      */}
+      {shown !== undefined && (
+        <div
+          className="levelCard__tile"
+          // The SVG arrives as a string rather than as elements. React elements for 79
+          // cards' worth of rectangles would be reconciled on every render of a list
+          // whose pictures never change, and `dangerouslySetInnerHTML` is the one place
+          // that risk is acceptable: the string comes from `tileSvg`, whose only inputs
+          // are the generated index, and it filters both its colours through a pattern
+          // before interpolating them into an attribute.
+          dangerouslySetInnerHTML={{ __html: tile }}
+        />
+      )}
       <span className="levelCard__body">
         <span className="levelCard__name">{entry.name}</span>
         {entry.author !== "" && (
@@ -301,42 +338,24 @@ function LevelCard({
           {shown?.chainGrass === true && <span>chain grass</span>}
         </span>
         {/*
-          The chosen difficulty's sentence. In the body rather than on the button, because a
-          `title` is a tooltip and this project's first platform is a phone. It names the
-          difficulty rather than the level, so a screen reader reads it as the answer to
-          "what does this control do".
+          What the chosen difficulty does — but only when it is not the default.
+
+          It was on every card, and for `normal` it is the same sentence 79 times: "The
+          level as its author wrote it, with no difficulty qualifier." Repeated that often
+          it stops being information and becomes furniture, and it was two lines of a card
+          that did not need them — a screenshot showed Octopi's wrapping to two lines
+          beside a third of the card left empty.
+
+          So it appears when the choice is not the default, which is the only time it
+          answers a question. `normal` is the level as written, which the card already says
+          by not qualifying it; `easy` and `hard` change the level, and that is worth a
+          sentence. Task 6.3 asked for these descriptions and they are still here — the
+          change is when they are shown, not whether they exist.
         */}
-        <span className="levelCard__difficultyNote">{described.description}</span>
+        {chosen !== "normal" && (
+          <span className="levelCard__difficultyNote">{described.description}</span>
+        )}
       </span>
-      {/*
-        The level's board, as a tile.
-
-        Placed on the right of the name by the stylesheet's grid areas rather than by
-        source order — the grid names the areas, so moving the tile in the DOM would not
-        move it on screen. It is *after* the body here on purpose even so: the body is what
-        a screen reader reads first, and the tile is `aria-hidden`, so having it earlier in
-        the document would only put a picture between the reader and the level's name.
-
-        It follows the *chosen* difficulty, because that is the question it answers — "what
-        am I about to play" — and a tile that always showed `normal` would quietly
-        contradict the button next to it.
-
-        `shown` is the resolved entry for the chosen difficulty, which can be undefined
-        for a level that offers the difficulty but resolves to nothing; the tile is then
-        omitted rather than drawn empty, since an empty board is not the level.
-      */}
-      {shown !== undefined && (
-        <div
-          className="levelCard__tile"
-          // The SVG arrives as a string rather than as elements. React elements for 79
-          // cards' worth of rectangles would be reconciled on every render of a list
-          // whose pictures never change, and `dangerouslySetInnerHTML` is the one place
-          // that risk is acceptable: the string comes from `tileSvg`, whose only inputs
-          // are the generated index, and it filters both its colours through a pattern
-          // before interpolating them into an attribute.
-          dangerouslySetInnerHTML={{ __html: tile }}
-        />
-      )}
       <span className="levelCard__actions">
         {entry.supported && offered.length > 1 && (
           <span

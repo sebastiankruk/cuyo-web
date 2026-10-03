@@ -20,11 +20,22 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const APP = readFileSync(resolve(import.meta.dirname, "App.tsx"), "utf8");
-const CSS = readFileSync(resolve(import.meta.dirname, "styles.css"), "utf8");
+const CSS_RAW = readFileSync(resolve(import.meta.dirname, "styles.css"), "utf8");
 
 /** The source with comments stripped, so an explanatory comment cannot satisfy an assertion. */
 function code(): string {
   return APP.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+}
+
+/**
+ * The stylesheet with its comments stripped, for the same reason.
+ *
+ * Not decoration: `.levelCard__tile`'s comment quotes the `margin` shorthand it replaced,
+ * so a test reading the raw file would match the *rejected* value and pass on the wrong
+ * code. Stripping comments is what makes an assertion about this file mean what it says.
+ */
+function css(): string {
+  return CSS_RAW.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
 describe("the card draws a tile", () => {
@@ -66,7 +77,7 @@ describe("the card draws a tile", () => {
     expect(source).toContain('className="levelCard__tile"');
     // And the other direction: the class must exist in the stylesheet, so a rename cannot
     // leave the CSS orphaned either. `tile` is the class `tileSvg` puts on the SVG itself.
-    expect(CSS).toContain(".levelCard__tile");
+    expect(css()).toContain(".levelCard__tile");
     expect(source).toContain("tileSvg(");
   });
 
@@ -94,49 +105,87 @@ describe("the card draws a tile", () => {
 });
 
 describe("the tile is styled as a tile", () => {
+  /**
+   * Every declaration made for a selector, across all of its rules.
+   *
+   * All of them, because `styles.css` declares `.levelCard` three times — a duplication
+   * that predates the tile and that a single-rule lookup hid. Reading only the first meant
+   * asserting on a rule that a later one overrides, which is how this file's own height
+   * assertion came to pass against the wrong declaration while the tile was still `grid`.
+   */
+  function rule(selector: string): string {
+    const out: string[] = [];
+    const source = css();
+    const open = `${selector} {`;
+    for (let at = source.indexOf(open); at >= 0; at = source.indexOf(open, at + 1)) {
+      const from = at + open.length;
+      out.push(source.slice(from, source.indexOf("}", from)));
+    }
+    return out.join("; ");
+  }
+
   it("is given a fixed height, so no card is taller than its text", () => {
     // Height rather than width, because the crops vary: 3 rows to 14 across the corpus.
     // A fixed *width* made the tall ones 134 pixels tall — taller than the name and author
     // they sat beside — which is what a screenshot showed. Fixed height bounds it at
     // 2.4rem, and the width follows the viewBox's aspect ratio: 27 to 128 pixels.
-    const rule = CSS.slice(CSS.indexOf(".levelCard__tile .tile"));
-    expect(rule.slice(0, rule.indexOf("}"))).toMatch(/height:\s*2\.4rem/);
+    const tile = rule(".levelCard__tile .tile");
+    expect(tile).toMatch(/height:\s*2\.4rem/);
     // `auto` is what lets the width come from the aspect ratio; a percentage here would
     // re-introduce the per-card size the fixed height exists to remove.
-    expect(rule.slice(0, rule.indexOf("}"))).toMatch(/width:\s*auto/);
-    // Guard, not design: if `auto` ever failed to resolve against the intrinsic ratio, the
-    // replaced-element default is far wider than the card.
-    expect(rule.slice(0, rule.indexOf("}"))).toMatch(/max-width:\s*100%/);
+    expect(tile).toMatch(/width:\s*auto/);
+    // A guard, and 40% rather than 100%: a float beside text on a narrow card must not be
+    // able to take the text's whole width and leave a word per line.
+    expect(tile).toMatch(/max-width:\s*40%/);
   });
 
-  it("sits on the right of the card's text, at every width", () => {
-    // A screenshot showed the tile above the level's name, which is a row the card cannot
-    // do without: the name and author are about 45 pixels tall, so a 38-pixel tile beside
-    // them adds no height at all. There was a breakpoint that moved it above the text on a
-    // narrow screen, and it is gone — a tile that changes sides with the viewport is a tile
-    // whose position has to be checked twice.
-    expect(CSS).not.toMatch(/@media[^{]*\{[^}]*levelCard__tile/);
-    expect(CSS).toMatch(/\.levelCard\b[^{]*\{[^}]*grid-template-areas:/);
-    expect(CSS).toMatch(/"body\s+tile"/);
-    expect(CSS).toMatch(/"act\s+act"/);
-    expect(CSS).toMatch(/\.levelCard__tile\b[^{]*\{[^}]*justify-self:\s*end/);
+  it("floats right, so the text beside it is only beside it", () => {
+    // The second screenshot showed the two-column grid squeezing every line of text for
+    // the card's whole height, so a description wrapped to three lines beside 128 pixels
+    // of empty space. Grid says "beside" or "below"; a float says "beside for a while,
+    // then full width", which is what a picture in a corner of a paragraph needs.
+    //
+    // Asserted as the *absence* of the mechanism that caused it, because the natural
+    // regression is putting the column back: it looks tidier in the source and it is what
+    // was wrong.
+    const tile = rule(".levelCard__tile");
+    expect(tile).toMatch(/float:\s*right/);
+    // The gap goes on the left, where the text is. A right margin would indent the card's
+    // own text at the card's edge instead of separating it from the tile.
+    expect(tile).toMatch(/margin-left:\s*1rem/);
+    expect(tile).not.toMatch(/margin-right/);
+    expect(css()).not.toMatch(/\.levelCard\b[^{]*\{[^}]*grid-template-(columns|areas)/);
   });
 
-  it("is placed by grid area, not by source order", () => {
-    // The tile comes *after* the body in the JSX, because the body is what a screen reader
-    // reads first and the tile is aria-hidden. So the placement has to come from the
-    // stylesheet, and these two rules are the only thing tying the element to its area.
-    expect(CSS).toMatch(/\.levelCard__body\b[^{]*\{[^}]*grid-area:\s*body/);
-    expect(CSS).toMatch(/\.levelCard__tile\b[^{]*\{[^}]*grid-area:\s*tile/);
-    expect(CSS).toMatch(/\.levelCard__actions\b[^{]*\{[^}]*grid-area:\s*act/);
+  it("contains the float, so the card wraps it rather than the tile hanging out", () => {
+    // `flow-root` is load-bearing twice over: it contains the float so the card's border
+    // and background enclose it, and it is the block formatting context the body's own
+    // grid needs. Losing it is the kind of change that only a screenshot would show.
+    expect(rule(".levelCard")).toMatch(/display:\s*flow-root/);
+    // And the actions clear it, so the difficulty buttons sit under the tile rather than
+    // beside its bottom edge — which would otherwise depend on the description's length.
+    expect(rule(".levelCard__actions")).toMatch(/clear:\s*both/);
+  });
+
+  it("is before the body in the source, because a float has to precede its text", () => {
+    // The one thing about the new arrangement that is structural rather than stylistic: a
+    // float placed after the text it is supposed to sit beside drops below it instead. So
+    // this is the assertion that ties the JSX order to the CSS, and it is the reason the
+    // tile moved up in the document. It is safe before the body because the tile is
+    // `aria-hidden` and so is not read at all.
+    const tileAt = code().indexOf('className="levelCard__tile"');
+    const bodyAt = code().indexOf('className="levelCard__body"');
+    expect(tileAt).toBeGreaterThan(-1);
+    expect(bodyAt).toBeGreaterThan(-1);
+    expect(tileAt, "the tile must precede the body it floats beside").toBeLessThan(bodyAt);
   });
 
   it("does not draw a marker, because at this size it cannot be seen", () => {
     // The real board marks a goal with a dot at 0.075 of a cell. A tile's cell is about
     // four pixels, so that is 0.3 pixels. A `circle` in the tile CSS would be a shape the
     // tile claims to distinguish and cannot render.
-    expect(CSS).not.toMatch(/levelCard__tile[^{]*\{[^}]*circle/i);
-    expect(CSS).not.toMatch(/\.tile\s+circle/);
+    expect(css()).not.toMatch(/levelCard__tile[^{]*\{[^}]*circle/i);
+    expect(css()).not.toMatch(/\.tile\s+circle/);
   });
 });
 

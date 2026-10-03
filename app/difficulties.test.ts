@@ -57,6 +57,22 @@ describe("the difficulty control reads the described names", () => {
     expect(source).not.toMatch(/title=\{[^}]*describ/i);
   });
 
+  it("but only when the difficulty is not the default", () => {
+    // From a screenshot of the catalogue. `normal`'s sentence is "The level as its author
+    // wrote it, with no difficulty qualifier" — the same two lines on 79 cards, which stops
+    // being information and becomes furniture, and on a card with a long description it
+    // was the difference between one line and three.
+    //
+    // So it is shown when the choice is not `normal`, which is the only time it answers a
+    // question. This asserts *when*, not *whether*: the descriptions are 6.3's deliverable
+    // and they are all still reachable, one difficulty press away.
+    const source = code();
+    expect(source).toMatch(/chosen !== "normal" && \(\s*<span className="levelCard__difficultyNote"/);
+    // And the guard is on the *chosen* difficulty, not on whether the level offers one —
+    // a level offering only `normal` must not gain a note.
+    expect(source).not.toMatch(/offered\.length > 1 && \(\s*<span className="levelCard__difficultyNote"/);
+  });
+
   it("still offers only what the level has", () => {
     // The descriptions must not make every level look adjustable. 13 of the 79 levels have no
     // difficulty variant, and a control with one button on it is worse than none.
