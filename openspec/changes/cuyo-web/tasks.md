@@ -6,7 +6,7 @@ lagged. On review, a task counts as done only when the implementation exists AND
 the verification it names exists and passes. That is a stricter bar than
 "the code is written", and several items fall short of it.
 
-Fully done and verified: 5.1-5.5, 5.9, 5.10, 5.14.
+Fully done and verified: 5.1-5.5, 5.9, 5.10, 5.14, 5.20.
 
 Implemented but the named verification is missing (the code is present; the test
 is not). These are cheap to close and should be done before new features:
@@ -23,7 +23,9 @@ is not). These are cheap to close and should be done before new features:
   5.19 restart works; the introduction state does not exist
 
 Not started:
-  5.20 the flipped coordinate system reported to Cual needs the Cual runtime
+  5.20 done as of the group-4 work: the inventory is `cual-runtime/mirror.test.ts` and it
+       found `loc_p` reading only a fall's side, so a blob on the right-hand field of a
+       two-player game reported the wrong player.
 
 Group 2: 2.1-2.7 are done and verified. The corpus test has now paid for itself
 four times over. At 2.4 it said the transcribed version rules accept every real
@@ -161,7 +163,7 @@ reach every expression while skipping a third of them is a gate nobody can trust
 - [x] 5.17 Implement scoring (1 normal, 20 goal, 10 chain, 10 time-bonus step) and verify the mixed 22-point case
 - [x] 5.18 Implement win detection on zero goal blobs and the time-bonus animation at 10 points per step, and verify the 300-point case
 - [x] 5.19 Implement the level lifecycle (intro, running, won/lost/bonus-complete) and restart with a fresh board, score and random sequence, and verify a restart matches the initial layout
-- [ ] 5.20 Implement `mirror` level support including the flipped coordinate system reported to Cual, and verify `loc_x`/`loc_y` are mirrored
+- [x] 5.20 Implement `mirror` level support including the flipped coordinate system reported to Cual, and verify `loc_x`/`loc_y` are mirrored — **the engine side was already there; what was missing was the inventory and the tests.** Upstream reads `ld->mSpiegeln` in eight places across four files, and they are not the same kind of work: four are engine (`blop.cpp`'s `loc_x`/`loc_y`, `blopgitter.cpp`'s three `TAUSCH_BITS`, `ort.cpp`'s `@(dx,dy)`, `fall.cpp`'s rotation swap) and four are drawing (`bildstapel.cpp`, three in `spielfeld.cpp`, two in `fall.cpp`). `mirror.test.ts` is the inventory, so "I already handled mirror" cannot be said about a fifth place nobody listed. **Found while writing it: `loc_p` was wrong for the right-hand field.** It read `position.kind === "fall" && position.right`, and `absort_feld` carries `rechts` exactly as `absort_fall` does — so a blob standing on the right-hand field of a two-player game reported 1 instead of 2. `BlobPosition`'s `cell` variant had no `right` at all, which is why the reading compiled. `absort_nirgends` was also missing from the list of blobs `loc_p` refuses. The corpus has two mirrored levels, `himmel.ld` and `aliens.ld`; `himmel.ld`'s description is "In which direction do balloons fall?" and it asks `kind@(0,-1)`, so the `dy` negation is the difference between a level that works and one that is upside down. Neither is hex, so the odd-column inversion has no level to exercise it
 
 ## 6. Level Catalog
 

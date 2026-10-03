@@ -32,7 +32,7 @@ const WORLD: ConstantWorld = {
 };
 
 function subject(
-  position: BlobPosition = { kind: "cell", x: 3, y: 5 },
+  position: BlobPosition = { kind: "cell", x: 3, y: 5, right: false },
   overrides: Partial<ConstantSubject> = {},
   world: Partial<ConstantWorld> = {},
 ): ConstantSubject {
@@ -132,10 +132,20 @@ describe("the constants the blob answers itself", () => {
     // `return mOrt.rechts ? 2 : 1;`
     expect(read("loc_p", subject({ kind: "fall", x: 0, y: 0, right: false }))).toBe(1);
     expect(read("loc_p", subject({ kind: "fall", x: 1, y: 0, right: true }))).toBe(2);
-    expect(read("loc_p", subject({ kind: "cell", x: 3, y: 5 }))).toBe(1);
-    // Upstream throws for the global and semiglobal blobs: they have no left or right.
-    expect(() => read("loc_p", subject({ kind: "global" }))).toThrow(/global or semiglobal/);
-    expect(() => read("loc_p", subject({ kind: "semiglobal" }))).toThrow(/global or semiglobal/);
+    expect(read("loc_p", subject({ kind: "cell", x: 3, y: 5, right: false }))).toBe(1);
+    // Upstream throws for the global, semiglobal and nowhere blobs: they have no left or
+    // right. `absort_nirgends` was missing from both the list and the message until 5.20.
+    expect(() => read("loc_p", subject({ kind: "global" }))).toThrow(/global, semiglobal or nowhere/);
+    expect(() => read("loc_p", subject({ kind: "semiglobal" }))).toThrow(
+      /global, semiglobal or nowhere/,
+    );
+    expect(() => read("loc_p", subject({ kind: "nowhere" }))).toThrow(
+      /global, semiglobal or nowhere/,
+    );
+    // And the right-hand field of a two-player game, which a fall-only reading got wrong.
+    expect(read("loc_p", subject({ kind: "cell", x: 3, y: 5, right: true }))).toBe(2);
+    // `absort_info` has no side of its own, so `mOrt.rechts` is false and it answers 1.
+    expect(read("loc_p", subject({ kind: "info" }))).toBe(1);
   });
 
   it("informational is true for the info blob and for a fall that is not at y = 0", () => {
@@ -143,19 +153,19 @@ describe("the constants the blob answers itself", () => {
     expect(read("informational", subject({ kind: "info" }))).toBe(1);
     expect(read("informational", subject({ kind: "fall", x: 0, y: 1, right: false }))).toBe(1);
     expect(read("informational", subject({ kind: "fall", x: 0, y: 0, right: false }))).toBe(0);
-    expect(read("informational", subject({ kind: "cell", x: 1, y: 1 }))).toBe(0);
+    expect(read("informational", subject({ kind: "cell", x: 1, y: 1, right: false }))).toBe(0);
   });
 });
 
 describe("loc_x and loc_y", () => {
   it("are the cell coordinates for a blob on the field", () => {
-    expect(read("loc_x", subject({ kind: "cell", x: 3, y: 5 }))).toBe(3);
-    expect(read("loc_y", subject({ kind: "cell", x: 3, y: 5 }))).toBe(5);
+    expect(read("loc_x", subject({ kind: "cell", x: 3, y: 5, right: false }))).toBe(3);
+    expect(read("loc_y", subject({ kind: "cell", x: 3, y: 5, right: false }))).toBe(5);
   });
 
   it("are mirrored when the level is mirrored", () => {
     // `ld->mSpiegeln ? grx - 1 - mOrt.x : mOrt.x`
-    const mirrored = subject({ kind: "cell", x: 3, y: 5 }, {}, { mirrored: true });
+    const mirrored = subject({ kind: "cell", x: 3, y: 5, right: false }, {}, { mirrored: true });
     expect(read("loc_x", mirrored)).toBe(12 - 1 - 3);
     expect(read("loc_y", mirrored)).toBe(16 - 1 - 5);
   });
@@ -185,19 +195,19 @@ describe("loc_xx and loc_yy", () => {
     // `xx = x * gric; yy = y * gric - mHochVerschiebung - getHexShift(x) * gric / 2;`
     // Asserted against the formula rather than a nice number, because "pixels" is the part
     // that looks like a mistake and is not.
-    const at = subject({ kind: "cell", x: 3, y: 5 });
+    const at = subject({ kind: "cell", x: 3, y: 5, right: false });
     expect(read("loc_xx", at)).toBe(3 * 8);
     expect(read("loc_yy", at)).toBe(5 * 8);
 
-    const scrolled = subject({ kind: "cell", x: 3, y: 5 }, {}, { verticalScroll: 16 });
+    const scrolled = subject({ kind: "cell", x: 3, y: 5, right: false }, {}, { verticalScroll: 16 });
     expect(read("loc_xx", scrolled)).toBe(3 * 8);
     expect(read("loc_yy", scrolled)).toBe(5 * 8 - 16);
   });
 
   it("shift up by half a row in a hex column that is offset", () => {
-    const shifted = subject({ kind: "cell", x: 3, y: 5 }, {}, { hexShift: (x) => x % 2 === 1 });
+    const shifted = subject({ kind: "cell", x: 3, y: 5, right: false }, {}, { hexShift: (x) => x % 2 === 1 });
     expect(read("loc_yy", shifted)).toBe(5 * 8 - 4);
-    const unshifted = subject({ kind: "cell", x: 2, y: 5 }, {}, { hexShift: (x) => x % 2 === 1 });
+    const unshifted = subject({ kind: "cell", x: 2, y: 5, right: false }, {}, { hexShift: (x) => x % 2 === 1 });
     expect(read("loc_yy", unshifted)).toBe(5 * 8);
   });
 
@@ -221,7 +231,7 @@ describe("the constants only a falling piece answers", () => {
     // it, so a blob standing on a cell falls through to the default of 0 - not to some other
     // route to false.
     expect(read("falling", falling)).toBe(1);
-    expect(read("falling", subject({ kind: "cell", x: 1, y: 1 }))).toBe(0);
+    expect(read("falling", subject({ kind: "cell", x: 1, y: 1, right: false }))).toBe(0);
   });
 
   it("falling_fast is the fall's own flag", () => {
@@ -254,7 +264,7 @@ describe("the constants only a falling piece answers", () => {
   });
 
   it("are the default 0 for a blob standing on a cell", () => {
-    const still = subject({ kind: "cell", x: 2, y: 2 });
+    const still = subject({ kind: "cell", x: 2, y: 2, right: false });
     expect(read("turn", still)).toBe(0);
     expect(read("falling", still)).toBe(0);
     expect(read("falling_fast", still)).toBe(0);

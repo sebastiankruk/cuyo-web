@@ -12,7 +12,7 @@ reasoning behind the sequence.
 | --------------- | ----- | ------------------------------------------------------------------- |
 | 1. Toolchain    | done  | Node, TypeScript, `make check` as the single gate, CI.              |
 | 2. Level format | done  | The `.ld` language, parsed and compiled against all 79 real levels. |
-| 5. Game core    | 19/20 | The rules: falling, connections, explosions, greys, border.         |
+| 5. Game core    | 20/20 | The rules: falling, connections, explosions, greys, border.         |
 | 14. Lint and CI | 15/20 | Code, docs, shell, spec and workflow linting; nine CI jobs.         |
 | 13. Coverage    | 3/8   | Some of it; thresholds and DOM tests outstanding.                   |
 
