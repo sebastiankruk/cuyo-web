@@ -277,8 +277,34 @@ function parseCodeLine(cursor: SharedCursor): Stmt {
     if (procedure !== null) return procedure;
     cursor.reset(save);
   }
+  // A letter *can* start a definition, and upstream's `proc_def_wort` has a `BUCHSTABE_TOK`
+  // production for it precisely so it can be refused by name — `x = { .. }` is a procedure one
+  // letter long, and refusing it as "cannot start a statement here" is true and useless.
+  //
+  // Only when a name could follow, though. A bare `A` is `buch_stern`, a letter draw, and there
+  // are 3029 of those in the corpus; refusing every one of them would be a fine way to break a
+  // level that works. `[` is here for `x[1] = …`, the versioned form.
+  if (token?.kind === "letter" && (isPunctAhead(cursor, "=", 1) || isPunctAhead(cursor, "[", 1))) {
+    cursor.fail(SINGLE_LETTER_PROCEDURE, token);
+  }
   return parseCodeSequence(cursor);
 }
+
+/**
+ * The two single-letter refusals, verbatim from `parser.yy`.
+ *
+ * `var_def_wort` and `proc_def_wort` each have a `BUCHSTABE_TOK` alternative whose only action
+ * is to throw, and upstream's comment on both is the same joke about making the error as
+ * hard to produce as possible. The *use* site already had its message — `parse.ts`'s
+ * `lokale_variable` — so this is about the two *declaration* sites, where the name is legal
+ * nowhere and the message said nothing about why.
+ *
+ * It matters for 4.17, which is about where a definition is recognised: `x = { .. }` used to be
+ * refused as "cannot start a statement here", which is true and useless, because the thing a
+ * level author wrote is a procedure whose name is one letter long.
+ */
+const SINGLE_LETTER_VARIABLE = "Variable names can't be single letters.";
+const SINGLE_LETTER_PROCEDURE = "Procedure names can't be single letters.";
 
 /** `name[versions] = body;`, or null when this is not a definition. */
 function tryParseProcedureDef(cursor: SharedCursor): Stmt | null {
@@ -346,6 +372,7 @@ function parseVarDecl(cursor: SharedCursor): Stmt {
   const declarations: VarDeclaration[] = [];
   for (;;) {
     const token = cursor.next();
+    if (token.kind === "letter") cursor.fail(SINGLE_LETTER_VARIABLE, token);
     if (token.kind !== "word") cursor.fail("expected a variable name", token);
     const versions = isPunctAhead(cursor, "[") ? parseVersionList(cursor) : [];
     // `var_def` ends in `unechter_default`, which is either nothing or `= value`. So
@@ -376,6 +403,7 @@ function parseDefaultDecl(cursor: SharedCursor): Stmt {
   const declarations: DefaultDeclaration[] = [];
   for (;;) {
     const token = cursor.next();
+    if (token.kind === "letter") cursor.fail(SINGLE_LETTER_VARIABLE, token);
     if (token.kind !== "word") cursor.fail("expected a variable name", token);
     const versions = isPunctAhead(cursor, "[") ? parseVersionList(cursor) : [];
     if (!cursor.takePunct("=")) cursor.fail("expected '=' in a default declaration");
@@ -660,6 +688,7 @@ function startsWithOrt(cursor: SharedCursor): boolean {
 function parseScoped(cursor: SharedCursor): Stmt {
   cursor.expectPunct("[");
   const name = cursor.next();
+  if (name.kind === "letter") cursor.fail(SINGLE_LETTER_VARIABLE, name);
   if (name.kind !== "word") {
     cursor.fail("expected a variable name after '['", name);
   }
