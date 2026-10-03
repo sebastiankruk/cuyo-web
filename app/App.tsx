@@ -288,22 +288,7 @@ function LevelCard({
         </span>
       )}
       {/*
-        The tile, before the body, because it is a `float` and a float has to precede the
-        text it sits beside. That is the whole mechanism: the card is one column, the tile
-        floats right for the first line or two of text, and everything below it runs the
-        full width of the card.
-
-        It was a two-column grid, and that was wrong in a way only a screenshot showed. The
-        tile's column is as wide as the tile for the card's *whole* height, so the
-        description and the tags were squeezed into `1fr` beside 128 pixels of empty space
-        they were nowhere near — Octopi's description wrapped to three lines with a third of
-        the card blank to its right. Grid cannot say "beside this for a while, then full
-        width"; that is what a float is for.
-
-        Before the body in the DOM is therefore fine for reading order, and better than
-        where it was: the tile is `aria-hidden`, so it is not read at all, whereas in its
-        old position after the body it was the only thing separating the difficulty control
-        from the end of the card.
+        The tile, before the text, so the grid's source order and reading order agree.
 
         It follows the *chosen* difficulty, because that is the question it answers — "what
         am I about to play" — and a tile that always showed `normal` would quietly
@@ -324,11 +309,31 @@ function LevelCard({
           dangerouslySetInnerHTML={{ __html: tile }}
         />
       )}
-      <span className="levelCard__body">
+      {/*
+        The card's text, in two groups rather than one, and that split is the whole layout.
+
+        The tile goes beside the *name*, and everything else runs the full width of the
+        card. When the text was a single group the only two ways to place the tile were
+        both wrong: a grid column made the column as wide as the tile for the card's
+        entire height, so the description and the tags were squeezed beside empty space
+        they were nowhere near; and a `float` was supposed to say "beside this for a
+        while, then full width", which depends on whether a float intrudes into a
+        `display: grid` container — and it does not, so the text either ignored the tile or
+        was narrowed by something subtler. Two screenshots and no browser to measure with
+        is a poor place to be relying on that.
+
+        Naming the areas removes the question. `head` is beside the tile, `rest` spans both
+        columns, `act` spans both. The description is full width because the stylesheet says
+        `rest rest` in two places, not because of how a float happens to interact with a
+        grid.
+      */}
+      <span className="levelCard__head">
         <span className="levelCard__name">{entry.name}</span>
         {entry.author !== "" && (
           <span className="levelCard__author">{entry.author}</span>
         )}
+      </span>
+      <span className="levelCard__rest">
         {entry.description !== "" && (
           <span className="levelCard__desc">{entry.description}</span>
         )}

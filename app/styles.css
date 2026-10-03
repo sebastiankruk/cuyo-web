@@ -644,43 +644,68 @@ button::-moz-focusring {
 }
 
 /*
- * The tile: the level's board, small, floated to the right of the card's text.
+ * The tile: the level's board, small, beside the card's *name*.
  *
- * **A float, not a grid column**, and a screenshot is the only reason that is not a grid.
- * With `grid-template-columns: 1fr auto` the tile's column is as wide as the tile for the
- * card's *whole* height, so every line of text was squeezed beside 128 pixels of empty
- * space it was nowhere near — a description wrapped to three lines with a third of the card
- * blank beside it. Grid can say "beside this" or "below this"; it cannot say "beside this
- * for the first two lines, then the full width", which is what a picture in a corner of a
- * paragraph needs. A float is exactly that sentence.
+ * **Named grid areas, and the third mechanism tried.** The card is:
  *
- * `flow-root` rather than the grid it replaced, and it is load-bearing twice: it contains
- * the float so the card's background and border wrap it rather than the tile hanging out
- * of the bottom, and it establishes the block formatting context the body's own grid needs.
+ *     | head      | tile |
+ *     | rest      | rest |
+ *     | act       | act  |
  *
- * **Height is fixed and width follows the aspect ratio**, which keeps it short. The tile
+ * The first version put the tile in a `1fr auto` column, which reserves the tile's width
+ * for the card's *entire* height — so the description and the tags were squeezed beside
+ * empty space they were nowhere near. The second used a `float`, on the reasoning that a
+ * float can say "beside this for a while, then the full width" which grid cannot. It
+ * cannot be relied on to: **a float does not intrude into a box that establishes an
+ * independent formatting context**, and the text group is `display: grid`, so whether the
+ * text was shortened, left full width and overlapped, or narrowed by something subtler
+ * depends on a rule I could not verify here — there is no browser in this project's tests
+ * and two screenshots disagreed with my reading of the first one.
+ *
+ * Naming the areas asks nothing of that rule. `rest` is full width because the stylesheet
+ * says `rest rest` twice, and that is the whole of it.
+ *
+ * **Height is fixed and width follows the aspect ratio**, which keeps the tile short. It
  * crops to the rows a level occupies, and those rows vary from 3 to 14 across the corpus,
  * so a fixed *width* gave tiles from 29 to 134 pixels wide — and the tall ones 134 pixels
  * of height, taller than the text beside them. A fixed height bounds both: every tile is
- * 2.4rem tall, and its width is that height times the crop's aspect, so a level that fills
- * the board is a narrow tall strip and a level with one row of blobs is a wide short one.
- * Nothing is scaled to fit and nothing is clipped, so the tile is still the board it
- * claims to be.
+ * 2.4rem tall, and its width is that height times the crop's aspect, so a level that
+ * fills the board is a narrow tall strip and a level with one row of blobs is a wide
+ * short one. Nothing is scaled to fit and nothing is clipped, so the tile is still the
+ * board it claims to be.
  */
 .levelCard {
-  display: flow-root;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "head tile"
+    "rest rest"
+    "act  act";
+  column-gap: 1rem;
+  align-items: start;
+}
+
+.levelCard__head {
+  grid-area: head;
 }
 
 .levelCard__tile {
-  float: right;
-  /*
-   * Longhand, not `margin: 0 0 0.4rem 1rem`. For a float the only margin that matters is
-   * the one between the picture and the text it is squeezing, and in the shorthand that
-   * is the *fourth* value — the one nobody reads. Written out, it is the gap.
-   */
-  margin: 0;
-  margin-bottom: 0.4rem;
-  margin-left: 1rem;
+  grid-area: tile;
+  justify-self: end;
+}
+
+.levelCard__rest {
+  grid-area: rest;
+}
+
+/*
+ * All four grid-area assignments in one block, because they only mean anything together:
+ * a name here that the `grid-template-areas` above does not list is a typo that silently
+ * places nothing, and one listed there that nothing claims is an area no content can reach.
+ * Split across two sections of the file they were duplicated by this change.
+ */
+.levelCard__actions {
+  grid-area: act;
 }
 
 .levelCard__tile .tile {
@@ -688,27 +713,19 @@ button::-moz-focusring {
   height: 2.4rem;
   /*
    * `auto` so the SVG takes its width from the viewBox's aspect ratio, which is what
-   * makes a fixed height possible. `max-width` as a guard rather than as a design: if a
-   * browser ever failed to resolve `auto` against the intrinsic ratio, the default
-   * replaced-element width would be far wider than the card.
+   * makes a fixed height possible.
+   *
+   * The bound is in `rem` rather than a percentage on purpose. A percentage `max-width`
+   * inside an `auto` grid column resolves against a size that is itself derived from that
+   * column's content, which is circular; browsers resolve it inconsistently and one of the
+   * outcomes is the tile taking the full column. 9rem is 144 pixels, which is wider than
+   * the widest tile the fixed height can produce (128px) and narrow enough to leave the
+   * name room on a small phone.
    */
   width: auto;
-  max-width: 40%;
+  max-width: 9rem;
   border: 1px solid var(--line);
   border-radius: 3px;
-}
-
-/*
- * The difficulty buttons clear the tile.
- *
- * Without this a card whose text is a single short line would put its Easy/Normal/Hard
- * control beside the bottom of the tile rather than under it, and which row that control
- * lands in would depend on the length of the level's description. Nothing here *reads*
- * differently either way, but a control that moves as descriptions change length looks
- * broken.
- */
-.levelCard__actions {
-  clear: both;
 }
 
 /*
@@ -747,7 +764,22 @@ button::-moz-focusring {
  * The cost is that the description is not selectable. For a catalogue of levels to
  * start, pressing the card is worth more than copying its text.
  */
-.levelCard__body {
+/*
+ * The two text groups.
+ *
+ * They were one element until a screenshot showed the description stuck in a narrow
+ * column: giving the tile its own grid column, or floating it, both failed to let the text
+ * below it use the full width, and the split into `head` (beside the tile) and `rest`
+ * (across the card) is what makes that a property of the stylesheet rather than of how a
+ * float interacts with a grid.
+ *
+ * `pointer-events: none` so a tap on the text reaches the card's stretched button, and
+ * `z-index` so both sit above it. Both came from `.levelCard__body`, which no longer
+ * exists — and both are load-bearing, because without them the card is unclickable
+ * everywhere except the Play button.
+ */
+.levelCard__head,
+.levelCard__rest {
   position: relative;
   z-index: 1;
   display: grid;
