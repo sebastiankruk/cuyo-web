@@ -209,6 +209,21 @@ export interface LevelDef {
    * carrying the program it is about to run.
    */
   readonly program: LevelProgram;
+  /**
+   * A number this level's `.ld` file defines, by name — `farben = 5`, `anzahl = 7`.
+   *
+   * **`null` for a name the level does not define as a single number.** Upstream has one
+   * namespace for all of this: `parser.yy`'s `variable_acode` does
+   * `gAktDefKnoten->getVerwandten(name, mVersion, true)` and gets whatever `DatenKnoten` is
+   * there, which is a `spezconst_*`, a `.ld` number, a kind name or a Cual `var` depending on
+   * what the level wrote. This port has four tables where upstream has one, so this is the fifth
+   * half of that split.
+   *
+   * `scope.nameResolver()` is the lookup — it is `konstante: wort`'s, which is
+   * `getVerwandten` too — so a `.ld` constant resolves the same way here as it does there, and
+   * a name that is a list or a colour reports `null` rather than a first element.
+   */
+  readonly levelNumber: (name: string) => number | null;
 }
 
 /** Per-kind neighbour override, kept out of `Kind` to avoid a cycle. */

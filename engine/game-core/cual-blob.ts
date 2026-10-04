@@ -395,7 +395,16 @@ export class BlobAnimation implements Animatable {
    * step, and a namespace that answers differently for the *same* store is the one that has to
    * be asked first when two of them would both have an answer.
    *
-   * 5. **A kind name** — `Blob`, `Kugel`, `Gras`. `angst.ld` writes
+   * 5. **A `.ld` number** — `farben`, `anzahl`. `jump.ld` has `farben = 5` and
+   * `angst.ld` has `anzahl = 7`, both plain level data, and both are read as Cual *values*:
+   * `if farbe@@0 != farben` and `(kind-Blob)%anzahl`. Upstream has no separate case for these
+   * because `variable_acode` reaches the configuration's `DatenKnoten`s and finds one; this port
+   * keeps the level's names in the loader's scope, so `LevelDef.levelNumber` is that lookup.
+   *
+   *   **After a declared variable and before a kind name.** A `var` winning is the choice that
+   *   makes a collision visible: upstream refuses a duplicate name outright, so nothing in the
+   *   corpus has one, and the order is unobservable for all 79.
+   * 6. **A kind name** — `Blob`, `Kugel`, `Gras`. `angst.ld` writes
    * `if basekind@(tauschrichtung,0)!=Blob`, so a kind's name is a value and not just a label.
    * Upstream has one namespace for all of this: every one is a `DatenKnoten` in the
    * configuration, which is why `parser.yy`'s `konstante: wort` and `variable_acode` both reach
@@ -416,6 +425,8 @@ export class BlobAnimation implements Animatable {
     if (constant !== null) return constant;
     const slot = this.slotFor(name);
     if (slot !== null) return this.store.get(slot);
+    const levelNumber = this.deps.level.levelNumber(name);
+    if (levelNumber !== null) return levelNumber;
     return this.kindNumberOf(name);
   }
 

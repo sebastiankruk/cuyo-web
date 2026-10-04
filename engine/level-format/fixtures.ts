@@ -119,6 +119,8 @@ export function nasenkugeln(): LevelDef {
     // startdist = "**********": ten goal blobs, each of the single goal kind.
     startDist: layout([[5, 5, 5, 5, 5, 5, 5, 5, 5, 5]]),
     program: EMPTY_PROGRAM,
+    // A fixture defines no `.ld` names, so every lookup misses.
+    levelNumber: () => null,
   };
 }
 
@@ -163,6 +165,8 @@ export function hormone(): LevelDef {
     // One row of goal blobs, as `startdist = "AAAAAAAAAA"` for one player.
     startDist: layout([[4, 4, 4, 4, 4, 4, 4, 4, 4, 4]]),
     program: EMPTY_PROGRAM,
+    // A fixture defines no `.ld` names, so every lookup misses.
+    levelNumber: () => null,
   };
 }
 

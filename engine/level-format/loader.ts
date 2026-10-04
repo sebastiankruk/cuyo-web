@@ -294,11 +294,24 @@ export class LevelLoader {
     // tokens on the parse tree and `scope` holds only resolved data words — and from the kinds
     // just built, because which code a kind runs is decided by its name.
     let program: LevelProgram;
+    let levelNumber!: (name: string) => number | null;
     try {
       // `scope.nameResolver()` is `konstante`'s name lookup — `getVerwandten` for the active
       // version — which is how a `reapply` default naming a level constant (`jump.ld`'s
       // `var farbe = farben : reapply`) folds to a number.
       const names = scope.nameResolver();
+      // `getVerwandten` again, wrapped so an unknown name is `null` rather than a throw. The same
+      // lookup serves two callers that want opposite things: `konstante: wort`'s folding wants
+      // the throw, because a name it cannot resolve is the error being reported, while
+      // `LevelDef.levelNumber` wants `null`, because it is one lookup among five namespaces and a
+      // miss is the normal case for four of them.
+      levelNumber = (name: string): number | null => {
+        try {
+          return names(name, scope.positionOf("numexplode"));
+        } catch {
+          return null;
+        }
+      };
       program = buildLevelProgram(levelFile, globalsFile, table.kinds, (name) =>
         names(name, scope.positionOf("numexplode")),
       );
@@ -398,6 +411,7 @@ export class LevelLoader {
       // a start layout in one object, and only one of them is ever played.
       startDist: toStartRows(rows, table.emptyKind),
       program,
+      levelNumber,
     };
 
     return {
