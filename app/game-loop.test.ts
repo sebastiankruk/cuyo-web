@@ -165,3 +165,86 @@ describe("GameLoop pausing", () => {
     loop.stop();
   });
 });
+
+describe("a step that throws", () => {
+  /**
+   * The loop survives, records why, and stops stepping.
+   *
+   * `request` is the first line of `tick`, so a throw from `sim.step()` does not kill the loop —
+   * it throws again on every frame, the board stops moving and `steps` stops advancing. That is
+   * indistinguishable from a frozen game by looking at it, which is why these assert the loop's
+   * *state* and not that it keeps going.
+   *
+   * Every one of the 79 corpus levels is a real case: 24 of them throw once a level's Cual code
+   * runs, which 15.6 is the first change to make possible.
+   */
+  function throwing(message = "Cual: no variable named 'Leer' in this level") {
+    let attempts = 0;
+    const sim = {
+      step: (): void => {
+        attempts++;
+        throw new Error(message);
+      },
+    } as unknown as Simulation;
+    const clock = new ManualClock();
+    const loop = new GameLoop(sim, clock);
+    loop.start();
+    return { clock, loop, attempts: () => attempts };
+  }
+
+  it("does not let the error escape the frame callback", () => {
+    const { clock } = throwing();
+    // `run` calls the queued callback synchronously, so an escaping throw lands here. This is the
+    // assertion that the browser console stays quiet.
+    expect(() => clock.run(STEP_MS)).not.toThrow();
+    expect(() => clock.run(STEP_MS)).not.toThrow();
+    expect(() => clock.run(STEP_MS)).not.toThrow();
+  });
+
+  it("records the message rather than losing it", () => {
+    // Upstream shows an error dialog on a `Fehler`; recording it is the half of that this layer
+    // can do, and it is what a diagnostic needs to be checkable at all.
+    const { clock, loop } = throwing();
+    clock.run(STEP_MS);
+    expect(loop.failure).toBe("Cual: no variable named 'Leer' in this level");
+  });
+
+  it("stops stepping, because a half-stepped board is not a state anything has meaning for", () => {
+    const { clock, loop, attempts } = throwing();
+    clock.run(STEP_MS);
+    const after = attempts();
+    expect(after).toBe(1);
+    expect(loop.steps).toBe(0);
+    // Ten more frames, and the simulation is not touched again. Upstream's `Cuyo::zeitSchritt`
+    // leaves the game on a `Fehler` rather than continuing from a board whose blobs half-moved.
+    for (let i = 0; i < 10; i++) clock.run(STEP_MS);
+    expect(attempts()).toBe(after);
+  });
+
+  it("keeps notifying listeners, so the last frame is drawn", () => {
+    // The board froze mid-step, so whatever it looked like *before* the throw is the last thing
+    // the player saw. A loop that stopped notifying would leave a blank canvas instead, which
+    // looks like a different bug.
+    const { clock, loop } = throwing();
+    let draws = 0;
+    loop.subscribe(() => draws++);
+    clock.run(STEP_MS);
+    expect(draws).toBeGreaterThan(0);
+  });
+
+  it("counts the frames it failed on, which is a frame count and says nothing new", () => {
+    const { clock, loop } = throwing();
+    clock.run(STEP_MS);
+    expect(loop.failureCount).toBe(1);
+    // It stays at 1, because the second failure is not re-recorded — the loop is not stepping.
+    clock.run(STEP_MS);
+    expect(loop.failureCount).toBe(1);
+  });
+
+  it("takes the first failure, not the last, so the message is the cause and not the consequence", () => {
+    const { clock, loop } = throwing();
+    clock.run(STEP_MS);
+    expect(loop.failure).toContain("Leer");
+    expect(loop.failure).not.toContain("consequence");
+  });
+});

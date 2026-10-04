@@ -409,6 +409,16 @@ button::-moz-focusring {
   font-size: 0.95rem;
 }
 
+/* Why the loop stopped stepping. `flex-basis: 100%` puts it on a line of its own so a long
+   message cannot squeeze the other two spans off a narrow screen — this is the one thing on the
+   line that has to stay readable, and `--danger` because it is a stop rather than a warning. */
+.play__dev-failure {
+  color: var(--danger);
+  flex-basis: 100%;
+  white-space: normal;
+  word-break: break-word;
+}
+
 .play__dev {
   display: flex;
   justify-content: space-between;

@@ -78,11 +78,16 @@ function stapelHoeheOfStatement(node: Stmt): StapelHoehe {
     case "sharedCall":
       return stapelHoeheOf(node.body);
 
-    // `stapel_code: mF1 + mF2` — both sides run in the same step, so their pictures **add**.
-    // `stapelHoeheOf` is what sums, so a sequence and a block are both just their own list.
+    // `stapel_code: mF1 + mF2` — both sides run in the same step, so their pictures **add**, and
+    // `stapelHoeheOf` is what sums. So both of these are just their own list:
+    //
+    // - `sequence` is `a; b; c`.
+    // - `block` is `{ ... }`, which is `stapel_code` upstream too (`'{' code '}'` returns `$2`
+    //   unchanged, so braces are not a node); kept as one here and it costs the same either way.
+    //
+    // The comment is above both labels rather than between them because a comment between two
+    // labels reads as a fallthrough to `no-fallthrough`, and it is not one.
     case "sequence":
-    // `{ ... }` is `stapel_code` in upstream (`'{' code '}'` returns `$2` unchanged, so braces
-    // are not a node); kept as one here, and it costs the same either way.
     case "block":
       return stapelHoeheOf(node.body);
 
