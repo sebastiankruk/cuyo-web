@@ -34,8 +34,35 @@ import {
 } from "./constants.ts";
 import type { NeighbourMode } from "./constants.ts";
 import { Blob, Board, EMPTY, componentOf, floats } from "./board.ts";
-import { BlobStore, TimeSlices } from "../cual-runtime/store.ts";
-import { BLOPART_GLOBAL, BLOPART_SEMIGLOBAL } from "../cual-runtime/global.ts";
+import { BLOBART_AUSSERHALB, BlobStore, TimeSlices } from "../cual-runtime/store.ts";
+import {
+  BLOPART_GLOBAL,
+  BLOPART_SEMIGLOBAL,
+  runStep,
+} from "../cual-runtime/global.ts";
+import type { Animatable, Field } from "../cual-runtime/global.ts";
+import { BlobAnimation, levelPictureSource } from "./cual-blob.ts";
+import type { BlobAnimationDeps } from "./cual-blob.ts";
+import { accessFieldFor } from "./cual-field.ts";
+import { PictureStack } from "../cual-runtime/draw.ts";
+import type { PictureSource } from "../cual-runtime/draw.ts";
+import type { Here, ResolvedOrt } from "../cual-runtime/access.ts";
+import type { ConstantSubject } from "../cual-runtime/constants.ts";
+import { hexGeometry } from "./constants.ts";
+import {
+  RICHTUNG_EINZEL,
+  RICHTUNG_SENK,
+  RICHTUNG_UNPLATZIERT,
+  RICHTUNG_WAAG,
+  cellX,
+  cellY,
+  pixelX,
+  pixelY,
+} from "./fall-geometry.ts";
+import type { FallCoordinates } from "../cual-runtime/constants.ts";
+import type { FallPos } from "./fall-geometry.ts";
+import type { Stmt } from "../cual-runtime/code.ts";
+import type { EffectContext, PlayedSample } from "../cual-runtime/effects.ts";
 import type { Position } from "./board.ts";
 import type { LevelDef } from "../level-format/level-data.ts";
 import { Prng } from "../prng.ts";
@@ -72,6 +99,26 @@ export interface FallPiece {
   fast: boolean;
   /** Set while the piece is sliding in horizontally after a move. */
   slideRemaining: number;
+  /**
+   * `Fall::mExtraX`: how many cells the piece is drawn left of or right of {@link x}.
+   *
+   * Set by {@link Simulation.shift} and cleared when the slide finishes, because upstream's
+   * `rutschen` moves the *picture* by one cell and then leaves `mPos.x` at the destination — so
+   * `loc_xx` for a sliding blob has to read the offset, and `getXX` adds it raw.
+   */
+  extraX: number;
+  /**
+   * `Fall::mExtraDreh`: the quarter turn a piece is part-way through, 0 when it is square.
+   *
+   * **Always 0 here, and that is upstream's value on every path this port has.** `mExtraDreh` is
+   * set by `dreheX`, the *fast* rotation — a rotate that does not fit, which leaves the piece drawn
+   * between orientations so it does not jump. {@link Simulation.rotate} checks whether the
+   * destination is free and returns if not, so it never takes that path.
+   *
+   * It is a field rather than nothing because `getDrehIndex` reads it, and a hard-coded 0 there
+   * would be indistinguishable from "fast rotation is modelled and currently never half-way".
+   */
+  extraDreh: number;
 }
 
 export type Phase =
@@ -208,9 +255,50 @@ export class Simulation {
   /** `Cuyo::getSpielerZahl()`; see {@link PLAYER_COUNT}. */
   readonly players = PLAYER_COUNT;
 
+  /**
+   * One `BildStapel` per cell, for a draw aimed at somebody else's cell.
+   *
+   * Created lazily and **never replaced**, which is upstream's arrangement: `Blop::mBild` is a
+   * member of the `Blop`, so a blob that is drawn onto repeatedly keeps the same stack object and
+   * `lazyLeereStapel` clears it in place. An array of fresh stacks each step would be a
+   * different object every step, and anything holding a reference — the renderer, a test — would
+   * be reading a stack nobody writes to any more.
+   *
+   * Sparse, because most cells are empty most of the time and `new PictureStack()` is not free.
+   */
+  private readonly cellStacks: (PictureStack | null)[] = new Array<null>(
+    GRX * GRY,
+  ).fill(null);
+
+  /**
+   * `levelPictureSource(level, program)`, built once.
+   *
+   * A field rather than a call per draw because it cannot change while a level is playing, and
+   * `PictureStack.add` asks it for every picture.
+   */
+  private readonly pictureSource: PictureSource;
+
+  /**
+   * `mMessage`, the text `message(m)` sets, and which the renderer draws.
+   *
+   * Empty rather than null when nothing has been said, because upstream's `Spielfeld::mMessage`
+   * is a `Str` that starts empty and `setMessage("")` is a legal thing for a level to do.
+   */
+  message = "";
+
+  /**
+   * `Sound::playSample` calls this step's code made, in order.
+   *
+   * A queue rather than a callback because nothing consumes sound yet — audio is group 11 — and
+   * a queue is assertable: a level's `sound(...)` reaching the queue is checkable, a level's
+   * sound reaching an audio device is not. Drained by nothing, so it is cleared per step.
+   */
+  playedSamples: PlayedSample[] = [];
+
   constructor(level: LevelDef, options: SimulationOptions = {}) {
     this.level = level;
     this.random = options.random ?? new Prng([options.seed ?? 0x9e3779b9]);
+    this.pictureSource = levelPictureSource(level, level.program);
     this.reset();
   }
 
@@ -357,6 +445,8 @@ export class Simulation {
       blobs: [mk(), mk()],
       fast: false,
       slideRemaining: 0,
+      extraX: 0,
+      extraDreh: 0,
     };
   }
 
@@ -504,7 +594,7 @@ export class Simulation {
   private shift(dx: number): void {
     const piece = this.fall;
     if (piece === null || piece.orientation === "single") return;
-    const moved: FallPiece = { ...piece, x: piece.x + dx };
+    const moved: FallPiece = { ...piece, x: piece.x + dx, extraX: dx };
     if (!this.fits(moved)) return;
     moved.slideRemaining = 16;
     this.fall = moved;
@@ -550,10 +640,379 @@ export class Simulation {
       return;
     }
 
+    // Nothing consumes sound yet (group 11), so the queue is cleared here rather than drained:
+    // what a caller can check is "this step's code asked for these samples", and a queue that
+    // accumulated would make that a different and much weaker claim.
+    this.playedSamples = [];
+
     this.advanceBorder();
     this.maybeRandomGrey();
     this.stepFall();
     this.resolvePhase();
+
+    // `animiere()` last, which is `cuyo.cpp:473`'s placement: the rules run to completion first
+    // and the blobs' code runs after them, so a blob reads the step's *result*.
+    //
+    // It runs on the step that ends the game, because it sits after `resolvePhase()` rather than
+    // behind the early returns above — and upstream's `animiere()` is likewise before the win
+    // check at `cuyo.cpp:475`. Steps taken *after* the game has ended return early and skip it,
+    // which is the port's own arrangement and not something upstream has an equivalent for.
+    this.animate();
+  }
+
+  /**
+   * `animiere()` — one step's worth of running every blob's Cual code.
+   *
+   * Task 15.6, and it is called at the **end** of {@link step}, which is the whole of
+   * `cuyo.cpp:473`'s placement: `spielSchritt()` (the border, the fall, the explosions) runs to
+   * completion first and the blobs' code runs last, so a blob's code sees the step's *result*
+   * rather than competing with it. That ordering is also why 15.4's `fallCount` snapshot is
+   * benign — the fall is finished before any code runs.
+   *
+   * `runStep` already holds the order (`global.ts`), so this is a matter of *supplying* it:
+   *
+   * - `Blop::lazyLeereStapel()` clears **every** stack, before anything animates. One call over
+   *   {@link cellStacks}, and each blob's own stack is cleared by its own `animate()`.
+   * - `Blop::beginGleichzeitig()` / `endGleichzeitig()` is this simulation's {@link slices},
+   *   shared with the global and semiglobal stores for the reason `makeSingletons` gives.
+   * - `ld->spielSchritt()` is `Blop::gGlobalBlop.animiere()`, which `runStep` calls first.
+   *
+   * ## Two of upstream's five lists have nothing to put in them here
+   *
+   * `mNaechsterFall` is populated — {@link next} is a piece — but `mInfoBlops` is empty, because
+   * nothing in this port has created an info blob and upstream's `if (mInfoBlopActive[i])` skips
+   * an inactive one anyway. Both are declared empty rather than omitted, so the shape of
+   * upstream's step stays visible in the code that runs it.
+   */
+  private animate(): void {
+    runStep(
+      this.makeAnimation("global", this.global, () => ({ kind: "global" })),
+      [this.field()],
+      {
+        clearPictureStacks: () => this.clearCellStacks(),
+        openWindow: () => this.slices.open(),
+        closeWindow: () => this.slices.close(),
+      },
+    );
+  }
+
+  /**
+   * `Spielfeld::mDaten.animiere()` and the rest, as `runStep` wants them.
+   *
+   * `BlopGitter::animiere()` is `for x { for y { … } }` — **column-major**, which is a real
+   * order rather than a detail: a level whose left neighbour writes a variable its right
+   * neighbour reads depends on which column goes first, and upstream's is x-major.
+   *
+   * `board.at` is indexed `y * GRX + x`, so the loop is over x outside and y inside and the
+   * index arithmetic is the other way round. Asserted rather than assumed in
+   * `simulation-animation.test.ts`.
+   */
+  private field(): Field {
+    const board: Animatable[] = [];
+    for (let x = 0; x < GRX; x += 1) {
+      for (let y = 0; y < GRY; y += 1) {
+        const blob = this.board.at(x, y);
+        if (blob === null) continue;
+        board.push(this.makeAnimation(`(${x},${y})`, blob.store, () => ({
+          kind: "cell",
+          x,
+          y,
+          right: false,
+        })));
+      }
+    }
+    // `mFall->animiere()` — the two blobs of the piece in play, at its pixel position. Upstream
+    // reads `Fall::getPos().getX()` for the *Ort* and the piece's own y for the row, so `here`
+    // is a `fall` and not a cell: a falling blob has no cell, and `korrekt` rejects an address
+    // that claims otherwise.
+    const falling: Animatable[] = [];
+    const piece = this.fall;
+    if (piece !== null) {
+      piece.blobs.forEach((blob, index) => {
+        falling.push(
+          this.makeAnimation(`fall${index}`, blob.store, () => ({
+            kind: "fall",
+            x: piece.x + index,
+            y: piece.yPx,
+            right: false,
+          })),
+        );
+      });
+    }
+    // `mNaechsterFall->animiere()` — the pieces not in play yet. One slot in this port.
+    const nextFalling: Animatable[] = [];
+    if (this.next !== null) {
+      this.next.blobs.forEach((blob, index) => {
+        nextFalling.push(
+          this.makeAnimation(`next${index}`, blob.store, () => ({
+            kind: "fall",
+            x: this.next?.x ?? index,
+            y: this.next?.yPx ?? 0,
+            right: false,
+          })),
+        );
+      });
+    }
+    // `mSemiglobal.animiere()` — last in its own field, and one per field, never shared.
+    const semiglobalStore = this.semiglobal(false);
+    const semiglobal: Animatable =
+      semiglobalStore === null
+        ? { name: "semiglobal", animate: () => undefined }
+        : this.makeAnimation("semiglobal", semiglobalStore, () => ({
+            kind: "semiglobal",
+            right: false,
+          }));
+    return {
+      right: false,
+      board,
+      falling,
+      nextFalling,
+      infoBlops: [],
+      semiglobal,
+    };
+  }
+
+  /**
+   * One `BlobAnimation` over a store, with this simulation as its surroundings.
+   *
+   * Built fresh per blob per step rather than cached, which is the cheap way round: a
+   * `BlobAnimation` is a name, a store, a code array and a dozen closures, while running a
+   * kind's code walks its ~1000-node tree. Caching would save an object per cell to keep a
+   * `here` up to date by hand, and a stale `here` is the failure 15.4 exists to prevent.
+   *
+   * `here` is a function rather than a value for the same reason 15.5 made it one on the deps:
+   * a falling blob's position moves within the step that animates it.
+   */
+  private makeAnimation(
+    name: string,
+    store: BlobStore,
+    here: () => Here,
+  ): Animatable {
+    const deps: BlobAnimationDeps = {
+      level: this.level,
+      program: this.level.program,
+      pictureSource: this.pictureSource,
+      here,
+      field: () => accessFieldFor(this, here()),
+      random: (limit) => this.random.int(limit),
+      constantSubject: () => this.constantSubjectFor(store, here()),
+      effects: (asked) => this.effectsFor(store, asked),
+      slices: this.slices,
+      stackAt: (_field, x, y) => this.stackAt(x, y),
+    };
+    const blob = new BlobAnimation(deps, name, store, this.drawCodeOf(store));
+    return blob;
+  }
+
+  /**
+   * The kind's draw code for whatever blob a store belongs to.
+   *
+   * Read from the store's own `kind`, so a blob whose code has just changed its kind gets the
+   * *new* kind's code on the next step and not the old one's — which is what upstream's
+   * `getSorte()->getEventCode(event_draw)` does, since it asks the blob's current sort.
+   *
+   * `blopart_global` and `blopart_semiglobal` are negative and so index nothing, which is why
+   * `null` rather than a throw: they are not kinds and they have no draw event. `globalCode`
+   * and `semiglobalCode` are looked up separately, by name, and are not kinds either — see
+   * `sorte.cpp:98-131`, which is the same fact seen from the loader.
+   */
+  private drawCodeOf(store: BlobStore): readonly Stmt[] | null {
+    const kind = store.getSpecial("kind");
+    if (kind < 0) return null;
+    return this.level.program.drawCode[kind] ?? null;
+  }
+
+  /**
+   * The picture stack of a cell, created on first use.
+   *
+   * `BildStapel::speichereBild` puts a foreign draw on the *target's* stack, so this cannot be
+   * the asking blob's own — which is why the asking blob keeps a `PictureStack` of its own and
+   * this one is per cell.
+   */
+  private stackAt(x: number, y: number): PictureStack | null {
+    if (x < 0 || x >= GRX || y < 0 || y >= GRY) return null;
+    const index = y * GRX + x;
+    let stack = this.cellStacks[index];
+    if (stack === null) {
+      stack = new PictureStack();
+      this.cellStacks[index] = stack;
+    }
+    return stack;
+  }
+
+  /**
+   * `Blop::lazyLeereStapel()`: clear every stack, before any blob animates.
+   *
+   * In place rather than by replacement, because upstream's stacks are members of their blobs
+   * and keep their identity across steps.
+   */
+  private clearCellStacks(): void {
+    for (const stack of this.cellStacks) stack?.clear();
+  }
+
+  /**
+   * The fifteen read-only constants, from the world rather than from any store.
+   *
+   * Each field is a translation of something upstream reads off the blob or the field, and the
+   * two that are *not* modelled yet are 0 rather than invented:
+   *
+   * - **`verticalScroll`** is `mHochVerschiebung`, which upstream raises as the field fills.
+   *   Nothing here scrolls, so `loc_xx` and `loc_yy` are the cell's own pixel position — which
+   *   is the *difference* a level like `aliens.ld` compares, and so is unaffected.
+   * - **`extraTurn`** is `mExtraDreh`, the quarter turn `dreheX` leaves behind when a fast piece
+   *   rotates and does not fit. {@link FallPiece} has no such field, so `turn` reports 0 and the
+   *   three constants that depend on it (`turn` itself and nothing else) are the ones that would
+   *   be wrong. Recorded rather than guessed: upstream's own comment beside it calls the fourth
+   *   quarter a latent bug, and inventing a value would hide the gap rather than show it.
+   */
+  private constantSubjectFor(store: BlobStore, here: Here): ConstantSubject {
+    const hex = hexGeometry(this.level.neighbours, this.level.hexFlip);
+    const blob = here.kind === "cell" ? this.board.at(here.x, here.y) : null;
+    /** The piece a falling blob belongs to, or null for anything that is not falling. */
+    const fallish: { readonly piece: FallPiece; readonly unplaced: boolean } | null =
+      here.kind !== "fall"
+        ? null
+        : this.fall !== null
+          ? { piece: this.fall, unplaced: false }
+          : this.next !== null
+            ? { piece: this.next, unplaced: true }
+            : null;
+    return {
+      position: here.kind === "cell" || here.kind === "fall" ? here : { kind: "nowhere" },
+      world: {
+        width: GRX,
+        height: GRY,
+        players: this.players,
+        time: this.time,
+        mirrored: this.level.mirror,
+        rowHeight: GRIC,
+        verticalScroll: 0,
+        hexShift: (x) => hex.enabled && (x & 1) === (hex.flip & 1),
+      },
+      chainSize: blob?.chainSize ?? 0,
+      // `getSorte(vergangenheit)->getBasekind()` — from the *shadow*, like `verbindetMit` in
+      // 3.10, so a blob that changed kind this step still reports the old base kind. A negative
+      // shadow kind is one of the three singletons, which have no base kind of their own.
+      baseKind: this.level.kinds[store.getSpecial("kind")]?.baseKind ?? BLOBART_AUSSERHALB,
+      // A blob of the *next* piece is a `blopart_fall` too, so `Fall::getSpezConst` answers it
+      // exactly as it answers the piece in play — `falling` is 1 for both. Reading `this.fall`
+      // for a next-piece blob would answer 0, and then `loc_*`'s refusal below would fire on a
+      // blob whose position is a fall, which is the confusing half of the bug and not the whole.
+      // The piece this blob belongs to, and whether it is the one in play. **A next piece is a
+      // `richtung_unplatziert`, not an orientation** — a fourth state, not a fifth orientation —
+      // and `getYY`'s unplaced branch returns from the border without reading the rotation table
+      // at all, so getting this wrong moves the preview by a whole row.
+      fall: fallish === null ? null : { extraTurn: fallish.piece.extraDreh, fast: fallish.piece.fast },
+      // Which of the piece's two blobs is asking. `here.x` is the *absolute* column — which is
+      // what `@(x,y)` against a falling blob means — and `getX(a)` is `x + a`, so the two differ
+      // and the index has to be carried separately.
+      fallIndex: fallish === null ? 0 : here.kind === "fall" && here.x > fallish.piece.x ? 1 : 0,
+      // The four coordinates, from `fall-geometry.ts`. Present only for a falling blob, because
+      // `readConstant` asks for them only there and a cell's are the board's own.
+      fallCoordinates:
+        fallish === null || here.kind !== "fall"
+          ? undefined
+          : this.fallCoordinates(fallish.piece, here.x, fallish.unplaced),
+      // `getVariableVergangenheit(spezvar_am_platzen)`, slot 13.
+      exploding: store.getAlt(13),
+    };
+  }
+
+  /**
+   * `Fall::getXX/getYY/getX/getY` for one blob of a piece, as `constants.ts` wants them.
+   *
+   * The `r` a `FallPos` carries is the piece's *orientation*, and `richtung_unplatziert` is a
+   * fourth state rather than a fifth orientation — "the piece that will enter play next" — which
+   * is why {@link FallPiece.orientation} has three values and `FallPos.r` has five.
+   */
+  private fallCoordinates(
+    piece: FallPiece,
+    absoluteX: number,
+    unplaced: boolean,
+  ): FallCoordinates {
+    const r = fallOrientationOf(piece, unplaced);
+    // `FallPos.x` is the piece's column, so the asking blob's `a` comes from how far right of it
+    // the blob is — which is 1 for a horizontal piece and for an unplaced one, and 0 otherwise.
+    // `a` is 0 or 1 by construction: `absort_fall(rechts, a)` names one of the piece's two
+    // blobs and nothing else produces a third. Clamped so a caller cannot index off the end.
+    const a = absoluteX >= piece.x ? 1 : 0;
+    const pos: FallPos = { x: piece.x, yy: piece.yPx, r };
+    const offsets = { extraX: piece.extraX, extraDreh: piece.extraDreh };
+    const hex = hexGeometry(this.level.neighbours, this.level.hexFlip);
+    const world = {
+      borderPx: this.borderPx,
+      hexShift: (x: number) => hex.enabled && (x & 1) === (hex.flip & 1),
+    };
+    return {
+      cellX: cellX(pos, a),
+      cellY: cellY(pos, a, world),
+      pixelX: pixelX(pos, a, offsets, this.level.mirror),
+      pixelY: pixelY(pos, a, offsets, this.level.mirror, world),
+    };
+  }
+
+  /**
+   * The five effects, bound to the blob whose code is running.
+   *
+   * Each one is a real call into this simulation where there is something to call, and a
+   * recorded value where there is not — `playSample` queues, because audio is group 11 and a
+   * queued sample is assertable while a sample reaching a sound card is not.
+   *
+   * `pop` is the interesting one: `Blop::lassPlatzen()` sets the blob's own `am_platzen`, and
+   * here that is `exploding = 1`, which is what `testExplosions` then looks for. Scheduling the
+   * explosion and *finishing* it are both already here, so a level's `explode` reaches the same
+   * state machine the rules do.
+   */
+  private effectsFor(_store: BlobStore, here: Here): EffectContext {
+    // `ort_absolut`, which the effects' routing and `bonus`'s "which player" both ask. The
+    // three singleton positions become `nowhere`, which is upstream's `absort_nirgends`: they
+    // have no place on the board, and `ResolvedOrt` is the shape that says so.
+    const resolved: ResolvedOrt = {
+      kind: here.kind === "cell" || here.kind === "fall" ? here.kind : "nowhere",
+      x: "x" in here ? here.x : 0,
+      y: "y" in here ? here.y : 0,
+      right: "right" in here ? here.right : false,
+    };
+    return {
+      here: resolved,
+      falling: this.phase === "falling" && this.fall !== null,
+      gridWidth: GRX,
+      addPoints: (_right, points) => {
+        this.score += points;
+      },
+      setMessage: (_right, text) => {
+        this.message = text;
+      },
+      pop: () => {
+        const blob = this.blobAt(here);
+        if (blob === null) return;
+        // `Blop::lassPlatzen()` sets the blob's own `am_platzen` to 1, and `testExplosions` is
+        // what then walks the animation forward. Both ends already exist here, so a level's
+        // `explode` reaches the same state machine the rules reach.
+        blob.exploding = 1;
+      },
+      // `EffectContext.playSample` takes a routed `PlayedSample`, so the panning column is
+      // already decided by the time it reaches here — `routeSample` is effects.ts's, and the
+      // walker is what calls it.
+      playSample: (sample) => {
+        this.playedSamples.push(sample);
+      },
+      playerLost: () => {
+        this.phase = "lost";
+      },
+    };
+  }
+
+  /**
+   * The blob standing at `here`, or null for the blobs that are not on the board.
+   *
+   * Only `effectsFor`'s `pop` needs it, and only a board or falling blob can pop — the global
+   * and semiglobal have no `Ort` on the board and `lassPlatzen` upstream is a `Blop` method that
+   * a blob without a cell does not have.
+   */
+  private blobAt(here: Here): Blob | null {
+    if (here.kind !== "cell") return null;
+    return this.board.at(here.x, here.y);
   }
 
   /**
@@ -586,8 +1045,13 @@ export class Simulation {
     const piece = this.fall;
     if (piece === null) return;
 
-    if (piece.slideRemaining > 0)
+    if (piece.slideRemaining > 0) {
       piece.slideRemaining = Math.max(0, piece.slideRemaining - 8);
+      // The slide is over when the offset is, which is upstream's `mExtraX` returning to 0 —
+      // and it is *not* the same moment, because `mExtraX` is what the picture is offset by and
+      // `slideRemaining` is only how long the renderer keeps drawing it there.
+      if (piece.slideRemaining === 0) piece.extraX = 0;
+    }
 
     const speed =
       piece.fast || piece.orientation === "single"
@@ -1018,4 +1482,20 @@ export class Simulation {
       phase: this.phase,
     };
   }
+}
+
+
+/**
+ * `FallPos.r` from the port's three orientations.
+ *
+ * The port models a piece as horizontal / vertical / single, and `FallPos.r` as `richtung_waag`
+ * / `richtung_senk` / `richtung_einzel` — plus `richtung_unplatziert`, which is not an
+ * orientation but a *state*: the piece that will enter play next. A piece is in that state when
+ * it is not the one in play, which is why the caller says which piece it means rather than this
+ * function guessing from the orientation.
+ */
+export function fallOrientationOf(piece: FallPiece, unplaced = false): FallPos["r"] {
+  if (unplaced) return RICHTUNG_UNPLATZIERT;
+  if (piece.orientation === "single") return RICHTUNG_EINZEL;
+  return piece.orientation === "horizontal" ? RICHTUNG_WAAG : RICHTUNG_SENK;
 }

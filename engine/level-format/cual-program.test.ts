@@ -110,6 +110,7 @@ const syntheticKind = (name: string): Kind[] => [
     name,
     role: "colour",
     artKey: name,
+    baseKind: 0,
     pictures: [],
     pictureCounts: [],
     versions: 1,

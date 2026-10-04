@@ -18,6 +18,7 @@ const COLOUR: Kind = {
   name: "colour",
   role: "colour",
   artKey: "colour",
+  baseKind: 0,
   pictures: [],
   pictureCounts: [],
   versions: 1,

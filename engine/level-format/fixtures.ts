@@ -42,6 +42,7 @@ function makeKinds(specs: readonly KindSpec[], chainGrass: boolean): Kind[] {
       name: s.name,
       role,
       artKey: role === "empty" ? "" : s.name,
+      baseKind: nextId,
       // No fixture models a picture *list*, so a fixture kind has no picture files and
       // `artKey` above is the kind's name rather than a picture. That is the same shape as a
       // real kind declared by a `greypic` word, which is what a fixture with no `pics` is.

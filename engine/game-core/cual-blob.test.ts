@@ -178,8 +178,29 @@ function harness(built: Built, here: Here, kindName = "drawer") {
       );
     },
     random: () => 0,
+    // A cell blob in a level with no fall in play: `falling` 0, `loc_*` from the cell, and
+    // `baseKind` from the kind table. Nothing in this suite asserts a `spezconst_*` value —
+    // `constants.test.ts` owns those — so this answers faithfully and cheaply.
+    constantSubject: () => ({
+      position: { kind: "cell", x: 1, y: GRY - 1, right: false },
+      world: {
+        width: GRX,
+        height: GRY,
+        players: 1,
+        time: 0,
+        mirrored: false,
+        rowHeight: 8,
+        verticalScroll: 0,
+        hexShift: () => false,
+      },
+      chainSize: 0,
+      baseKind: 0,
+      fall: null,
+      fallIndex: 0,
+      exploding: 0,
+    }),
     effects: () => effects.context,
-    window: { defer: (target, slot, value) => target.setInternal(slot, value) },
+    slices,
     stackAt: (_field, x, y) => {
       const key = `${x},${y}`;
       let stack = stacks.get(key);

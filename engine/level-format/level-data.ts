@@ -30,6 +30,19 @@ export interface Kind {
   /** Logical art key; may be empty for a kind that draws nothing. */
   readonly artKey: string;
   /**
+   * `Sorte::mBasekind`, and what Cual reads as the constant `basekind`.
+   *
+   * **This is not the kind's own number.** `sorte.cpp:214` sets it to `mBlopart` and then
+   * `sorte.cpp:234` overwrites it with the kind's `basekind = <kind>` definition, so a kind may
+   * declare that it *is* another kind for the purpose of `basekind`. Six levels read the
+   * constant — `angst.ld`, `kachelnR.ld` and four more — and all of them compare it with `==`,
+   * which is the shape that needs the remapping and not a synonym.
+   *
+   * Read from the *shadow*, `getSorte(vergangenheit)->getBasekind()`, so a blob that changed
+   * kind this step still reports the old base kind.
+   */
+  readonly baseKind: number;
+  /**
    * Every picture file this kind has, in the order `pics` lists them.
    *
    * `artKey` is this list's first entry, and it used to be the *only* thing kept: `kinds.ts`

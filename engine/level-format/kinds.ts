@@ -247,7 +247,7 @@ export function buildKinds(level: DefinitionScope, defaults: KindDefaults): Kind
   for (const kind of byNumber) if (kind !== undefined) kinds.push(kind);
 
   return {
-    kinds,
+    kinds: resolveBaseKinds(kinds, byNumber, level),
     count: total,
     emptyKind: -1,
     emptyArtKey,
@@ -407,6 +407,10 @@ function makeKind(
     name,
     role,
     artKey,
+    // Placeholder; `buildKinds` resolves the name to a kind number once every kind exists,
+    // because `basekind` may name a kind declared later in the file. Upstream reads it in
+    // `Sorte::Sorte`'s constructor, where the table is already complete.
+    baseKind: id,
     pictures,
     // Filled in by the loader, which is the only place with the art manifest to resolve the
     // counts through. `buildKinds` reads `scope`, and a `.ld` says how many icons a picture
@@ -523,4 +527,50 @@ function constantTable(
     if (value !== undefined) out.set(name, value);
   }
   return out;
+}
+
+
+/**
+ * `basekind = <kind>` for every kind that declares one.
+ *
+ * `sorte.cpp:234` reads it as a `VarDefinition` with `mArt == vd_konstante` — a **constant**,
+ * so a number or a name — from the kind's *own* section (`getKind` does not look at the
+ * parent, the same separation the picture list has).
+ *
+ * Resolved in a second pass because the name may refer to a kind declared later in the file,
+ * which upstream does not have to care about: it reads the whole table before it builds any
+ * `Sorte`. A name that is not a kind is refused by name, because `angst.ld`'s
+ * `basekind != Blob` and `kachelnR.ld`'s `basekind != Kachel` compare against another kind's
+ * number and a wrong one would be a wrong comparison rather than an error.
+ */
+function resolveBaseKinds(
+  kinds: readonly Kind[],
+  byNumber: readonly (Kind | undefined)[],
+  level: DefinitionScope,
+): Kind[] {
+  const byName = new Map(kinds.map((kind) => [kind.name, kind.id]));
+  return kinds.map((kind) => {
+    const own = level.childSection(kind.name);
+    if (own === undefined || !own.hasOwn("basekind")) return kind;
+    const word = own.ownWord("basekind") ?? "";
+    if (word === "") {
+      throw new LdParseError(
+        `${kind.name} has basekind with no kind name`,
+        own.positionOf("basekind").line,
+        own.positionOf("basekind").col,
+        level.filename,
+      );
+    }
+    const target = byName.get(word);
+    if (target === undefined) {
+      throw new LdParseError(
+        `${kind.name} has basekind=${word}, which is not a kind of this level`,
+        own.positionOf("basekind").line,
+        own.positionOf("basekind").col,
+        level.filename,
+      );
+    }
+    void byNumber;
+    return { ...kind, baseKind: target };
+  });
 }

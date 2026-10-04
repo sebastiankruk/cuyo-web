@@ -60,10 +60,12 @@ import type { PictureSource } from "../cual-runtime/draw.ts";
 import type { Animatable } from "../cual-runtime/global.ts";
 import type { AccessField, Here } from "../cual-runtime/access.ts";
 import { resolveConstant } from "../cual-runtime/const-tables.ts";
+import { readConstant } from "../cual-runtime/constants.ts";
+import type { ConstantSubject } from "../cual-runtime/constants.ts";
 import { neighbourReader, readAddressed, resolveOrt, storeAt } from "../cual-runtime/access.ts";
 import { evaluate } from "../cual-runtime/expr.ts";
 import type { EvalContext, Ort } from "../cual-runtime/expr.ts";
-import type { BlobStore, KindChange } from "../cual-runtime/store.ts";
+import type { BlobStore, KindChange, TimeSlices } from "../cual-runtime/store.ts";
 import type { EffectContext } from "../cual-runtime/effects.ts";
 import type { LevelProgram } from "../level-format/cual-program.ts";
 import type { LevelDef } from "../level-format/level-data.ts";
@@ -98,12 +100,34 @@ export interface BlobAnimationDeps {
   field(): AccessField;
   /** The simulation's one random source, so `rnd` and the game agree on the sequence. */
   random(limit: number): number;
+  /**
+   * What the asking blob is, for the fifteen read-only constants.
+   *
+   * `getSpezConst(spezconst_falling)` is not a variable and not a compile-time constant: it
+   * reads the *game* — whether a piece is falling, how fast, how far the field has scrolled,
+   * which column this blob is in — so it needs the world and not the store. Asked per read
+   * rather than held, because `falling` is true of a step's middle and false of its end.
+   *
+   * **This is a fourth namespace, and 15.5 wired only three.** The corpus reads `falling` in
+   * `3d.ld` and `players` and `time` in several levels, so the first real run threw "no variable
+   * named 'falling'" — which is 15.5's error message working, on a name its `valueOf` did not
+   * know about.
+   */
+  constantSubject(): ConstantSubject;
   /** `bonus`, `message`, `explode`, `sound` and `lose`, already bound to this blob. */
   effects(here: Here): EffectContext;
-  /** The window deferred writes queue onto: the simulation's, never one of the blob's own. */
-  readonly window: {
-    defer(store: BlobStore, slot: number, value: number, operation: "+=" | "="): void;
-  };
+  /**
+   * `Blop::gZZ`: the window deferred writes queue onto, and the slice counter behind them.
+   *
+   * **The simulation's, never one of the blob's own.** An `@`-assignment (`x@(0,1) += 1`) is
+   * *deferred* — applied at `endGleichzeitig`, not when it is written — so that a blob reading
+   * its neighbour mid-step sees the beginning-of-step value. A per-blob queue would make each
+   * blob's `@`-write invisible to the next blob in the step, which is the whole mechanism.
+   *
+   * `runStep` opens and closes it around the whole step, so this one object serves the global
+   * blob, every cell and the semiglobal alike.
+   */
+  readonly slices: TimeSlices;
   /**
    * The picture stack of a cell, for a draw aimed at somebody else.
    *
@@ -246,7 +270,7 @@ export class BlobAnimation implements Animatable {
       evaluate: (expr) => evaluate(expr, this.evalContext(field)),
       slotOf: (name) => this.slotFor(name),
       field,
-      slices: undefined,
+      slices: this.deps.slices,
       effects: this.deps.effects(here),
       draw: {
         // `mMalenErlaubt` is true for exactly this call: `execEvent` sets it false, so a draw
@@ -356,12 +380,52 @@ export class BlobAnimation implements Animatable {
     return special < 0 ? null : special;
   }
 
-  /** A name's value: a constant, or the contents of its slot. */
+  /**
+   * A name's value, and the order the four namespaces are tried in.
+   *
+   * 1. **`spezconst_*`** — `readConstant`, which needs the game and answers per blob.
+   * 2. **Cual's own constants** — `resolveConstant`, the `#define`s of `cual.h` and friends,
+   *    which upstream's parser folds at parse time and this port resolves at run time. So
+   *    `Q_ALL`, `DIR_*` and `nothing` are values, not variables.
+   * 3. **A declared variable** — one of the level's own `var` lines.
+   * 4. **A system variable** — one of the fourteen `spezvar_*` slots, disjoint from 3 because
+   *    `neueVarDefinition` refuses to redeclare one.
+   *
+   * `spezconst_*` first because it is the only one that can differ between two blobs in the same
+   * step, and a namespace that answers differently for the *same* store is the one that has to
+   * be asked first when two of them would both have an answer.
+   *
+   * 5. **A kind name** — `Blob`, `Kugel`, `Gras`. `angst.ld` writes
+   * `if basekind@(tauschrichtung,0)!=Blob`, so a kind's name is a value and not just a label.
+   * Upstream has one namespace for all of this: every one is a `DatenKnoten` in the
+   * configuration, which is why `parser.yy`'s `konstante: wort` and `variable_acode` both reach
+   * `getVerwandten` and get the same answer. This port has four tables where upstream has one,
+   * so the order above *is* the namespace.
+   *
+   *   **Last, which is the one order that could be wrong.** Upstream forbids the collision: a
+   *   `var` and a kind of the same name would be two `DatenKnoten`s under one name, and
+   *   `neueVarDefinition` refuses that. Here nothing refuses it, so a level that did it would
+   *   silently read the variable rather than the kind. Measured: no level in the corpus declares
+   *   a `var` after a kind's name, so the order is unobservable for all 79 — and a variable
+   *   winning is the answer that makes such a collision a visible bug rather than a silent one.
+   */
   private valueOf(name: string): number | null {
+    const readOnly = readConstant(name, this.deps.constantSubject());
+    if (readOnly !== null) return readOnly;
     const constant = resolveConstant(name);
     if (constant !== null) return constant;
     const slot = this.slotFor(name);
-    return slot === null ? null : this.store.get(slot);
+    if (slot !== null) return this.store.get(slot);
+    return this.kindNumberOf(name);
+  }
+
+  /** A kind's number by name, which is what `DatenKnoten` holding a kind number reads as. */
+  private kindNumberOf(name: string): number | null {
+    const kinds = this.deps.level.kinds;
+    for (let i = 0; i < kinds.length; i += 1) {
+      if (kinds[i]?.name === name) return kinds[i]?.id ?? null;
+    }
+    return null;
   }
 
   /** The slot a named variable occupies, which is what a caller needs to write one by address. */
