@@ -29,6 +29,49 @@ export interface Kind {
   readonly role: KindRole;
   /** Logical art key; may be empty for a kind that draws nothing. */
   readonly artKey: string;
+  /**
+   * `Sorte::mBasekind`, and what Cual reads as the constant `basekind`.
+   *
+   * **This is not the kind's own number.** `sorte.cpp:214` sets it to `mBlopart` and then
+   * `sorte.cpp:234` overwrites it with the kind's `basekind = <kind>` definition, so a kind may
+   * declare that it *is* another kind for the purpose of `basekind`. Six levels read the
+   * constant — `angst.ld`, `kachelnR.ld` and four more — and all of them compare it with `==`,
+   * which is the shape that needs the remapping and not a synonym.
+   *
+   * Read from the *shadow*, `getSorte(vergangenheit)->getBasekind()`, so a blob that changed
+   * kind this step still reports the old base kind.
+   */
+  readonly baseKind: number;
+  /**
+   * Every picture file this kind has, in the order `pics` lists them.
+   *
+   * `artKey` is this list's first entry, and it used to be the *only* thing kept: `kinds.ts`
+   * read `pics` in full, took entry zero as `artKey` and discarded the rest, which is why the
+   * file count and the first file's icon count were unavailable where they were needed.
+   *
+   * Both are needed now. `Sorte::ladeCualEvents` chooses a kind's default draw code from
+   * `mBilddateien.size()` — one file is `default1` or `default2`, several is `default3` — and
+   * `PictureSource.pictureCount(kind, file)` resolves Cual's `file` variable through this
+   * list to reach a picture's icon count. Empty for a kind that has no picture file at all,
+   * which is what a kind named by a `greypic` or `startpic` *word* is unless its own section
+   * declares `pics`.
+   */
+  readonly pictures: readonly string[];
+
+  /**
+   * How many icons each of {@link pictures} holds, in the same order.
+   *
+   * The picture's, not the level's: upstream reads it from the image (`anzBildchen`,
+   * `src/bilddatei.cpp:205`) and this project ships no images, so the figure is transcribed per
+   * key in `picture-icons.ts` and resolved through the art manifest **here, at load**, so that
+   * nothing in the game needs the manifest at run time.
+   *
+   * `PictureSource.pictureCount(kind, file)` is `this[file]`, which is how Cual's `file`
+   * variable reaches a picture. Empty for a kind with no picture file, and a `0` entry is
+   * impossible here: a key the table records as 0 is not a picture, and `artKey`'s
+   * documentation says why such a kind never gets one.
+   */
+  readonly pictureCounts: readonly number[];
   /** Number of distinct appearances, chosen at random as `version`. */
   readonly versions: number;
   /** Contribution to component size. */
@@ -104,6 +147,25 @@ export interface LevelDef {
   /** Board-wide neighbour mode; an individual kind may override it. */
   readonly neighbours: NeighbourMode;
 
+  /**
+   * `hexflip`, 0 to 3: which way the hex column offset alternates.
+   *
+   * Added by task 15.4, and it is here rather than in `LevelSettings` alone because
+   * `getHexShift` needs it: `LevelDaten::getHexShift(bool rechts, int x)` reads `mSechseck`
+   * *and* `mSechseckFlip`, so a level's hex column parity is level data the engine has to
+   * carry. `settings.ts` parsed and range-checked it from the start and the value was then
+   * dropped on the way to a `LevelDef`, which is the same shape of gap `presentation.test.ts`
+   * records for the renderer — there, `hexflip=2` agrees with the default `0` because
+   * `columnShift` reads bit 1 only for a right-hand field and no hex board in this port is
+   * two-player. **This field is what makes that gap reachable to close**, and 15.4 needs it:
+   * `AccessField.hexShift` has to answer per column and per side, and "the default every
+   * time" would be a member that is not implemented.
+   *
+   * Only meaningful when {@link neighbours} is a hex mode; `columnShift` ignores it in a
+   * rectangular board, which is upstream's `if (!ld->mSechseck) return false`.
+   */
+  readonly hexFlip: number;
+
   /** Goal blobs need a chain reaction to be destroyed. */
   readonly chainGrass: boolean;
   /** Border descent, in steps per pixel. */
@@ -147,6 +209,21 @@ export interface LevelDef {
    * carrying the program it is about to run.
    */
   readonly program: LevelProgram;
+  /**
+   * A number this level's `.ld` file defines, by name — `farben = 5`, `anzahl = 7`.
+   *
+   * **`null` for a name the level does not define as a single number.** Upstream has one
+   * namespace for all of this: `parser.yy`'s `variable_acode` does
+   * `gAktDefKnoten->getVerwandten(name, mVersion, true)` and gets whatever `DatenKnoten` is
+   * there, which is a `spezconst_*`, a `.ld` number, a kind name or a Cual `var` depending on
+   * what the level wrote. This port has four tables where upstream has one, so this is the fifth
+   * half of that split.
+   *
+   * `scope.nameResolver()` is the lookup — it is `konstante: wort`'s, which is
+   * `getVerwandten` too — so a `.ld` constant resolves the same way here as it does there, and
+   * a name that is a list or a colour reports `null` rather than a first element.
+   */
+  readonly levelNumber: (name: string) => number | null;
 }
 
 /** Per-kind neighbour override, kept out of `Kind` to avoid a cycle. */

@@ -46,6 +46,15 @@ export class GameLoop {
   /** Last frame duration in ms, for the dev overlay. */
   frameMs = 0;
   paused = false;
+  /**
+   * Why the simulation stopped, or null while it is running.
+   *
+   * Set when a step throws, and **the loop keeps running** — so this is a field and not a thrown
+   * error, and the dev overlay and the level list can show it.
+   */
+  failure: string | null = null;
+  /** How many times the failing step threw, which is a frame count and says nothing new. */
+  failureCount = 0;
 
   constructor(
     private readonly sim: Simulation,
@@ -69,6 +78,43 @@ export class GameLoop {
     return () => this.listeners.delete(fn);
   }
 
+  /**
+   * One simulation step, with the failure handled rather than propagated.
+   *
+   * ## Why this exists
+   *
+   * `sim.step()` runs a level's Cual code as of 15.6, and it can throw — 24 of the 79 corpus
+   * levels do, on names and pictures this port has not wired yet. Before 15.6 it could not, so
+   * this had no handler and needed none.
+   *
+   * **An uncaught throw here looks exactly like a frozen game.** `request` is the *first* line of
+   * {@link tick}, so the next frame is already queued when `step()` throws: the loop does not die,
+   * it throws again on every frame forever. `this.steps` stops advancing, the board stops moving,
+   * the border stops rising, and the browser console fills with the same error. That is the
+   * report "the game stops after the first bombs going off", and it is what a player sees whether
+   * the cause is a missing namespace or a picture budget.
+   *
+   * So the loop **records** the failure and stops stepping, which is upstream's arrangement too:
+   * `Cuyo::zeitSchritt` wraps `zeitSchrittIntern` in a `try`, and a `Fehler` puts up an error
+   * dialog and leaves the game rather than continuing from a half-stepped board. Stopping is the
+   * honest choice — a board whose blobs half-moved is not a state the renderer or the rules have
+   * any meaning for.
+   *
+   * @returns whether the step happened, so the caller can stop catching up.
+   */
+  private step(): boolean {
+    if (this.failure !== null) return false;
+    try {
+      this.sim.step();
+      this.steps++;
+      return true;
+    } catch (error) {
+      this.failure = error instanceof Error ? error.message : String(error);
+      this.failureCount++;
+      return false;
+    }
+  }
+
   private tick = (now: number): void => {
     this.raf = this.clock.request(this.tick);
     const delta = now - this.last;
@@ -82,9 +128,7 @@ export class GameLoop {
       let steps = 0;
       while (this.accumulator >= STEP_MS && steps < 5) {
         this.accumulator -= STEP_MS;
-        this.sim.step();
-        this.steps++;
-        steps++;
+        if (this.step()) steps++;
       }
       if (this.accumulator > STEP_MS * 5) this.accumulator = 0;
     }

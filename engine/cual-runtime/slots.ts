@@ -213,6 +213,32 @@ export function slotOf(bit: number): number {
 }
 
 /**
+ * How {@link allocateSlots} should treat a `procedureDef` or `&name` body.
+ *
+ * **The default (`false`) is right for a tree that will run as parsed**, which is what every
+ * test in this file and every hand-built fixture is. **The level loader does not use it**, because
+ * it allocates over two trees and needs the reader to know which body is the live one.
+ */
+export interface AllocationOptions {
+  /**
+   * The caller has already allocated over the **linked** trees, where a call's body is a spliced
+   * copy (`neueBusyNummern`) and `&name`'s is the shared original. A parsed body is then a
+   * superseded tree: its busy flags would take up array space nothing ever reads.
+   *
+   * Its *declarations* are still counted, because upstream numbers a variable at parse time
+   * (`neueVarDefinition` on the level's `DefKnoten`) and every copy of the body shares the one
+   * variable. So the linked trees are handed over with their declarations removed —
+   * {@link withoutDeclarations} — or a `var` inside a spliced procedure would be counted once
+   * from the parsed body and again from every copy, giving `x` several slots under one name.
+   *
+   * Both numbers still come from **one** counter, because a blob's array holds both: a busy flag
+   * is a bit in an `int`, and `neueBoolVariable` allocates a new `int` through the same
+   * `neueVariable` a `var` uses.
+   */
+  readonly bodiesLinked?: boolean;
+}
+
+/**
  * Allocate busy slots for a parsed block.
  *
  * **Order.** Upstream reserves each node's slots in its constructor, and Bison reduces
@@ -225,7 +251,168 @@ export function slotOf(bit: number): number {
  * for the same reason. `var_def` is only reachable from `code_zeile`, so a `varDecl` is
  * always a top-level statement and never appears inside a tree that would need it hoisted.
  */
-export function allocateSlots(statements: readonly Stmt[]): Allocation {
+/**
+ * Number every `var` and `default` line in a tree, and nothing else.
+ *
+ * Used for a procedure or `&name` body under {@link AllocationOptions.bodiesLinked}: the
+ * declarations belong to the parsed body (upstream numbers a variable at parse time), while the
+ * busy flags belong to each copy. Walking to *every* depth matters — `globals.ld` writes its
+ * `var` lines at the top of a procedure, and a one-level-deep search would miss them and leave
+ * every global variable sitting directly after the special variables.
+ */
+function numberDeclarations(
+  nodes: readonly Stmt[],
+  allocator: SlotAllocator,
+  declaredSlots: Map<string, number>,
+): void {
+  for (const node of nodes) {
+    if (node.kind === "varDecl" || node.kind === "defaultDecl") {
+      for (const declaration of node.declarations) {
+        allocator.allocateDeclaredVariable();
+        // **The name has to be recorded too**, and until 15.7 it was not: a `var` inside a
+        // procedure body or a `&held` body got a slot and no name, so `EvalContext.variable`
+        // could not find it and every level that declared one there failed with "no variable
+        // named 'x'" the moment its blobs ran. `Theater`'s `Leer`, `Aliens`'s `p_shoot` and
+        // `Kolben`'s `blitzrate` are all of that shape.
+        //
+        // The empty name is a Spez-Var, which `visit`'s own `varDecl` case already declines to
+        // record; same rule here, so the two paths cannot disagree about it.
+        if (declaration.name !== "") {
+          declaredSlots.set(declaration.name, allocator.lastVariableSlot);
+        }
+      }
+      continue;
+    }
+    numberDeclarations(childrenOf(node), allocator, declaredSlots);
+  }
+}
+
+/** Every immediate child statement of a node, for the recursive walks. */
+function childrenOf(node: Stmt): readonly Stmt[] {
+  switch (node.kind) {
+    case "sequence":
+    case "block":
+    case "sharedCall":
+      return node.body;
+    case "scoped":
+    case "procedureDef":
+      return [node.body];
+    case "commaSequence":
+      return node.parts;
+    case "if":
+      return node.otherwise === null ? [node.then] : [node.then, node.otherwise];
+    case "switch":
+      return [node.case];
+    case "switchCase":
+      return node.otherwise === null ? [node.body] : [node.body, node.otherwise];
+    case "call":
+      return [];
+    default:
+      return [];
+  }
+}
+
+/**
+ * A copy of a tree with every `var` and `default` line taken out.
+ *
+ * For the *linked* trees only, and for the reason {@link AllocationOptions.bodiesLinked} gives:
+ * `linkCalls` drops a block's top-level declarations because upstream keeps them as definitions
+ * rather than code, but a declaration **inside a procedure body** survives into every spliced
+ * copy — and upstream numbers that variable once, at parse time. Allocating over the copies as
+ * well as the parsed body therefore counted `BoniMali2`'s 763 variables several times over, which
+ * is how the corpus's largest blob array went from 112 slots to 764.
+ *
+ * Recursive, because a declaration can sit at any depth of a body, and it removes the node while
+ * keeping the sequence it was in, so `{ var x; y; }` becomes `{ y; }` rather than `{ ; y; }`.
+ */
+export function withoutDeclarations(statements: readonly Stmt[]): readonly Stmt[] {
+  const out: Stmt[] = [];
+  let changed = false;
+  for (const node of statements) {
+    if (node.kind === "varDecl" || node.kind === "defaultDecl") {
+      changed = true;
+      continue;
+    }
+    const rebuilt = rebuildWithoutDeclarations(node);
+    if (rebuilt !== node) changed = true;
+    out.push(rebuilt);
+  }
+  // **The original array when nothing was removed.** Not a new array holding the original nodes:
+  // `busySlots` is keyed by object identity, so a copy of the *list* is harmless but a copy of
+  // any *node* is a node the walker will never visit and a flag the runner will never find.
+  // 15.7 found this as "a 'switchCase' has no busy slots" on the first level whose draw code was a
+  // bare condition chain — `switchCase`, `if`, `scoped` and `procedureDef` were all rebuilt
+  // unconditionally, so every one of their flags was keyed to an object that no longer existed.
+  return changed ? out : statements;
+}
+
+/**
+ * One node with its declarations removed, or **the same node** when it had none.
+ *
+ * Split out from {@link withoutDeclarations} because the identity requirement is per node and not
+ * merely per list: a rebuilt `if` whose `then` happened to be unchanged is still a different
+ * object, and a flag keyed to it is unreachable.
+ */
+function rebuildWithoutDeclarations(node: Stmt): Stmt {
+  switch (node.kind) {
+    case "sequence":
+    case "block": {
+      const body = withoutDeclarations(node.body);
+      return body === node.body ? node : { ...node, body };
+    }
+    case "sharedCall": {
+      const body = withoutDeclarations(node.body);
+      return body === node.body ? node : { ...node, body };
+    }
+    case "scoped":
+    case "procedureDef": {
+      const body = withoutDeclarations([node.body]);
+      return body[0] === node.body ? node : { ...node, body: body[0] as Stmt };
+    }
+    case "commaSequence": {
+      const first = withoutDeclarations([node.parts[0]]);
+      const second = withoutDeclarations([node.parts[1]]);
+      if (first[0] === node.parts[0] && second[0] === node.parts[1]) return node;
+      return { ...node, parts: [first[0] as Stmt, second[0] as Stmt] };
+    }
+    case "if": {
+      const then = withoutDeclarations([node.then]);
+      const otherwise = node.otherwise === null ? null : withoutDeclarations([node.otherwise]);
+      if (then[0] === node.then && (otherwise === null || otherwise[0] === node.otherwise)) {
+        return node;
+      }
+      return {
+        ...node,
+        then: then[0] as Stmt,
+        ...(otherwise === null ? {} : { otherwise: otherwise[0] as Stmt }),
+      };
+    }
+    case "switch": {
+      const entry = withoutDeclarations([node.case]);
+      return entry[0] === node.case ? node : { ...node, case: entry[0] as SwitchCase };
+    }
+    case "switchCase": {
+      const body = withoutDeclarations([node.body]);
+      const otherwise = node.otherwise === null ? null : withoutDeclarations([node.otherwise]);
+      if (body[0] === node.body && (otherwise === null || otherwise[0] === node.otherwise)) {
+        return node;
+      }
+      return {
+        ...node,
+        body: body[0] as Stmt,
+        ...(otherwise === null ? {} : { otherwise: otherwise[0] as Stmt }),
+      };
+    }
+    default:
+      return node;
+  }
+}
+
+export function allocateSlots(
+  statements: readonly Stmt[],
+  options?: AllocationOptions,
+): Allocation {
+  const bodiesLinked = options?.bodiesLinked ?? false;
   const allocator = new SlotAllocator();
   const busySlots = new Map<Stmt, BusySlots>();
   const declaredSlots = new Map<string, number>();
@@ -291,13 +478,42 @@ export function allocateSlots(statements: readonly Stmt[]): Allocation {
         //
         // Found by the man page's ampersand example failing: a shared animation's flags were
         // not allocated at all, so `&anim` advanced every step instead of one frame per step.
+        //
+        // Under `bodiesLinked` the held statements are the same objects the linked tree holds,
+        // so their flags are numbered there; numbering them here as well would only renumber
+        // them. **Their declarations still have to be counted from here**, because a `var`
+        // inside a `&held` body is numbered once at parse time like any other — which is why
+        // this is a declarations-only walk and not a skip.
+        if (bodiesLinked) {
+          numberDeclarations(node.body, allocator, declaredSlots);
+          return;
+        }
         for (const child of node.body) visit(child);
         return;
       case "scoped":
+        // `[x=e] body` is not a copy — scoping runs in place — so it needs no special handling
+        // and is *not* one of the two cases a linker replaces with another object.
+        visit(node.body);
+        return;
       case "procedureDef":
         // A procedure body's flags are counted against the level, not the procedure: a
         // `DefKnoten` for a sort walks up to the level knoten to ask for a variable, so a
         // procedure's busy flags share one array with the level that calls it.
+        //
+        // **Unless the caller says the body has already been linked**, which is what 15.5 found
+        // and what `buildLevelProgram` says when it allocates over both trees. See
+        // {@link AllocationOptions}: a linked copy is the body that will actually run, and the
+        // parsed body is then a second, never-run tree whose flags would take another
+        // `BITS_PER_SLOT`-th of the array for nothing.
+        if (bodiesLinked) {
+          // Declarations only, and **through every level of the body**. `neueVarDefinition` runs
+          // at parse time on the level's `DefKnoten`, so a `var` anywhere in a procedure is
+          // numbered once, from the parsed body; a linked copy would be a second variable under
+          // the same name. Its busy flags are a different matter — each copy needs its own, and
+          // they are numbered where the copy is (see `withoutDeclarations`).
+          numberDeclarations([node.body], allocator, declaredSlots);
+          return;
+        }
         visit(node.body);
         return;
       default:

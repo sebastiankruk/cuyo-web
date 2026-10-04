@@ -21,7 +21,8 @@ import { parseLd } from "./parser.ts";
 import type { LdDefinition, LdFile } from "./parser.ts";
 import { LdLexError } from "./lexer.ts";
 import { Version } from "./version.ts";
-import { DefinitionScope, rootScope } from "./scope.ts";
+import { DefinitionScope, rootScope, stripPicExtension } from "./scope.ts";
+import { BLOPART_LEER } from "../cual-runtime/store.ts";
 import { buildKinds, UNDEFINED_EXPLODE } from "./kinds.ts";
 import { cssColour, kindDefaultsFrom, readLevelSettings } from "./settings.ts";
 import type { LevelSettings } from "./settings.ts";
@@ -294,8 +295,46 @@ export class LevelLoader {
     // tokens on the parse tree and `scope` holds only resolved data words — and from the kinds
     // just built, because which code a kind runs is decided by its name.
     let program: LevelProgram;
+    let levelNumber!: (name: string) => number | null;
     try {
-      program = buildLevelProgram(levelFile, globalsFile, table.kinds);
+      // `scope.nameResolver()` is `konstante`'s name lookup — `getVerwandten` for the active
+      // version — which is how a `reapply` default naming a level constant (`jump.ld`'s
+      // `var farbe = farben : reapply`) folds to a number.
+      const names = scope.nameResolver();
+      // `getVerwandten` again, wrapped so an unknown name is `null` rather than a throw. The same
+      // lookup serves two callers that want opposite things: `konstante: wort`'s folding wants
+      // the throw, because a name it cannot resolve is the error being reported, while
+      // `LevelDef.levelNumber` wants `null`, because it is one lookup among five namespaces and a
+      // miss is the normal case for four of them.
+      // `knoten.cpp:385`'s `speicherKnotenConst`: for `emptypic = Leer` it registers
+      // `VarDefinition("Leer", blopart_keins, vd_konstante, da_nie, 0)` in **`namespace_variable`**.
+      // That is the namespace `parser.yy:738`'s `ausdruck: variable` looks in, so `kind == Leer`
+      // finds a `VarDefinition`, `istKonstante()` is true, and the name is substituted at parse
+      // time as `zahl_acode(-1)`.
+      //
+      // **Answered here rather than in the scope**, and the reason is the port/upstream
+      // difference that matters: upstream keeps `namespace_variable` and sections in *separate*
+      // maps, so the constant and `Baggis`'s `sbNix={ … }` section coexist under one name with no
+      // conflict. This port has one `defs` map per scope, so a `defineNumber("Leer", -1)` would
+      // collide with the section — which is exactly what an earlier attempt did, and it made
+      // three levels fail to *load* with "expected a list of values but found a section".
+      //
+      // The value is `BLOPART_LEER`, which is `blopart_keins` — and which is already this port's
+      // empty-kind index, since `game-core/board.ts`'s `EMPTY` is -1 too. Nothing about the board
+      // or the kind numbering moves.
+      const emptyName =
+        table.emptyArtKey === "" ? null : stripPicExtension(table.emptyArtKey);
+      levelNumber = (name: string): number | null => {
+        if (name === emptyName) return BLOPART_LEER;
+        try {
+          return names(name, scope.positionOf("numexplode"));
+        } catch {
+          return null;
+        }
+      };
+      program = buildLevelProgram(levelFile, globalsFile, table.kinds, (name) =>
+        names(name, scope.positionOf("numexplode")),
+      );
     } catch (cause) {
       throw new LevelLoadError(origin, (cause as Error).message, { cause });
     }
@@ -309,19 +348,39 @@ export class LevelLoader {
     // Resolving the keys here means a missing picture is a load failure with a
     // diagnostic, rather than a blank cell a player notices.
     const goalArtKeys: string[] = [];
+    const kinds: Kind[] = [];
     for (const kind of kindsWithCode) {
-      if (kind.artKey === "") continue;
-      try {
-        const entry = resolveArtKey(art, kind.artKey, kind.name, origin.file);
-        if (kind.role === "grass") goalArtKeys.push(entry.key);
-      } catch (cause) {
-        throw new LevelLoadError(origin, (cause as Error).message, { cause });
-      }
       // Upstream refuses to load a kind that detonates on size with no threshold.
       if (kind.numexplode === UNDEFINED_EXPLODE && needsNumExplode(kind)) {
         const d = undefinedExplode(kind, origin);
         throw new LevelLoadError(origin, d.message);
       }
+      // **Every picture file the kind declares, with its icon count** — and *only* those.
+      //
+      // Not `artKey`. A kind declared by a `greypic` or `startpic` *word* rather than an entry
+      // in `pics` has no picture file at all: upstream's `Sorte::Sorte` opens no image for one,
+      // which is why `sorte.cpp:104`'s condition starts `mBilddateien.size() > 0` and why such a
+      // kind's `defaultCode` is null and it draws nothing. `artKey` nevertheless falls back to
+      // the kind's own name, and for `unterwasser.ld`'s `greypic=ibwSchuh.xpm` that name happens
+      // to be a real file on disk — so validating `artKey` found a picture where upstream has
+      // none, and a kind whose name is *not* a file (`Hormone`'s `ihGrau`) failed to load at all.
+      // `artKey` is the renderer's colour key and is passed through untouched.
+      const counts: number[] = [];
+      for (const key of kind.pictures) {
+        const entry = resolveArtKey(art, key, kind.name, origin.file);
+        if (entry.icons < 1) {
+          throw new LevelLoadError(
+            origin,
+            `kind ${kind.name} names picture "${key}", which is recorded as having no ` +
+              `icons. A picture with no icons is not a picture, so either the transcription ` +
+              `or the level's \`pics\` list is wrong.`,
+          );
+        }
+        counts.push(entry.icons);
+      }
+      const first = kind.pictures[0];
+      if (first !== undefined && kind.role === "grass") goalArtKeys.push(first);
+      kinds.push({ ...kind, pictureCounts: counts });
     }
 
     let dist;
@@ -351,9 +410,10 @@ export class LevelLoader {
       name: settings.name,
       author: settings.author,
       description: settings.description,
-      kinds: kindsWithCode,
+      kinds,
       emptyKind: table.emptyKind,
       neighbours: settings.neighbours,
+      hexFlip: settings.hexFlip,
       chainGrass: settings.chainGrass,
       topTime: settings.topTime,
       hetzrandStop: settings.topStop,
@@ -371,6 +431,7 @@ export class LevelLoader {
       // a start layout in one object, and only one of them is ever played.
       startDist: toStartRows(rows, table.emptyKind),
       program,
+      levelNumber,
     };
 
     return {

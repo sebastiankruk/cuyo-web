@@ -250,20 +250,26 @@ failed quietly rather than loudly, which is the worse kind.
 own" and that the defaults were therefore the main path, from a probe whose classification was
 wrong: it counted a kind as "using a default" whenever its `defaultCode` was non-null, which is
 true of nearly every kind whether or not its own procedure won. Measured properly: of 556 kinds,
-**502 define a procedure of their own, 5 fall back to `default1`, none to `default3`, and 49 have
-no code at all**. The fallback is a tail. It is still implemented — five corpus kinds need it —
-but the module no longer claims to be arranged around it. The five are named in the test
+**502 define a procedure of their own, 5 fall back to a default, and 49 have no code at all**.
+The fallback is a tail. It is still implemented — five corpus kinds need it — but the module no
+longer claims to be arranged around it. The five are named in the test
 (`Pfeile/ipGrau`, `Ziehlen/gras`, `Embroidery/jsGruenGras`, `Darken/dnStart`,
 `Explosive/lbBlack`) rather than counted, so two of them silently changing default would fail.
+**The defaults all five took at the time were `default1`, and three of them should not have
+been** — that was reading a `pics` run's multiplicity as an icon count, and group 15 has the
+correction and the measurement behind it.
 
-**`default2` and `default2g` are unreachable from the corpus**, because no level writes a kind
-with exactly one multi-icon picture file, and **no level uses `pics = name * count` at all**. That
-last one was a coverage hole mutation found: collapsing `runs.length > 1` into `sum(counts) > 1`
-left all 24 tests green while the two disagree on `pics = bolzer * 3`, which is one file with
-three icons (`default2`) and not three files (`default3`). `defaultCodeFor` is now exported and
-unit-tested on run lists written out by hand, because the loader cannot be used for it — the art
-manifest is keyed by **filename**, so a synthetic level cannot borrow another level's picture
-names and fails before the default is ever chosen.
+**`default2` and `default2g` are reachable from the corpus**, by three kinds — `Ziehlen/gras`,
+`Embroidery/jsGruenGras` and `Darken/dnStart` — because their pictures have 10, 6 and 16 icons.
+An earlier version of this note said they were unreachable because no level writes a kind with
+exactly one multi-icon picture file, and that was an artefact of reading a `pics` run's
+multiplicity as its icon count; see group 15. `default3` is reachable too, by 318 kinds, and
+like `default2` is never actually run because those kinds all define their own procedure.
+
+`defaultCodeFor` is exported and unit-tested on picture lists naming real keys from the committed
+icon table, because the loader cannot be used for it — the art manifest is keyed by **filename**,
+so a synthetic level cannot borrow another level's picture names and fails before the default is
+ever chosen.
 
 **`allocateSlots` discarded the index of each declared variable**, so a user variable could not
 be resolved at all: it reaches the evaluator as `{ kind: "variable", name }` and
@@ -776,6 +782,96 @@ a program, `Simulation` has no step that runs one, nothing implements `cual-runt
 `Animatable` or `AccessField`, and nothing calls `runStep` outside its own test. `Blob.vars` is
 allocated by `board.ts` and read by nobody — a placeholder left for exactly this.
 
+**15.4 turned up a bug that had been sitting in the checklist since 15.1, and fixing it is a
+prerequisite for 15.5.** `defaultCodeFor` read a `pics` run's `count` as an icon count. It is
+`getVielfachheit` — *multiplicity*, the number of `Sorte` objects `ladSorten` creates sharing one
+picture (`mSorten.neueSorte(nr, mSorten[nr-1], false); // false = ist nur kopie`) — and the real
+icon count is `anzBildchen()` from the image. **Measured over the corpus's constant-count
+entries: 914 of 936 disagree with their image.** So three of the five kinds that fall back to a
+default were drawing the wrong picture:
+
+| kind                     | picture           | icons | was      | is          |
+| ------------------------ | ----------------- | ----: | -------- | ----------- |
+| `Pfeile/ipGrau`          | `ipGrau.xpm`      |     1 | default1 | default1    |
+| `Explosive/lbBlack`      | `lbBlack.xpm`     |     1 | default1 | default1    |
+| `Embroidery/jsGruenGras` | `jsGruenGras.xpm` |     6 | default1 | **default2g** |
+| `Ziehlen/gras`           | `mziAlle.xpm`     |    10 | default1 | **default2g** |
+| `Darken/dnStart`         | `dnBlack.xpm`     |    16 | default1 | **default2g** |
+
+All three wrong ones are grass, which is what makes it visible rather than cosmetic:
+`default1 = *` draws icon 0 and `default2g = {pos=version; *}` draws the version, so those
+goal blobs showed the same face every time whatever their `version` was.
+
+**The note 15.1 recorded about `default2`/`default2g`/`default3` being "unreachable from the
+corpus" was an artefact of that bug and was wrong on all three counts.** Measured across all 79
+levels at the version `cual-program.test.ts` loads, by how many kinds each default is chosen for:
+**`default1` 5, `default2` 142, `default2g` 29, `default3` 318** — all four reached, and only
+two ever *run*, because every `default2` and `default3` kind in the corpus defines its own
+procedure and takes precedence. `default3` is every kind with more than one picture file.
+(The figures depend on the version loaded: the same census over every track and difficulty gives
+250 and 322, because the version decides which kinds exist at all. The test asserts one basis
+and says which, rather than quoting a number that is true of some load and not others.)
+
+**Where the icon counts come from, and why not the `.ld`.** Upstream reads them from the pixels —
+`(breite/gric) * (hoehe/gric)` at `gric` 32, `src/bilddatei.cpp:205` — and this project does not
+ship those spritesheets, so at run time there is no image to measure and no way to recover the
+number. So the count is *ours* to state, since the artwork is ours, and it is stated in
+`engine/level-format/picture-icons.ts`: one entry per manifest key, **222 measured and 4 recorded
+as 0**, transcribed by `levels-src/transcribe-picture-icons.ts` from upstream's image headers and
+committed. Transcribing upstream is the honest starting value because upstream's icons and
+Cual's `pos` values are a matched pair — a level asks for `pos = 7` because the file had at
+least eight icons.
+
+  **The four zeroes are not gaps, and saying so was worth the measurement.** `Grau`, `Starr`,
+  `Start` and `start_dummy` are *kind names, not picture names*: a kind declared by a `greypic`
+  or `startpic` **word** has no picture file unless its own section declares `pics`, and upstream
+  opens no image for one. The same fact reaches the code as `defaultCode = null`, reached from
+  the other side. An earlier version of the transcriber *threw* on them, which would have been
+  the wrong reaction to a correct answer.
+
+  **Two of upstream's own spritesheets defeated the reader, and both fixes are about not being
+  fooled by a uniform corpus.** `aDragon.xpm` writes `"128 64 2 1 "` — the numbers are *not*
+  followed immediately by the closing quote — so a header pattern anchored on `"` found nothing
+  in that file and silently dropped 21 keys. And the uncompressed files carry the full GPL notice
+  before the header, putting it around line 15 rather than 4. And `itGras.xpm.gz` has a valid
+  gzip header and a deflate stream Node's one-shot `gunzipSync` rejects outright, while a
+  streaming inflate recovers the first 16 kB — which is all the script needs, since the XPM header
+  sits about 60 bytes in. Upstream's data is allowed to be slightly broken; the script's job is
+  to say what it could read and refuse to guess about the rest.
+
+  **`Kind` now carries `pictures`, not just `artKey`.** `kinds.ts` read `pics` in full and kept
+  entry zero, which is why the file count and the first file's icon count were unavailable where
+  they were needed. `pics[1]=` is a **version specifier**, not a second entry — `darken.ld`'s
+  `pics=dnBlack2.xpm  pics[1]=dnBlack.xpm` looks like two files and is one, so `default3` is
+  reached by 318 kinds and none of them is `dnStart`. I wrote the opposite in a comment first and
+  the test caught it.
+
+  **`defaultCodeFor` refuses a key with no stated figure, naming it.** The available guess is
+  `default1`, and it is both a guess and the wrong picture, since `default1 = *` draws icon 0 of
+  whatever the level was choosing between. This is what makes the committed table's coverage a
+  hard requirement rather than a nicety.
+
+  14 mutations, all caught: the run count read as an icon count again · one icon treated as
+  several and several as one · grass given `default2` · the file-count rule removed · the refusal
+  turned into a guess · the refusal losing the key · a picture-less kind given a default ·
+  `pictures` keeping only the first file · the table losing its largest entry · a wrong figure ·
+  a missing key · an invented fourth zero · an unknown key answering 0 rather than null.
+
+  **One thing this could not check, and says so.** `picture-icons.test.ts` re-derives every figure
+  from the image where `.context/upstream-cuyo` exists, and prints that it did not where it does
+  not rather than returning quietly. That is a live skip of the kind 12.8 removed from
+  `render/palette.test.ts`, and the difference is that this one *cannot* be lifted — the tree is
+  gitignored and CI has no images — so coverage of the table is checked unconditionally and only
+  the figures are conditional.
+
+  **And a bound I guessed wrong.** The first version of the distribution test asserted no picture
+  exceeds 16 icons, reasoning that `schema16` is the widest schema. Measured: 46 of 222 exceed
+  16, up to `mbSchmelz1.xpm` at 512×1024 — 512 icons. Those are lettersets, backgrounds and
+  full-picture sets (`mpAlle.xpm`, `mflAlles.xpm`, `btScore.xpm`, `spLabyrinth.xpm`) which are
+  drawn by index too and are bounded by no schema. So the assertion is a distribution: 40 keys
+  have exactly 16 (the count group 8's compositor must produce for a `schema16` kind) and 30 have
+  exactly 1 (`default1`'s entire population), with the largest named rather than bounded.
+
 The order within a step is upstream's, not a guess. `cuyo.cpp:422-542` runs the border, random
 greys, the falling piece, the row transfer and the explosion test, then `Spielfeld::spielSchritt`,
 and only then `animiere()` at `cuyo.cpp:473` — **so the rules run first and the blobs' code last.**
@@ -792,7 +888,68 @@ and wiring without the defaults would leave the great majority of the corpus ine
 - [x] 15.1 Extract a level's Cual program from its parsed `.ld` and `globals.ld` into a value — the level's procedures, and for every kind the resolved draw code, being its own named procedure or the default its picture count selects — as a pure function of the two parsed files, and verify it across all 79 levels
 - [x] 15.2 Give `Kind` its draw code and `LevelDef` its program, and build both in `LevelLoader`, so a loaded level carries the code it is about to run
 - [x] 15.3 Replace `Blob`'s unused `vars: Int32Array` with a real `BlobStore`, allocated per blob against one shared `TimeSlices` per board, so each cell has the variable array `AccessField.at` has to hand back
-- [ ] 15.4 Implement `AccessField` over the live `Board` — `at`, `global`, `semiglobal`, `here`, `hex`, `hexShift`, `mirrored`, `players`, `fallCount` — and verify each against what the addressed access already does on a hand-built field
-- [ ] 15.5 Implement `Animatable` for one blob: its kind's draw code, its own store, and `animate()` as `braucheLeereStapel` then `initSchritt` then the code
-- [ ] 15.6 Run the blobs' code at the end of `Simulation.step()`, through `runStep`, in the order `cuyo.cpp:473` uses — and with the picture stacks cleared and one window opened around it
+- [x] 15.4 Implement `AccessField` over the live `Board` — `at`, `global`, `semiglobal`, `here`, `hex`, `hexShift`, `mirrored`, `players`, `fallCount` — and verify each against what the addressed access already does on a hand-built field — **the oracle is the *same* hand-built field 4.7 and 4.16 use.** `access.test.ts`'s builder moved to `engine/testing/field.ts` and both suites import it, because "the live board gives the same answers" is only a claim if the thing compared with is the thing 4.7 pinned; a second transcription in the new file would have been a third implementation of a rule that is already settled. `access.test.ts` is unchanged apart from the import — 17 tests, same assertions. The singletons' kinds went from the sentinels 99/100 to `blopart_global`/`blopart_semiglobal`, which nothing in 4.7 read.
+
+  `Simulation` grew what the two singletons need, because `AccessField.global` and `.semiglobal` have to have somewhere to come from: `global`, a per-side `semiglobals` table with `semiglobal(right)` over it, `players` and `fallCount()`, all created in `reset()` because upstream creates the global blob in `LevelDaten::startLevel` and a restart is a new level. Both are allocated against **the simulation's** `TimeSlices`, which is the part that is not obvious and is the reason a global blob with a counter of its own would read the board as of whenever its own window opened.
+
+  **Three decisions that are not mechanical, and `hexFlip` is a fourth.**
+
+  - **`height` is `GRY`, and upstream's is sometimes `GRY + 1`.** `getGrY()` returns `gry + 1` when `mRueberReihe` is set, and that is the *Rüberreihe* — the row one player hands to another. `bekommVielleichtReihe` asks `Cuyo::bitteUmReihe`, which is `mSpielfeld[!reSp]->bitteUmReihe(h)`, an index into a **second** field. Two-player is a non-goal, so `getGrY() === gry` here and the answer is the constant.
+  - **There is no hex edge row either, and that is the same mechanism.** `getFeld(x, y)` returns `mHexExtra[x]` for `y >= getGrY()` and `koordMalOK` allows `y < getGrY() + 1`, so upstream can address a row *past* the board and find a real blob. This `Board` has no such row, so `at` answers null at `y = GRY`. Measured over the corpus rather than assumed: no level addresses a literal row 20, and the shape that would find it is a level's `hex` code addressing one. **Recorded, not fixed** — inventing the row is a bigger change than the gap, and it is 7.x's territory if anything.
+  - **`at` applies `rechts_ok` itself,** not only `isReachable`. Upstream refuses a right-hand address before the field is indexed (`absort_feld`'s validity is `rechts_ok(rechts) && koordOK(x, y)`, and `finde()` is `getFeld`, which `CASSERT`s `koordMalOK`), so answering the *left* field's blob would be a read upstream cannot perform. `at` is reachable directly, so `isReachable` checking it too is not redundancy.
+  - **`hexflip` had to be put on `LevelDef`,** which is slightly beyond the task and not optional: `getHexShift` reads `mSechseck` *and* `mSechseckFlip`, so a per-column, per-side `hexShift` cannot be answered without it, and "the default every time" would have been a member that is not implemented. `settings.ts` parsed and range-checked `hexflip` from the start and the value was then dropped on the way to a `LevelDef` — the same shape of gap `presentation.test.ts` records for the renderer. **The renderer's own `hexflip` gap is untouched and still open:** `render/board.ts` calls `hexGeometry(level.neighbours)` with no flip, and it is a separate fix in a separate tier.
+
+  **The verification is a differential test with a non-vacuity guard, because "they agree" is worth nothing if nothing was ever reachable.** Twenty addresses cross every branch `resolveOrt` and `isReachable` have — both blanks, absolute and relative cell, both fall forms, all four half specifiers, four ways off the board — and the suite asserts that the list contains both verdicts, that the values read through it are not all the same, and that the connection mask is not zero. Three of the checks run the *same* battery on a hex board (`hexflip = 1`), on a mirrored board and with a right-hand half spelled, because `hex`, `hexShift` and `mirrored` change the answer only where they change it.
+
+  **The board is built from `startDist`, not placed by hand,** because `Simulation.reset` gives every blob its store from `makeBlob` on **this simulation's** `TimeSlices`. A blob with a counter of its own would answer every `getAlt` from its own history and the shadow rules would be untestable.
+
+  **Two things the first run got wrong, both from one cause.** The hand-built field reported kind 0 for every cell and the two fields disagreed on every neighbour pattern. `set` takes its shadow *before* it writes, and the field's slice counter was still 0 — so `getAlt` was reading the value from before the kinds were written. `neighbour-read.test.ts` documents exactly this and opens its slice before returning; the shared helper does not, and **the caller has to**, which is now a comment on `handBuilt()` in the test rather than a trap. The second was mine: `neighbourReader(field)("?1??????")` as a test for "hex has no horizontal connection" pins `ro`, not `rechts`; index 2 is `rechts`, and hex *does* have `ro`.
+
+  **Mutation-checked, twenty-three mutations, twenty-one caught.** The two that were not are the interesting ones, and both are the same fact: **deleting the adapter's own `x`/`y` bounds changes no answer**, because `Board.at` is `inBounds(x, y) ? cells[…] : null` and refuses first. Upstream checks those coordinates in two places too (`korrekt` in the caller, `CASSERT` in `finde`), so keeping both is faithful — but against the live board the guard is *untestable*, which is a claim about the test's reach and not a passing test. Rather than delete it or leave it unverified, the file now carries **one white-box test** that supplies the smallest `CualFieldHost` whose board does not bound-check, and asserts the four sides are refused. That matters for the hex edge row above: if the board behind `at` ever stops being a fixed 10x20 grid, that guard is what keeps the answer right. A twenty-third mutation (`global` returning an *occupied* board cell) was caught; an earlier version of it returning the *empty* cell at (0,0) was a no-op on this board and would have been recorded as an uncaught mutation that was really a badly chosen one.
+
+  **`fallCount` is a snapshot, and that is a constraint on the caller.** `AccessField.fallCount` is a `readonly number`, so the adapter reads `getFallAnz()` when the field is built; upstream reads it at each `korrekt()`. That is a divergence, and it is benign for a reason that is stated rather than hoped: the fall belongs to the rules, and `cuyo.cpp:422-542` finishes them before `animiere()` at line 473, so the count cannot change while a blob's code runs. Asserted rather than noted — a field built with a piece in play still says 2 after `sim.fall = null` — so 15.6 knows it has to build a field per blob per step.
+
+  22 tests. `engine/` coverage 93.9% statements and 88.2% branches against floors of 90 and 85, and the README table was **already stale before this** — it claimed 41 engine files and `render/` at 91.7% when HEAD measured 42 and 97.6% — so it is re-measured and corrected rather than only bumped.
+- [x] 15.5 Implement `Animatable` for one blob: its kind's draw code, its own store, and `animate()` as `braucheLeereStapel` then `initSchritt` then the code
+
+  **This found the largest thing wrong so far: no level's draw code could ever have run.** A comma sequence needs a busy flag, and `runCode` throws without one. `allocateSlots` was run over the **parsed** blocks only — but `linkCalls` *splices a copy* of a called procedure's body into the caller (`neueBusyNummern`), so those copies are different objects and appeared in no allocation ever made. **Every kind's draw code in the corpus is a spliced procedure**, so the first `,` in any level's animation would have thrown. Nothing had caught it because nothing in the project had ever *run* a level's code: 15.4 tested `AccessField` against a hand-built field, and 15.1 through 4.18 tested the pieces against hand-built stores. This is the lesson the AGENTS notes record about explosion tests, arriving a second time and for the same reason.
+
+  **The corpus's largest blob array moves from 112 slots to 807, and the old figure was wrong.** `blop.cpp:59` sizes every blob with `ld->mLevelKnoten->getDatenLaenge()`, read *after* the level loads; loading copies each kind's draw code and each copy's fresh flags come from `knoten->neueBoolVariable()` (`code.cpp:192`), which walks up to the parent (`knoten.cpp:545`) — so the level knoten grows by every copy, and the figure is read afterwards. `BoniMali2` measures 44 kinds, 68 declared variables and 23184 busy flags: 725 ints of flags plus the variables. Allocating over the linked trees as well was the fix, and the 112 was an under-count of a tree that could not run.
+
+  **One allocator, two trees, and each half counted once.** The parsed blocks are needed for *declarations* (`linkCalls` drops `var`/`default`, so allocating over the linked trees alone would hand back an array too short for every user variable) and the linked trees for *flags* (above). Both go into **one** call, because a busy flag is a bit in an `int` and `neueBoolVariable` allocates through the same `neueVariable` a `var` uses — two allocators would hand out colliding numbers. `AllocationOptions.bodiesLinked` says a procedure or `&held` body's *flags* are numbered where the copy is while its *declarations* are still numbered from the parsed body, and `withoutDeclarations` is the belt-and-brace that keeps a copy's `var` lines out. Measured: without it `BoniMali2` reaches 764 with the copies numbered *and* the parsed bodies numbered again; the two halves are not the same set.
+
+  **`var blitz` moves from slot 23 to 14, and the assertion changed rather than the number.** The old 23 depended on the 9 `int`s of flags `globals.ld`'s own procedures took, numbered once from the parsed blocks; correcting the allocation moves the flags, and `globals.ld` declares no variables of its own (measured), so nothing above `blitz` displaces it any more. What a caller can rely on is asserted instead: after the special variables, contiguous, in declaration order, no duplicates.
+
+  **`DrawContext.picture` had to become four getters.** `mal_code` reads `mDaten[spezvar_file]`, `[spezvar_pos]` and `[spezvar_quarter]` at the moment it draws, and `getSorte()` then too. Capturing them when the context was built — once per step — meant a level's own `file=…; pos=…; *` drew the *previous* step's picture, which is precisely the animation a level writes to avoid. Getters rather than a change to `DrawContext`, because that interface is 4.9's and is verified against `draw.test.ts`.
+
+  **Three namespaces, and the order is upstream's.** A name resolves as a **constant**, then a **system variable**, then a **declared** variable. Each of the first two was a real failure: `qu = Q_ALL` threw "no variable named 'Q_ALL'" because only `declaredSlots` was consulted, and `speicherPicsConst` ends with "Wenn es eine Konstante ist, wird auch noch eine Variable draus gemacht" — *if it is a constant, a variable is made of it too*. And `kind = 1` threw the same way, because `neueVarDefinition` refuses to redeclare one of the fourteen special slots, so system and user names are disjoint by construction and looking only in `declaredSlots` can never find either. A name that is none of the three throws **by name** rather than reading 0: zero is a legal value in Cual, so answering it would turn a level's typo into a level that quietly misbehaves.
+
+  **`Code::getStapelHoehe` is transcribed into its own file, and one node kind does not map one-to-one.** `getStapelHoehe(int & nsh)` reports two figures, not one: the depth of the blob's *own* stack (`mal_code` counts 1) and how many draws aim at a *neighbour's* (which needs depth there), and `leveldaten.cpp:545` adds the accumulated neighbour total to the running maximum of the own depths. `A*@(x,y)` is upstream a **two-node** sequence — `stapel_code(buchstabe_code(A), mal_code_fremd(ort))` (`parser.yy:604`) — while this port models it as one `letterDraw` with an optional position, so the addressed form has to contribute the neighbour count itself. Mapping `buchstabe_code => 0` for both shapes would silently halve the budget for every addressed letter draw.
+
+  **`KindChange.kindDefaults` is the one member the compiled trees cannot answer, so it is collected at load.** `linkCalls` drops the declarations it lives in, which is the same reason the slot pass needs the parsed blocks — and a `da_kind` default is read, not evaluated, at kind-change time (`getDefault(i)`), so it has to be folded *now*. `parser.yy`'s `echter_default: konstante` includes `+ - * / %`, unary minus and parentheses, each action computing the value, so `silbergold.ld`'s `default inhibit = DIR_LLU+DIR_LLD+DIR_RRD+DIR_RRU : reapply` is valid and upstream has the number long before a blob exists. Folding **reuses the evaluator** with a constants-only context rather than writing a second folder, so `divv`/`modd`'s rounding is 3.2's and not a second answer. Three things this surfaced, each of which a narrower rule would have got wrong: a name in a default is a **level** constant (`konstante: wort` is `getVerwandten`, so `jump.ld`'s `var farbe = farben : reapply` resolves in the `.ld` namespace and not Cual's); a default may name a **system variable** (`cual.6`: "Also, the default of a system variable can be changed this way", and `silbergold.ld` does exactly that with no `var` anywhere near it); and the search for declarations has to go to **every depth**, because `globals.ld` writes its `var` lines at the top of a procedure. All 79 levels load.
+
+  **The picture counts moved to load time, because `PictureSource` must not need the manifest.** `Kind.pictureCounts` is resolved through the art manifest in `loader.ts` — every file a kind declares, not just the first, because Cual's `file` variable indexes the whole list — so nothing in the game carries the manifest. Found by the same `ArtKeyError` that uncovered the previous commit's second bug: `inRosaNasen1.xpm` was a key nothing had ever asked for.
+
+  **`here` and `field` are asked per step rather than held, which is 15.4's constraint made structural.** `here` moves when the blob does and `AccessField.fallCount` is a snapshot, so a field cached across steps would answer with the fall count from whenever it was built. Asserted rather than noted: the harness counts how many times `deps.here()` was called across two steps. The stack a foreign draw lands on is likewise `deps.stackAt(field, x, y, right)` and never the asking blob's own — `BildStapel::speichereBild` puts it on the *target's*.
+
+  12 tests, over a synthetic level built through the real `buildLevelProgram` so the allocation, the busy slots and the `da_kind` defaults are the genuine articles. Four kinds cover a draw, a foreign draw, an addressed read and a kind change, and the order assertions are about **which step ran against whose state** rather than about the walker, which 4.1–4.12 own. **`engine/` coverage 93.3% statements and 87.0% branches against floors of 90 and 85.** Loading a level is now ~1000 nodes of allocation heavier, which pushes two of `tile-corpus.test.ts`'s sweeps past vitest's 5s default *under coverage instrumentation only* (1.1s and 0.4s outside it); their timeouts were raised to 30s with the measurement in a comment rather than the work trimmed.
+- [x] 15.6 Run the blobs' code at the end of `Simulation.step()`, through `runStep`, in the order `cuyo.cpp:473` uses — and with the picture stacks cleared and one window opened around it
+
+  **The first real run found three namespaces 15.5 was missing, and all three are corpus code.** `readConstant`'s refusal for a falling blob was the blocker, but the two cheaper ones were already broken and would have been found by any level that ran: the **15 `spezconst_*`** (`getSpezConst(spezconst_falling)` is neither a variable nor a compile-time constant — it reads the *game*, and `3d.ld` reads `falling`); **`Kind.baseKind`** (`sorte.cpp:234` reads a kind's own `basekind = <kind>` and it is **not** the kind's own number — six levels compare it with `==`, which is the shape that needs the remapping and not a synonym); and **kind names as values**, because `angst.ld` writes `basekind@(0,0) != Blob`. Upstream has **one** `DatenKnoten` per name; this port has four tables, so the lookup order *is* the namespace. Kind names go **last**, and that is the one order that could be wrong — upstream forbids the collision outright, so a variable silently winning is what makes such a collision visible instead of invisible.
+
+  **`pos_fall`'s half-cell geometry was refused in 5.x and became reachable here**, so it is its own commit rather than a footnote. `constants.ts` threw *"needs pos_fall's half-cell geometry, which is not written yet"*, and the refusal was right: `FallPos::getY` divides a **pixel** row by `gric` and `getXX`/`getYY` add a rotation offset from a 22-character digit table and `gric * sin(30°)`. **33 of the 79 levels read `loc_*`.** Transcribed into `engine/game-core/fall-geometry.ts` with three things kept as written rather than tidied — `mExtraX` added **raw** rather than scaled by `gric` (pinned as the literal form, because a later reader would otherwise multiply on entirely reasonable-sounding grounds); `y0 / gric` truncating toward zero so `Math.trunc` and not `Math.floor`, which differs for a piece above the border; and `getYY` returning from the border for an unplaced piece **before** reading the table, while `getXX` has no such branch because "where it will appear" is what `mPos.x` already means there. **The refusal stays** and now names what to do: no geometry supplied means a wiring gap, and the failure it prevents is a *wrong* answer, `getXX` differing from `getX` by a factor of `gric` plus the rotation offset.
+
+  **`ConstantSubject.fallCoordinates` is four numbers, not a callback.** `cual-runtime` must not import `engine/game-core`, so the arithmetic stays where it belongs and the interface is flat — which is enough because `readConstant` only ever asks about the *asking* blob, so a general interface would buy nothing. `fallIndex` is separate from `position.x` because for a fall `x` is the **absolute** column (which is what `@(x,y)` against a falling blob means) while `getX(a)` is `x + a`, and for a horizontal piece at column 3 those are 3 and 4.
+
+  **A next piece's blobs are `richtung_unplatziert`, not an orientation** — a fourth state, not a fifth. Answering `falling` 0 for one put its preview a whole row out and then tripped the geometry refusal, which is the confusing half of that bug and not the whole.
+
+  **`BlopGitter::animiere()` is column-major** (`for x { for y }`) and that is a real order, not a detail: a level whose left neighbour writes a variable its right neighbour reads depends on which column goes first. `field()` supplies all five of upstream's lists; the next piece is populated and info blobs are empty, which `runStep` skips anyway.
+
+  **The window is the simulation's `slices`, shared with the global and semiglobal stores.** An `@`-assignment is *deferred* — applied at `endGleichzeitig` — so that a blob reading its neighbour mid-step sees the beginning-of-step value. A per-blob queue would make each blob's `@`-write invisible to the next blob in the step, which is the whole mechanism. `AnimationDeps.window` became `AnimationDeps.slices` for exactly this: the wrapper type invented in 15.5 was not the thing `execute.ts` wanted, and `ExecutionContext.slices` needs the `TimeSlices` itself.
+
+  **`FallPiece` gains `mExtraX` and `mExtraDreh`.** `shift` sets the offset, because upstream's `rutschen` moves the *picture* by a cell and leaves `mPos.x` at the destination — so `loc_xx` for a sliding blob has to read it. `mExtraDreh` is **always 0 here, and that is upstream's value on every path this port has**: it is set by `dreheX`, the *fast* rotation, and `rotate` checks whether the destination is free and returns if not. Both are fields rather than nothing so that a hard-coded 0 at the use site stays distinguishable from "not modelled yet".
+
+  **The five effects are wired for real.** `explode` sets `exploding = 1`, so a level's `explode` reaches the same state machine the rules do and `testExplosions` finds it; `sound` queues per step because audio is group 11 and **a queued sample is assertable where a sample reaching a sound card is not**.
+
+  **Every stepping test got heavier**, because every step now animates: three tests crossed vitest's 5s default *under coverage instrumentation only* (1090ms, 692ms and 1188ms outside it) and were raised to 30s with the measurement in a comment. Trimmed instead would mean skipping the animation, which is the AGENTS-notes explosion failure arriving a third time. 8 scenario tests that were failing on `loc_x` now pass. **`engine/` coverage 93.4% statements and 87.6% branches.**
 - [ ] 15.7 Verify the wiring against the corpus: re-run the 12.3 survey and record how many of the 79 levels' outcomes changed, and name a level whose blobs now move on their own

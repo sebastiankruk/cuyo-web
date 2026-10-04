@@ -169,6 +169,25 @@ function applyOperation(write: DeferredWrite): void {
 /** `blopart_ausserhalb` in `sorte.h`. "Off the board", so a piece nobody has placed yet. */
 export const BLOBART_AUSSERHALB = -5;
 
+/**
+ * `blopart_keins`: the empty kind, and the only negative number a level may assign.
+ *
+ * `sorte.h:84`, and the whole block around it is the shape of upstream's numbering:
+ * `blopart_keins (-1)`, `blopart_global (-2)`, `blopart_semiglobal (-3)`,
+ * `blopart_info (-4)`, `blopart_min_sorte (-4)`, `blopart_ausserhalb (-5)`, and
+ * `blopart_farbe/gras/grau (-6/-7/-8)` which are *role* markers rather than numbers. The comment
+ * above them says "Die Nummern >= 0 sind die normalen Farbsorten" — numbers >= 0 are the normal
+ * colour kinds — so everything at or below -1 is a sentinel and **none of them occupies a slot**.
+ *
+ * That is why registering the empty kind costs nothing: it is -1, not an appended number.
+ *
+ * `blopart_min_cual` is also -1, commented "Letzte Art, auf die man ein Blop von cual aus noch
+ * setzen darf" — *the last kind a blob may be set to from Cual*. `baggis.ld`'s `kind = sbNix`
+ * does exactly that, which is why an assignment rather than a comparison is the thing that needs
+ * this to be a real number.
+ */
+export const BLOPART_LEER = -1;
+
 /** `viertel_alle` in `bilddatei.h`. "All four quarters", i.e. unrotated. */
 export const VIERTEL_ALLE = -1;
 

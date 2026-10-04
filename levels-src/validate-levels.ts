@@ -267,12 +267,19 @@ function compileLevel(
 
   // Every picture the level names must resolve through the manifest - the same call,
   // with the same failure, that the game makes at load time.
+  //
+  // **`kind.pictures`, not `kind.artKey`,** and every entry rather than the first. `artKey` is
+  // the renderer's colour key and falls back to a kind's own name when the kind declares no
+  // `pics` list of its own - `Zahn`'s grey kind is named `Grau`, which is not a picture file and
+  // never was. And sweeping only the first file of a kind left 566 of the corpus's 792 keys
+  // outside this check entirely.
   for (const kind of table.value.kinds) {
-    if (kind.artKey === "") continue;
-    const resolved = capture(origin, "art-key", () =>
-      resolveArtKey(ART_MANIFEST, kind.artKey, kind.name, origin.file),
-    );
-    if (!resolved.ok) return fail(resolved);
+    for (const key of kind.pictures) {
+      const resolved = capture(origin, "art-key", () =>
+        resolveArtKey(ART_MANIFEST, key, kind.name, origin.file),
+      );
+      if (!resolved.ok) return fail(resolved);
+    }
   }
 
   return {

@@ -1046,21 +1046,24 @@ describe("upstream corpus: art keys", () => {
           }
           levels++;
           for (const kind of table.kinds) {
-            if (kind.artKey === "") continue;
-            seen.set(
-              kind.artKey,
-              `${name} ${def.name}[${version.toString()}] ${kind.name}`,
-            );
-            try {
-              resolveArtKey(
-                ART_MANIFEST,
-                kind.artKey,
-                kind.name,
-                `${name} ${def.name}`,
-              );
-              resolved++;
-            } catch (error) {
-              missing.push((error as Error).message);
+            // **`kind.pictures`, not `kind.artKey`.** The manifest's claim is that every
+            // *picture file a level names* has an entry, and `artKey` is not that: for a kind
+            // declared by a `greypic` or `startpic` word it falls back to the kind's own name,
+            // which upstream never opens an image for. Sweeping `artKey` therefore asked for
+            // pictures that do not exist — `unterwasser.ld`'s `greypic=ibwSchuh.xpm` resolved
+            // to a real file on disk, so it passed by luck, while `Hormone`'s `ihGrau` is not a
+            // file at all and failed.
+            //
+            // It also swept only the *first* picture of each kind, which is how 566 of the
+            // corpus's 792 keys went unregistered until 15.5 asked for a count per file.
+            for (const key of kind.pictures) {
+              seen.set(key, `${name} ${def.name}[${version.toString()}] ${kind.name}`);
+              try {
+                resolveArtKey(ART_MANIFEST, key, kind.name, `${name} ${def.name}`);
+                resolved++;
+              } catch (error) {
+                missing.push((error as Error).message);
+              }
             }
           }
         }
@@ -1068,10 +1071,15 @@ describe("upstream corpus: art keys", () => {
     }
 
     expect(missing, `\n${missing.slice(0, 20).join("\n")}`).toEqual([]);
+    // Exact rather than a floor, which is the point of `12.8`: the floors this replaced
+    // (`> 150` distinct keys, `> 1000` resolutions) were slack enough to hide the loss of a
+    // fifth of the corpus, which is roughly what happened when only `artKey` was swept — 226
+    // keys registered where there are 792.
+    expect(seen.size, "distinct art keys referenced").toBe(792);
+    expect(resolved, "art key resolutions across three versions").toBeGreaterThan(2000);
     expect(levels, "levels resolved").toBeGreaterThan(150);
-    expect(resolved, "art keys resolved").toBeGreaterThan(1000);
-    // Distinct keys rather than references, which is what the manifest holds.
-    expect(seen.size, "distinct art keys referenced").toBeGreaterThan(150);
+    // Distinct keys rather than references, which is what the manifest holds: a manifest
+    // carrying a key nothing references is as wrong as one missing a key something does.
     expect(
       manifestKeys(ART_MANIFEST).length,
       "manifest carries keys nothing references",

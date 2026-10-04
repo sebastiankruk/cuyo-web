@@ -66,6 +66,8 @@ interface Hud {
   phase: Phase;
   frameMs: number;
   steps: number;
+  /** Why the loop stopped stepping, or null while it is running. */
+  failure: string | null;
 }
 
 const INITIAL_HUD: Hud = {
@@ -75,6 +77,7 @@ const INITIAL_HUD: Hud = {
   phase: "falling",
   frameMs: 0,
   steps: 0,
+  failure: null,
 };
 
 export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
@@ -186,6 +189,7 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
           phase: s.phase,
           frameMs: loop.frameMs,
           steps: loop.steps,
+          failure: loop.failure,
         });
       }
     });
@@ -481,6 +485,17 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
       </nav>
 
       <footer className="play__dev">
+        {/*
+          The failure, **in the dev overlay rather than hidden**, because 24 of the 79 levels
+          throw as soon as their Cual code runs and the loop now stops stepping instead of
+          throwing once a frame forever. A frozen board with no explanation is the report I
+          cannot act on; this names the cause, in place, on the board that froze.
+        */}
+        {hud.failure !== null && (
+          <span className="play__dev-failure">
+            stopped: {hud.failure}
+          </span>
+        )}
         <span>
           {hud.phase} · step {hud.steps} · {hud.frameMs.toFixed(0)} ms/frame
         </span>

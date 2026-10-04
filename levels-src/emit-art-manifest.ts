@@ -18,72 +18,30 @@
  *
  * Nothing here ships to the browser. The output is a TypeScript module of plain data,
  * imported by the game at build time and bundled like any other.
+ *
+ * ## The one-way dependency on `transcribe-picture-icons.ts`, and why it fails loudly
+ *
+ * Each entry carries an icon count, which is the picture's and cannot be derived from the key
+ * text. This script *discovers* the keys; `transcribe-picture-icons.ts` *measures* them against
+ * upstream's spritesheets and writes `engine/level-format/picture-icons.ts`. So the order is
+ * this script, then that one, then this one again — and **a key with no figure is a thrown
+ * error rather than a 0**, because a 0 is a real value meaning "this key is not a picture" and
+ * a figure of 0 would quietly pick `default1` for a picture with sixteen faces.
+ *
+ * In practice the committed table already covers the committed manifest, so neither run is part
+ * of `make check`. Only adding a level changes that, and then the error says which target to run.
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseLd } from "../engine/level-format/parser.ts";
-import { Version } from "../engine/level-format/version.ts";
-import { DefinitionScope, rootScope } from "../engine/level-format/scope.ts";
-import { buildKinds } from "../engine/level-format/kinds.ts";
-import {
-  kindDefaultsFrom,
-  readLevelSettings,
-} from "../engine/level-format/settings.ts";
 import { artManifest } from "../engine/level-format/art.ts";
 import type { ArtEntry, ArtManifest } from "../engine/level-format/art.ts";
-import {
-  availableLevelFiles,
-  readGlobals,
-  readLevelFile,
-} from "./level-sources.ts";
+import { iconCountOf } from "../engine/level-format/picture-icons.ts";
+import { collectReferences } from "./picture-keys.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(HERE, "generated/art-manifest.ts");
-
-/** The versions to resolve, matching the corpus oracle's list. */
-const VERSIONS = [
-  Version.of("1", "main"),
-  Version.of("2", "main"),
-  Version.of("1", "contrib", "hard"),
-];
-
-/** One picture reference, as found in a level. */
-interface Reference {
-  readonly key: string;
-  readonly kind: string;
-  readonly origin: string;
-}
-
-/**
- * Every `.ld` file that may declare a level.
- *
- * `summary.ld` is the index rather than a level, and `globals.ld` holds the shared
- * definitions both are resolved against. `example.ld` is documentation: its picture
- * names are illustrative and would put keys in the manifest that no level uses.
- */
-/**
- * Every level file, from both committed sources.
- *
- * A contributed level naming a picture the vendored levels do not use must still get an
- * entry, or the build fails for the level that is supposed to be adding to the game.
- * Failing on an unknown key is the point of the manifest, and a contributed level is
- * exactly the case it exists to catch.
- */
-function levelFiles(): string[] {
-  const files = availableLevelFiles().filter((f) => f !== "globals.ld");
-  // Zero is not a legitimate state here. There are 79 vendored levels, so an empty
-  // list means an incomplete checkout or a changed directory layout - and an empty
-  // manifest would silently blank every level rather than fail.
-  if (files.length === 0) {
-    throw new Error(
-      "No level files found in levels/upstream/ or levels/. The vendored levels are " +
-        "committed, so this is an incomplete checkout rather than a missing fetch.",
-    );
-  }
-  return files;
-}
 
 /**
  * The generated appearance for a picture.
@@ -118,55 +76,6 @@ function generatedSource(key: string): ArtEntry["source"] {
   return { kind: "generated", hue, saturation, lightness };
 }
 
-/** Collects every picture name the bundled levels reference. */
-function collectReferences(): {
-  refs: Reference[];
-  files: number;
-  levels: number;
-} {
-  const globals = parseLd(readGlobals(), "globals.ld");
-  const refs: Reference[] = [];
-  let files = 0;
-  let levels = 0;
-
-  for (const file of levelFiles()) {
-    const parsed = parseLd(readLevelFile(file), file);
-    const sections = parsed.definitions.filter(
-      (d) => d.value.type === "section",
-    );
-    if (sections.length === 0) continue;
-    files++;
-
-    for (const version of VERSIONS) {
-      const root = rootScope(file, version);
-      root.defineAll(globals.definitions);
-      root.defineAll(parsed.definitions);
-      for (const def of sections) {
-        if (def.value.type !== "section") continue;
-        const level = new DefinitionScope(def.name, root, version, file);
-        level.defineAll(def.value.definitions);
-        levels++;
-        let table;
-        try {
-          const settings = readLevelSettings(level);
-          table = buildKinds(level, kindDefaultsFrom(settings));
-        } catch {
-          // A level that cannot be resolved contributes no references. The
-          // validator (task 2.13) is what reports that; this step's job is to
-          // collect picture names, not to duplicate its diagnostics.
-          continue;
-        }
-        const where = `${file} ${def.name}[${version.toString()}]`;
-        for (const kind of table.kinds) {
-          if (kind.artKey === "") continue;
-          refs.push({ key: kind.artKey, kind: kind.name, origin: where });
-        }
-      }
-    }
-  }
-  return { refs, files, levels };
-}
-
 /** The manifest source, as a module with no imports so it is trivially auditable. */
 function emit(
   manifest: ArtManifest,
@@ -183,6 +92,7 @@ function emit(
         return `  {
     key: ${JSON.stringify(entry.key)},
     source: { kind: "image", path: ${JSON.stringify(entry.source.path)} },
+    icons: ${entry.icons},
     firstKind: ${JSON.stringify(entry.firstKind)},
   },`;
       }
@@ -194,6 +104,7 @@ function emit(
       saturation: ${entry.source.saturation},
       lightness: ${entry.source.lightness},
     },
+    icons: ${entry.icons},
     firstKind: ${JSON.stringify(entry.firstKind)},
   },`;
     });
@@ -206,6 +117,12 @@ function emit(
 //
 // The artwork is generated from each key rather than authored, and upstream's
 // spritesheets are deliberately not shipped - see scripts/check-no-upstream-art.sh.
+//
+// \`icons\` is the one number here that is not derivable from the key text: how many icons
+// the picture has, which decides both the default draw code a kind runs and whether a
+// \`pos\` Cual asks for is in range. It comes from engine/level-format/picture-icons.ts,
+// which is transcribed from upstream's image dimensions and committed, because there is no
+// image at run time to measure.
 
 import { artManifest } from "../../engine/level-format/art.ts";
 import type { ArtEntry } from "../../engine/level-format/art.ts";
@@ -227,21 +144,28 @@ function main(): void {
         `which would silently emit an empty manifest and blank every level.`,
     );
   }
-  // Deduplicate by key, keeping the first kind that used it.
-  //
-  // There is deliberately no conflict check here. A picture's role can differ between
-  // versions of one level - `ziehlen.ld` uses `mziAlle.xpm` as a colour at
-  // [1, main] and as a goal blob at [1, contrib, hard] - and role belongs to the
-  // level's kind, which the game already has. An earlier version of this file
-  // rejected that as a conflict and refused to emit a manifest, which was wrong.
-  const byKey = new Map<string, Reference>();
-  for (const ref of refs) if (!byKey.has(ref.key)) byKey.set(ref.key, ref);
+  // Already deduplicated by the sweep, which owns the first-kind-wins rule.
+  const byKey = new Map(refs.map((ref) => [ref.key, ref]));
 
-  const entries: ArtEntry[] = [...byKey.values()].map((ref) => ({
-    key: ref.key,
-    source: generatedSource(ref.key),
-    firstKind: ref.kind,
-  }));
+  // Named before the map, so the failure can say how many keys are missing rather than only the
+  // first — a level adding a kind with three pictures would otherwise take three runs.
+  const missingIcons = [...byKey.keys()].filter((key) => iconCountOf(key) === null);
+  const entries: ArtEntry[] = [...byKey.values()].map((ref) => {
+    const icons = iconCountOf(ref.key);
+    if (icons === null) {
+      throw new Error(
+        `art-manifest: picture '${ref.key}' (first seen on kind ${ref.kind}) has no stated ` +
+          `icon count, so it cannot be emitted. Run \`make picture-icons\` — it needs \`make ` +
+          `fetch-corpus\` first — and then run this again. ${missingIcons.length} key(s) in all.`,
+      );
+    }
+    return {
+      key: ref.key,
+      source: generatedSource(ref.key),
+      icons,
+      firstKind: ref.kind,
+    };
+  });
 
   const manifest = artManifest(entries);
   mkdirSync(dirname(OUT), { recursive: true });

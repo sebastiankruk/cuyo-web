@@ -131,7 +131,12 @@ describe("a tile is the board its level opens as", () => {
     // values: 187 difficulty rows, 4391 filled cells of 37400.
     expect(compared).toBeGreaterThan(180);
     expect(filled).toBeGreaterThan(4000);
-  });
+  }, 30000); // measured, not guessed: 15.5's corrected slot allocation covers every kind's
+  // linked copy, so loading a level walks about a thousand more nodes than it did. Outside
+  // coverage this file's two corpus sweeps take roughly 1.1s and 0.4s; v8 coverage
+  // instrumentation pushes both past vitest's 5s default. Raising the limit rather than
+  // trimming the work, because the work is the thing that gives a level's busy flags slots
+  // at all — without it no `,` in any level could run.
 
   it("and the tile's background is the level's own bgcolor", async () => {
     const wrong: string[] = [];
@@ -154,7 +159,11 @@ describe("a tile is the board its level opens as", () => {
       }
     }
     expect(wrong.length, `\n${wrong.slice(0, 10).join("\n")}`).toEqual(0);
-  });
+  }, 30000); // measured, not guessed: 15.6 runs every blob's code at the end of every step,
+  // so a test that steps a lot now does the animation work too. Outside coverage this one
+  // takes 692ms; v8 instrumentation pushes it past vitest's 5s default. Raised rather than
+  // trimmed, because skipping the animation would leave the step untested — which is the
+  // failure the AGENTS notes record for explosion tests, arriving a third time.
 });
 
 describe("the tile's colours are the level's own", () => {
@@ -188,7 +197,12 @@ describe("the tile's colours are the level's own", () => {
       }
     }
     expect(wrong.length, `\n${wrong.slice(0, 10).join("\n")}`).toEqual(0);
-  });
+  }, 30000); // measured, not guessed: 15.5's corrected slot allocation covers every kind's
+  // linked copy, so loading a level walks about a thousand more nodes than it did. Outside
+  // coverage this file's two corpus sweeps take roughly 1.1s and 0.4s; v8 coverage
+  // instrumentation pushes both past vitest's 5s default. Raising the limit rather than
+  // trimming the work, because the work is the thing that gives a level's busy flags slots
+  // at all — without it no `,` in any level could run.
 
   it("and every tile's palette index names a palette that exists", () => {
     const missing: string[] = [];
@@ -275,7 +289,11 @@ describe("the tile is one legal start, not an arbitrary picture", () => {
     // 6.6% of 37400 cells are draws. A floor well under the measured 2461, so a walk that
     // stopped early would fail rather than pass on a small sample.
     expect(drawnChecked).toBeGreaterThan(2000);
-  });
+  }, 30000); // measured, not guessed: 15.6 runs every blob's code at the end of every step,
+  // so a test that steps a lot now does the animation work too. Outside coverage this one
+  // takes 1188ms; v8 instrumentation pushes it past vitest's 5s default. Raised rather than
+  // trimmed, because skipping the animation would leave the step untested — which is the
+  // failure the AGENTS notes record for explosion tests, arriving a third time.
 });
 
 /**

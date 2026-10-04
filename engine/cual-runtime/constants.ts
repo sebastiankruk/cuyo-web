@@ -138,8 +138,40 @@ export interface ConstantSubject {
    * 0 for a stationary blob and not "false by another route".
    */
   readonly fall: { readonly extraTurn: number; readonly fast: boolean } | null;
+  /**
+   * **Which of the piece's two blobs is asking** — upstream's `absort_fall(rechts, 0)` or
+   * `absort_fall(rechts, 1)`, the `a` in `FallPos::getX(a)`.
+   *
+   * Separate from {@link position}, whose `x` for a fall is the *absolute* column — that is what
+   * `@(x,y)` against a falling blob means, and the two differ: a horizontal piece at column 3 has
+   * its second blob at column 4 with `a == 1`, while `getX(1)` is `3 + 1`.
+   */
+  readonly fallIndex: number;
   /** `getVariableVergangenheit(spezvar_am_platzen)` — slot 13, the shadow read. */
   readonly exploding: number;
+  /**
+   * The four coordinates of a **falling** blob, and absent for anything else.
+   *
+   * Computed by the caller rather than asked for here, because the arithmetic is the fall
+   * simulation's own — `FallPos::getX/getY` and `Fall::getXX/getYY`, half-cell trigonometry for a
+   * hexagonal grid — and `cual-runtime` must not know about `engine/game-core`. Four numbers
+   * rather than a callback, because `readConstant` never asks about a *different* blob: every
+   * question here is about the one whose code is running, which is why the caller's answer is
+   * enough and a general interface would not be.
+   *
+   * `cellX`/`cellY` are in cells, `pixelX`/`pixelY` in pixels, which is the same split as
+   * `loc_x`/`loc_y` against `loc_xx`/`loc_yy` and for the same reason: upstream's `getXX` is
+   * "where is the picture drawn" and `getX` is "which cell is it over".
+   */
+  readonly fallCoordinates?: FallCoordinates;
+}
+
+/** The four coordinates of a falling blob, from `fall-geometry.ts`. */
+export interface FallCoordinates {
+  readonly cellX: number;
+  readonly cellY: number;
+  readonly pixelX: number;
+  readonly pixelY: number;
 }
 
 /**
@@ -222,7 +254,22 @@ export function readConstant(name: string, subject: ConstantSubject): number | n
       return 1;
     case "loc_x":
     case "loc_y":
-      // Only answered here for a blob actually on a cell; `break` otherwise.
+      // **A falling blob goes through the fall's own geometry**, not the board's. `getX`/`getY`
+      // delegate to `FallPos`, whose `getY` divides a *pixel* row by `gric` and whose two blobs
+      // can be in different rows for a horizontal piece on a hex board. Approximating with the
+      // cell coordinates would be half a row out for every rotated piece, so this used to throw.
+      //
+      // Asked for as a closure rather than an interface, because `engine/` must not be imported
+      // here (a layer rule: `cual-runtime` knows nothing about the board), and the fall's
+      // geometry is genuinely a *fall* concern — `fall-geometry.ts` owns it.
+      if (position.kind === "fall") {
+        const at = subject.fallCoordinates;
+        // `absort_nirgends` upstream throws; the default of -1 is this table's own default for a
+        // coordinate it cannot place, and a fall with no geometry is a wiring gap rather than a
+        // thing the level did wrong.
+        if (at === undefined) break;
+        return name === "loc_x" ? at.cellX : at.cellY;
+      }
       if (position.kind === "cell") {
         // `ld->mSpiegeln ? grx - 1 - mOrt.x : mOrt.x`
         return name === "loc_x"
@@ -260,16 +307,20 @@ export function readConstant(name: string, subject: ConstantSubject): number | n
     }
   }
 
-  // A falling piece's own coordinates come from `pos_fall`'s half-cell geometry, not from its
-  // cell: `Fall::getX` delegates to `mPos.getX(a)`, and `getXX`/`getYY` index a digit table by
-  // rotation and add trigonometric offsets. That is the fall simulation's own geometry, and
-  // it is refused here rather than approximated with the cell coordinates — the approximation
-  // would differ by half a cell for every rotated fall, and the default of -1 would be a
-  // silent wrong answer rather than an absent one.
+  // `loc_xx` and `loc_yy` for a falling piece, from the same supplied geometry as `loc_x`/`loc_y`
+  // above. `getXX`/`getYY` add a rotation offset from a digit table and `gric * sin(30°)`, which is
+  // `fall-geometry.ts`'s — and `getXX` genuinely differs from `getX`, so falling back to the cell
+  // coordinates here would be a silent wrong answer rather than an absent one. **Still refused**
+  // when the caller supplied nothing, because that is a wiring gap and not something the level did.
   if (position.kind === "fall") {
-    throw new Error(
-      `Cual: '${name}' of a falling piece needs pos_fall's half-cell geometry, which is not written yet`,
-    );
+    const at = subject.fallCoordinates;
+    if (at === undefined) {
+      throw new Error(
+        `Cual: '${name}' of a falling piece needs pos_fall's half-cell geometry, which this ` +
+          `caller did not supply. Build the coordinates with engine/game-core/fall-geometry.ts.`,
+      );
+    }
+    return name === "loc_xx" ? at.pixelX : at.pixelY;
   }
 
   // `BlopGitter::getSpezConst` — the board, for the half-cell coordinates.

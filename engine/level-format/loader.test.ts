@@ -18,6 +18,9 @@ import { ART_MANIFEST } from "../../levels-src/generated/art-manifest.ts";
 import { ScriptedPrng } from "../testing/prng-stub.ts";
 import { LEVEL_INDEX } from "../../levels-src/generated/level-index.ts";
 import type { Track } from "./index-data.ts";
+import type { LevelDef } from "./level-data.ts";
+import { EMPTY } from "../game-core/board.ts";
+import { BLOPART_LEER } from "../cual-runtime/store.ts";
 
 /**
  * The committed level files.
@@ -342,6 +345,14 @@ describe("LevelLoader: what it produces", () => {
   it("fails when a picture is not in the manifest, naming the key", async () => {
     // The art check happens at load, so a missing key is a diagnostic rather than a
     // blank cell discovered by a player.
+    //
+    // **The missing key is on a kind's *own* `pics` list**, which is the only place a picture
+    // is looked up from. This used to put `fehlt.xpm` in the *level's* list, which declared
+    // the three kinds but attached no picture to any of them — so with the lookup moved to
+    // `kind.pictures` the test stopped failing, which is the correct behaviour and made the
+    // test a lie. Upstream reads a kind's pictures from its own section (`getKind` does not
+    // look at the parent), so that is where the key has to be.
+    //
     // Real `.ld` syntax, copied from a level file: definitions are `Name={` with no
     // spaces, lists are comma-separated, and a picture name may or may not carry an
     // extension - both forms occur upstream.
@@ -350,11 +361,12 @@ describe("LevelLoader: what it produces", () => {
       '  name="Test"',
       '  author="Nobody"',
       "  numexplode=4",
-      "  pics=inGruen.xpm,inGelb.xpm,fehlt.xpm",
+      "  pics=inGruen.xpm,inGelb.xpm,inGras.xpm",
       "  greypic=inGrau.xpm",
       "  startpic=inGras.xpm",
       "  emptypic=Grau",
       '  startdist=".........."',
+      "  inGruen={ pics=fehlt.xpm }",
       "}",
       "",
     ].join("\n");
@@ -418,3 +430,86 @@ function primaryOf(entry: { tracks: ReadonlyMap<Track, number> }): Track {
   }
   return "all";
 }
+
+describe("the empty kind's name", () => {
+  /**
+   * `emptypic = Leer` makes `Leer` the number -1, which is what makes `Theater`'s
+   * `if kind@(0,-1) == Leer` and `Baggis`'s `kind = sbNix` resolve.
+   *
+   * `knoten.cpp:393` registers it as `VarDefinition("Leer", blopart_keins, vd_konstante, da_nie, 0)`
+   * in **`namespace_variable`** — the namespace `parser.yy:738`'s `ausdruck: variable` looks in, so
+   * `istKonstante()` is true and the name is substituted at parse time as `zahl_acode(-1)`.
+   *
+   * **And the name is often a section too**, with real code in it (`baggis.ld`'s `sbNix={ … }`), so
+   * the answer must not come from the scope's definition map: upstream keeps sections and
+   * `namespace_variable` apart, this port has one map per scope, and an earlier attempt at this
+   * registered it there and made three levels fail to *load*.
+   */
+  async function loaded(emptypic: string, extra = ""): Promise<LevelDef> {
+    const source = [
+      "Empty={",
+      '  name="Empty"',
+      '  author="Nobody"',
+      "  numexplode=4",
+      "  pics=inGruen.xpm,inGelb.xpm",
+      "  greypic=inGrau.xpm",
+      "  startpic=inGras.xpm",
+      `  emptypic=${emptypic}`,
+      '  startdist="...."',
+      extra,
+      "}",
+      "",
+    ].join("\n");
+    const { fetchLevel } = countingFetcher({ "empty.ld": source, "globals.ld": "" });
+    const loader = new LevelLoader({
+      fetchLevel,
+      art: ART_MANIFEST,
+      globalsSource: "",
+      random: prng(1),
+    });
+    return (await loader.load("empty.ld", "Empty", "main")).level;
+  }
+
+  it("resolves the emptypic name to -1, which is blopart_keins", async () => {
+    const level = await loaded("Leer");
+    expect(level.levelNumber("Leer")).toBe(-1);
+    // It is registered under the **stripped** name, as `speicherKnotenConst`'s `picsEndungWeg`
+    // does, so Cual reads `Leer` and not `Leer.xpm`.
+    expect(level.levelNumber("Leer.xpm")).toBeNull();
+    // (`maze.ld` is the one corpus level that writes an extension — `emptypic=mlHinter.xpm` —
+    // so the stripping is load-bearing rather than theoretical.)
+    // And the empty kind is -1 for the board too, so a blob and a Cual comparison agree.
+    expect(EMPTY).toBe(-1);
+    expect(BLOPART_LEER).toBe(-1);
+  });
+
+  it("resolves it even when the name is also a section with code in it", async () => {
+    // The shape `baggis.ld` has: `emptypic=sbNix` *and* `sbNix={ … }`. Both must work, and neither
+    // may break the other — which is the whole reason this is answered outside the scope.
+    const level = await loaded("sbNix", "  sbNix={\n    weight=1\n  }");
+    expect(level.levelNumber("sbNix")).toBe(-1);
+    // The kind is not renumbered into the `pics` sequence to make room for it.
+    expect(level.kinds.map((kind) => kind.name)).not.toContain("sbNix");
+    expect(level.kinds[0]?.id).toBe(0);
+  });
+
+  it("leaves every other name alone, including one that looks like a kind", async () => {
+    const level = await loaded("Leer");
+    expect(level.levelNumber("Leer")).toBe(-1);
+    // A name nothing defines is still null rather than a throw. `nothing` is *not* such a
+    // name: it is one of the engine's predefined ones and resolves to -1, like Cual's own table.
+    expect(level.levelNumber("inGruen")).toBeNull();
+    expect(level.levelNumber("noSuchNameAnywhere")).toBeNull();
+  });
+
+  it("resolves the name even when the level spells it 'nothing', which means no picture", async () => {
+    // **`emptypic = nothing` is upstream's "no empty picture"** and `readEmptyArtKey` maps it to
+    // `""`. So the *kind* is still created — `leveldaten.cpp:511` says "Auch, wenn es kein
+    // Leer-Bildchen gibt, soll es geladen werden" — but `speicherKnotenConst` never ran for it,
+    // because it is guarded on there being a word. Which means there is no name for Cual to ask
+    // about, and `nothing` resolves to -1 only because it is one of the engine's predefined
+    // numbers in its own right.
+    const level = await loaded("nothing");
+    expect(level.levelNumber("Leer")).toBeNull();
+  });
+});

@@ -54,6 +54,30 @@ export interface ArtEntry {
   readonly key: string;
   readonly source: ArtSource;
   /**
+   * How many icons this picture has.
+   *
+   * `Bilddatei::anzBildchen()`, which is `(breite/gric) * (hoehe/gric)` at `gric` = 32 —
+   * upstream computes it from the image and this project does not ship the images, so the
+   * number is stated here and transcribed by `levels-src/transcribe-picture-icons.ts`. See
+   * `engine/level-format/picture-icons.ts` for why it is committed rather than measured.
+   *
+   * **Two decisions hang off it**, and both are silent when it is wrong:
+   *
+   * - `Sorte::ladeCualEvents` (`src/sorte.cpp:104-130`) picks the default draw code from it:
+   *   more than one picture *file* is `default3`, one file with several icons is
+   *   `default2`/`default2g`, and a single-icon file is `default1`. Those draw visibly
+   *   different things.
+   * - `BildStapel::speichereBild` refuses a `pos` outside it, because blitting past the end of
+   *   a file would draw whatever follows it there.
+   *
+   * **Never zero for a key that is in the manifest.** A kind declared by a `greypic` or
+   * `startpic` *word* has no picture file at all unless its own section declares `pics`, and
+   * upstream opens no image for one — so such a kind has no key here rather than a key with no
+   * icons. That is the fix for a confusing earlier state, where `artKey` fell back to the kind's
+   * own name and four kind names were registered as pictures with zero icons.
+   */
+  readonly icons: number;
+  /**
    * The kind this picture was first seen on.
    *
    * Recorded so a resolution failure can say which kind asked for the missing key,

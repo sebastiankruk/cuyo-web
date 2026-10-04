@@ -42,6 +42,13 @@ function makeKinds(specs: readonly KindSpec[], chainGrass: boolean): Kind[] {
       name: s.name,
       role,
       artKey: role === "empty" ? "" : s.name,
+      baseKind: nextId,
+      // No fixture models a picture *list*, so a fixture kind has no picture files and
+      // `artKey` above is the kind's name rather than a picture. That is the same shape as a
+      // real kind declared by a `greypic` word, which is what a fixture with no `pics` is.
+      pictures: [],
+      // No fixture models a picture list, so there are no counts to state.
+      pictureCounts: [],
       versions: s.versions ?? 1,
       weight: s.weight ?? 1,
       behaviour: defaultBehaviour(role, chainGrass),
@@ -95,6 +102,8 @@ export function nasenkugeln(): LevelDef {
     kinds: withExplode,
     emptyKind: -1,
     neighbours: NeighbourMode.Rect,
+    // `hexflip` defaults to 0 and is only read in a hex mode; neither fixture is one.
+    hexFlip: 0,
     chainGrass: false,
     topTime: DEFAULT_TOPTIME,
     hetzrandStop: 0,
@@ -110,6 +119,8 @@ export function nasenkugeln(): LevelDef {
     // startdist = "**********": ten goal blobs, each of the single goal kind.
     startDist: layout([[5, 5, 5, 5, 5, 5, 5, 5, 5, 5]]),
     program: EMPTY_PROGRAM,
+    // A fixture defines no `.ld` names, so every lookup misses.
+    levelNumber: () => null,
   };
 }
 
@@ -138,6 +149,7 @@ export function hormone(): LevelDef {
     kinds: withExplode,
     emptyKind: -1,
     neighbours: NeighbourMode.Diagonal,
+    hexFlip: 0,
     chainGrass: true,
     topTime: DEFAULT_TOPTIME,
     hetzrandStop: 0,
@@ -153,6 +165,8 @@ export function hormone(): LevelDef {
     // One row of goal blobs, as `startdist = "AAAAAAAAAA"` for one player.
     startDist: layout([[4, 4, 4, 4, 4, 4, 4, 4, 4, 4]]),
     program: EMPTY_PROGRAM,
+    // A fixture defines no `.ld` names, so every lookup misses.
+    levelNumber: () => null,
   };
 }
 
