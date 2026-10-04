@@ -57,7 +57,13 @@ export function stapelHoeheOf(statements: readonly Stmt[]): StapelHoehe {
   let foreign = 0;
   for (const statement of statements) {
     const height = stapelHoeheOfStatement(statement);
-    own = Math.max(own, height.own);
+    // **A sum, and this was a maximum until 15.7.** A `code` list is `stapel_code`, upstream is
+    // `mF1 + mF2`, and every part runs in the same step onto the same stack — so `a; b; c` with
+    // three draws needs three layers, not one. The maximum was reached for because the two
+    // *branch* nodes also sum to here and taking the max hid the difference: `pfeile.ld`'s kinds
+    // hold 30 `draw` nodes between them and the budget came out 1, so the second real draw of the
+    // first step threw "too many pictures drawn for one single blob".
+    own += height.own;
     foreign += height.foreign;
   }
   return { own, foreign };
@@ -72,10 +78,9 @@ function stapelHoeheOfStatement(node: Stmt): StapelHoehe {
     case "sharedCall":
       return stapelHoeheOf(node.body);
 
-    // `stapel_code: mF1 + mF2` — both sides run in the same step, so their pictures coexist.
+    // `stapel_code: mF1 + mF2` — both sides run in the same step, so their pictures **add**.
+    // `stapelHoeheOf` is what sums, so a sequence and a block are both just their own list.
     case "sequence":
-      return stapelHoeheOf(node.body);
-
     // `{ ... }` is `stapel_code` in upstream (`'{' code '}'` returns `$2` unchanged, so braces
     // are not a node); kept as one here, and it costs the same either way.
     case "block":

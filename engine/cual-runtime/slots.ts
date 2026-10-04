@@ -260,15 +260,30 @@ export interface AllocationOptions {
  * `var` lines at the top of a procedure, and a one-level-deep search would miss them and leave
  * every global variable sitting directly after the special variables.
  */
-function numberDeclarations(nodes: readonly Stmt[], allocator: SlotAllocator): void {
+function numberDeclarations(
+  nodes: readonly Stmt[],
+  allocator: SlotAllocator,
+  declaredSlots: Map<string, number>,
+): void {
   for (const node of nodes) {
     if (node.kind === "varDecl" || node.kind === "defaultDecl") {
-      for (let i = 0; i < node.declarations.length; i += 1) {
+      for (const declaration of node.declarations) {
         allocator.allocateDeclaredVariable();
+        // **The name has to be recorded too**, and until 15.7 it was not: a `var` inside a
+        // procedure body or a `&held` body got a slot and no name, so `EvalContext.variable`
+        // could not find it and every level that declared one there failed with "no variable
+        // named 'x'" the moment its blobs ran. `Theater`'s `Leer`, `Aliens`'s `p_shoot` and
+        // `Kolben`'s `blitzrate` are all of that shape.
+        //
+        // The empty name is a Spez-Var, which `visit`'s own `varDecl` case already declines to
+        // record; same rule here, so the two paths cannot disagree about it.
+        if (declaration.name !== "") {
+          declaredSlots.set(declaration.name, allocator.lastVariableSlot);
+        }
       }
       continue;
     }
-    numberDeclarations(childrenOf(node), allocator);
+    numberDeclarations(childrenOf(node), allocator, declaredSlots);
   }
 }
 
@@ -312,69 +327,85 @@ function childrenOf(node: Stmt): readonly Stmt[] {
  */
 export function withoutDeclarations(statements: readonly Stmt[]): readonly Stmt[] {
   const out: Stmt[] = [];
+  let changed = false;
   for (const node of statements) {
-    if (node.kind === "varDecl" || node.kind === "defaultDecl") continue;
-    if (node.kind === "sequence" || node.kind === "block") {
-      const body = withoutDeclarations(node.body);
-      if (body.length === 0) continue;
-      out.push(body.length === node.body.length ? node : { ...node, body });
+    if (node.kind === "varDecl" || node.kind === "defaultDecl") {
+      changed = true;
       continue;
     }
-    if (node.kind === "scoped") {
-      out.push({ ...node, body: withoutDeclarations([node.body])[0] ?? node.body });
-      continue;
-    }
-    if (node.kind === "sharedCall") {
-      out.push({ ...node, body: withoutDeclarations(node.body) });
-      continue;
-    }
-    if (node.kind === "procedureDef") {
-      out.push({
-        ...node,
-        body: withoutDeclarations([node.body])[0] ?? node.body,
-      });
-      continue;
-    }
-    if (node.kind === "if") {
-      out.push({
-        ...node,
-        then: withoutDeclarations([node.then])[0] ?? node.then,
-        ...(node.otherwise === null
-          ? {}
-          : { otherwise: withoutDeclarations([node.otherwise])[0] ?? node.otherwise }),
-      });
-      continue;
-    }
-    if (node.kind === "commaSequence") {
-      out.push({
-        ...node,
-        parts: [
-          withoutDeclarations([node.parts[0]])[0] ?? node.parts[0],
-          withoutDeclarations([node.parts[1]])[0] ?? node.parts[1],
-        ],
-      });
-      continue;
-    }
-    if (node.kind === "switch") {
-      out.push({
-        ...node,
-        case: withoutDeclarations([node.case])[0] as SwitchCase,
-      });
-      continue;
-    }
-    if (node.kind === "switchCase") {
-      out.push({
-        ...node,
-        body: withoutDeclarations([node.body])[0] ?? node.body,
-        ...(node.otherwise === null
-          ? {}
-          : { otherwise: withoutDeclarations([node.otherwise])[0] ?? node.otherwise }),
-      });
-      continue;
-    }
-    out.push(node);
+    const rebuilt = rebuildWithoutDeclarations(node);
+    if (rebuilt !== node) changed = true;
+    out.push(rebuilt);
   }
-  return out;
+  // **The original array when nothing was removed.** Not a new array holding the original nodes:
+  // `busySlots` is keyed by object identity, so a copy of the *list* is harmless but a copy of
+  // any *node* is a node the walker will never visit and a flag the runner will never find.
+  // 15.7 found this as "a 'switchCase' has no busy slots" on the first level whose draw code was a
+  // bare condition chain — `switchCase`, `if`, `scoped` and `procedureDef` were all rebuilt
+  // unconditionally, so every one of their flags was keyed to an object that no longer existed.
+  return changed ? out : statements;
+}
+
+/**
+ * One node with its declarations removed, or **the same node** when it had none.
+ *
+ * Split out from {@link withoutDeclarations} because the identity requirement is per node and not
+ * merely per list: a rebuilt `if` whose `then` happened to be unchanged is still a different
+ * object, and a flag keyed to it is unreachable.
+ */
+function rebuildWithoutDeclarations(node: Stmt): Stmt {
+  switch (node.kind) {
+    case "sequence":
+    case "block": {
+      const body = withoutDeclarations(node.body);
+      return body === node.body ? node : { ...node, body };
+    }
+    case "sharedCall": {
+      const body = withoutDeclarations(node.body);
+      return body === node.body ? node : { ...node, body };
+    }
+    case "scoped":
+    case "procedureDef": {
+      const body = withoutDeclarations([node.body]);
+      return body[0] === node.body ? node : { ...node, body: body[0] as Stmt };
+    }
+    case "commaSequence": {
+      const first = withoutDeclarations([node.parts[0]]);
+      const second = withoutDeclarations([node.parts[1]]);
+      if (first[0] === node.parts[0] && second[0] === node.parts[1]) return node;
+      return { ...node, parts: [first[0] as Stmt, second[0] as Stmt] };
+    }
+    case "if": {
+      const then = withoutDeclarations([node.then]);
+      const otherwise = node.otherwise === null ? null : withoutDeclarations([node.otherwise]);
+      if (then[0] === node.then && (otherwise === null || otherwise[0] === node.otherwise)) {
+        return node;
+      }
+      return {
+        ...node,
+        then: then[0] as Stmt,
+        ...(otherwise === null ? {} : { otherwise: otherwise[0] as Stmt }),
+      };
+    }
+    case "switch": {
+      const entry = withoutDeclarations([node.case]);
+      return entry[0] === node.case ? node : { ...node, case: entry[0] as SwitchCase };
+    }
+    case "switchCase": {
+      const body = withoutDeclarations([node.body]);
+      const otherwise = node.otherwise === null ? null : withoutDeclarations([node.otherwise]);
+      if (body[0] === node.body && (otherwise === null || otherwise[0] === node.otherwise)) {
+        return node;
+      }
+      return {
+        ...node,
+        body: body[0] as Stmt,
+        ...(otherwise === null ? {} : { otherwise: otherwise[0] as Stmt }),
+      };
+    }
+    default:
+      return node;
+  }
 }
 
 export function allocateSlots(
@@ -454,7 +485,7 @@ export function allocateSlots(
         // inside a `&held` body is numbered once at parse time like any other — which is why
         // this is a declarations-only walk and not a skip.
         if (bodiesLinked) {
-          numberDeclarations(node.body, allocator);
+          numberDeclarations(node.body, allocator, declaredSlots);
           return;
         }
         for (const child of node.body) visit(child);
@@ -480,7 +511,7 @@ export function allocateSlots(
           // numbered once, from the parsed body; a linked copy would be a second variable under
           // the same name. Its busy flags are a different matter — each copy needs its own, and
           // they are numbered where the copy is (see `withoutDeclarations`).
-          numberDeclarations([node.body], allocator);
+          numberDeclarations([node.body], allocator, declaredSlots);
           return;
         }
         visit(node.body);
