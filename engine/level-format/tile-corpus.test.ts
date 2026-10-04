@@ -159,7 +159,11 @@ describe("a tile is the board its level opens as", () => {
       }
     }
     expect(wrong.length, `\n${wrong.slice(0, 10).join("\n")}`).toEqual(0);
-  });
+  }, 30000); // measured, not guessed: 15.6 runs every blob's code at the end of every step,
+  // so a test that steps a lot now does the animation work too. Outside coverage this one
+  // takes 692ms; v8 instrumentation pushes it past vitest's 5s default. Raised rather than
+  // trimmed, because skipping the animation would leave the step untested — which is the
+  // failure the AGENTS notes record for explosion tests, arriving a third time.
 });
 
 describe("the tile's colours are the level's own", () => {
@@ -285,7 +289,11 @@ describe("the tile is one legal start, not an arbitrary picture", () => {
     // 6.6% of 37400 cells are draws. A floor well under the measured 2461, so a walk that
     // stopped early would fail rather than pass on a small sample.
     expect(drawnChecked).toBeGreaterThan(2000);
-  });
+  }, 30000); // measured, not guessed: 15.6 runs every blob's code at the end of every step,
+  // so a test that steps a lot now does the animation work too. Outside coverage this one
+  // takes 1188ms; v8 instrumentation pushes it past vitest's 5s default. Raised rather than
+  // trimmed, because skipping the animation would leave the step untested — which is the
+  // failure the AGENTS notes record for explosion tests, arriving a third time.
 });
 
 /**

@@ -52,7 +52,7 @@ by 20 tall, so the tile is unavoidably portrait, and 79 portrait tiles in a scro
 a constraint the next few catalogue tasks inherit.
 
 **The coverage floors exist and are below the measurement on purpose.** `engine/` is at
-93.3% against a 90% floor, `render/` at 97.6% against 80%, and `app/` has no floor because
+93.4% against a 90% floor, `render/` at 97.6% against 80%, and `app/` has no floor because
 a component's percentage measures how much JSX it has rather than whether it works. A floor
 set to today's figure would move with every regression and so could never catch one. Two
 things about them are worth knowing before trusting a green run: the floors only bite under

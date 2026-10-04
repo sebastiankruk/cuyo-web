@@ -260,7 +260,11 @@ describe("5.12 random grey arrivals", () => {
     // two.
     expect(observed).toBeGreaterThan(expected * 0.75);
     expect(observed).toBeLessThan(expected * 1.25);
-  });
+  }, 30000); // measured, not guessed: 15.6 runs every blob's code at the end of every step,
+  // so a test that steps a lot now does the animation work too. Outside coverage this one
+  // takes 1090ms; v8 instrumentation pushes it past vitest's 5s default. Raised rather than
+  // trimmed, because skipping the animation would leave the step untested — which is the
+  // failure the AGENTS notes record for explosion tests, arriving a third time.
 
   it("never schedules a random grey when randomGreys is negative", () => {
     const sim = new Simulation({ ...withoutGoals(), randomGreys: -1 }, {
