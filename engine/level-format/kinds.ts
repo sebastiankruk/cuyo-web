@@ -412,6 +412,9 @@ function makeKind(
     goalProb,
     distKey,
     defaultCode,
+    // Filled in by the loader, which is the only place that has the parsed `<< >>` blocks.
+    // See `Kind.drawCode`.
+    drawCode: null,
   };
 }
 

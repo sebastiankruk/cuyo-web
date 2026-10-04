@@ -24,7 +24,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LevelLoader } from "./loader.ts";
 import { parseLd } from "./parser.ts";
-import { buildLevelProgram } from "./cual-program.ts";
+import { buildLevelProgram, EMPTY_PROGRAM } from "./cual-program.ts";
 import { defaultCodeFor } from "./kinds.ts";
 import type { LevelProgram } from "./cual-program.ts";
 import type { Kind } from "./level-data.ts";
@@ -114,6 +114,7 @@ const syntheticKind = (name: string): Kind[] => [
     goalProb: 0,
     distKey: null,
     defaultCode: null,
+    drawCode: null,
   },
 ];
 
@@ -522,5 +523,113 @@ describe("the corpus, measured", () => {
       }
     }
     expect([largest, largestLevel]).toEqual([112, "BoniMali2"]);
+  });
+});
+
+describe("a loaded level carries its program", () => {
+  /** Straight through the loader — no hand-joining, which is what 15.1's tests did. */
+  const loaded = async (id: string) => {
+    const entry = LEVEL_INDEX.levels.find((candidate) => candidate.id === id);
+    if (entry === undefined) throw new Error(`${id} is not in the level index`);
+    const difficulty = [...entry.difficulties.values()][0];
+    if (difficulty === undefined) throw new Error(`${id} has no difficulties`);
+    return loader().load(entry.filename, entry.id, difficulty.track, difficulty.difficulty);
+  };
+
+  it("and its kinds carry the code they run", async () => {
+    const { level } = await loaded("Baggis");
+    // All seven, which is the figure 15.1 measured — so attaching the program changed nothing
+    // about which code a kind runs, which is the point of putting it on the kind rather than
+    // recomputing it.
+    const withCode = level.kinds.filter((kind) => kind.drawCode !== null);
+    expect(withCode.map((kind) => kind.name)).toEqual([
+      "sbKaese",
+      "sbBrezel",
+      "sbBurger",
+      "sbBroetchen",
+      "sbSunglas",
+      "sbOfen",
+      "sbBlitzer",
+    ]);
+  });
+
+  it("with `Kind.drawCode` being the very array the program holds, not a copy", async () => {
+    // The two could drift if either were built separately, so this asserts identity. A `toEqual`
+    // would pass on a copy and miss a level whose kinds had been re-linked against something
+    // else, which is exactly the failure that would be hardest to see.
+    const { level } = await loaded("Baggis");
+    level.kinds.forEach((kind, index) => {
+      expect(kind.drawCode, `${kind.name} is not the program's array`).toBe(
+        level.program.drawCode[index] ?? null,
+      );
+    });
+  });
+
+  it("including globals.ld's code, which the loader used to throw away entirely", async () => {
+    // `parseLd(source).definitions` is what the loader took, and it discarded `file.code` — the
+    // `<< >>` blocks outside any definition. For a level that is nearly nothing; for
+    // `globals.ld` it is **everything**, because `schema16` and `default1` through `default3`
+    // all live there. So before 15.2 a loaded level had no access to any of it, and this
+    // assertion is the one that would have failed then.
+    const { level } = await loaded("Baggis");
+    expect(level.program.procedures.has("schema16")).toBe(true);
+    expect(level.program.procedures.has("default1")).toBe(true);
+    expect(level.program.procedures.has("default3")).toBe(true);
+    // And the level's own, which are the ones only its file has.
+    expect(level.program.procedures.has("geblitzt")).toBe(true);
+  });
+
+  it("and every call still resolves, for all 79 levels", async () => {
+    // The figure 15.1 measured from hand-joined files, re-measured through the loader. If the
+    // loader's files were joined differently — the discarded `file.code` being the obvious
+    // candidate — this is where it would show.
+    const broken: string[] = [];
+    for (const { entry, difficulty } of everyLevel()) {
+      const result = await loader().load(
+        entry.filename,
+        entry.id,
+        difficulty.track,
+        difficulty.difficulty,
+      );
+      for (const miss of result.level.program.unresolved) {
+        broken.push(`${entry.id}: ${miss.owner} calls ${miss.name}`);
+      }
+    }
+    expect(broken).toEqual([]);
+  });
+
+  it("and the same 502 / 5 / 49 split between own code, a default and none", async () => {
+    let own = 0;
+    let fallback = 0;
+    let none = 0;
+    for (const { entry, difficulty } of everyLevel()) {
+      const { level } = await loader().load(
+        entry.filename,
+        entry.id,
+        difficulty.track,
+        difficulty.difficulty,
+      );
+      for (const [index, kind] of level.kinds.entries()) {
+        if (level.program.drawCode[index] === null) none += 1;
+        else if (level.program.procedures.has(kind.name)) own += 1;
+        else fallback += 1;
+      }
+    }
+    expect([own, fallback, none]).toEqual([502, 5, 49]);
+  });
+
+  it("and a hand-written fixture carries the empty program, honestly", async () => {
+    // `fixtures.ts` transcribes a level's data and never had its Cual, so its kinds have none
+    // and its program is `EMPTY_PROGRAM`. Asserted rather than assumed, because a fixture that
+    // quietly grew a program would mean the game-core tests were exercising something no real
+    // level does.
+    const { nasenkugeln } = await import("./fixtures.ts");
+    const level = nasenkugeln();
+    expect(level.program).toBe(EMPTY_PROGRAM);
+    expect(level.kinds.every((kind) => kind.drawCode === null)).toBe(true);
+    // Its allocation is the smallest `getDatenLaenge` can be: the special variables and
+    // nothing else, because there are no user variables in a fixture.
+    expect(level.program.allocation.slotCount).toBe(SPECIAL_VARIABLE_COUNT);
+    expect(level.program.allocation.declaredCount).toBe(0);
   });
 });

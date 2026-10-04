@@ -9,6 +9,8 @@
  */
 
 import { NeighbourMode } from "../game-core/constants.ts";
+import type { LevelProgram } from "./cual-program.ts";
+import type { Stmt } from "../cual-runtime/code.ts";
 
 /** What role a kind plays, which fixes its default behaviour. */
 export type KindRole = "empty" | "colour" | "grey" | "grass";
@@ -58,6 +60,19 @@ export interface Kind {
    * the file count was unavailable and this had to be settled at the point it is still in hand.
    */
   readonly defaultCode: string | null;
+  /**
+   * The statements this kind runs on `event_draw`, or `null` when it runs nothing.
+   *
+   * A **view** of `LevelProgram.drawCode` at this kind's index, not a second copy: the loader
+   * writes the very array the program holds, so the two cannot disagree, and there is a test
+   * asserting they are the same references rather than merely equal.
+   *
+   * Set by the loader, not by `buildKinds`. `buildKinds` reads `scope` and so has no access to
+   * the parsed `<< >>` blocks the code comes from — it emits `null` and the loader fills it in
+   * once the program exists. That is why a hand-written `Kind` in a fixture may leave it
+   * `null`: such a level has no code, which is also what a kind with no pictures gets.
+   */
+  readonly drawCode: readonly Stmt[] | null;
 }
 
 /** One cell of a `startdist` row. */
@@ -120,6 +135,18 @@ export interface LevelDef {
    * Each entry is either `null` for an empty cell or `{ kind, version }`.
    */
   readonly startDist: readonly StartRow[];
+
+  /**
+   * The level's Cual: its procedures, each kind's draw code, the global and semiglobal
+   * programs, and the slot allocation every blob's variable array is sized from.
+   *
+   * Added by task 15.2. Until now a loaded level carried its kinds, colours and start layout and
+   * **no code at all**, which is why nothing in the game or the tests ever ran a level's Cual:
+   * groups 2 and 3 built the reader and the runtime and the join was missing. Task 15.1 builds
+   * this value from the two parsed files and the loader attaches it here, so a level arrives
+   * carrying the program it is about to run.
+   */
+  readonly program: LevelProgram;
 }
 
 /** Per-kind neighbour override, kept out of `Kind` to avoid a cycle. */

@@ -285,6 +285,35 @@ transfer and the explosion test, then `Spielfeld::spielSchritt`, and only then `
 `cuyo.cpp:473`, so **the rules run first and the blobs' code last**. That belongs to 15.6 and is
 recorded in group 15's preamble rather than here.
 
+**15.2 turned out to be mostly about a discarded value.** The loader did
+`parseLd(source, filename).definitions`, which throws away `file.code` — the `<< >>` blocks
+written outside any definition. For a level that is nearly nothing. **For `globals.ld` it is
+everything**: `schema16` and `default1` through `default3` all live in one top-level block, so the
+loader was discarding the whole of the Cual the corpus depends on. `parseFile` and `parseGlobals`
+now keep the `LdFile`.
+
+The test that pins this is the one that would have failed before: a loaded `Baggis` has
+`schema16`, `default1` and `default3` in `program.procedures`. Mutation confirmed it — putting
+the `.definitions` discard back fails three tests.
+
+**`Kind.drawCode` is a view of `program.drawCode`, not a second copy**, and the test asserts the
+*references* are equal rather than the contents. A `toEqual` would pass on a copy and miss a level
+whose kinds had been re-linked against something else, which is the failure hardest to see; making
+the copy fails twelve tests.
+
+**`buildKinds` emits `drawCode: null` and the loader fills it in**, because `buildKinds` reads
+`scope` and has no access to the parsed `<< >>` blocks the code comes from. So a hand-written
+`Kind` may leave it `null` — which is also what a kind with no pictures gets.
+
+**The fixtures carry `EMPTY_PROGRAM`, exported rather than cast at the use site.** They predate
+the `.ld` parser and transcribe a level's *data*, so they have no code; "this level has no code"
+is a value with a name, and its allocation is the smallest `getDatenLaenge` can be — the special
+variables and nothing else. Asserted, because a fixture that quietly grew a program would mean the
+game-core tests were exercising something no real level does.
+
+Re-measured through the loader rather than trusted from 15.1: **502 / 5 / 49** and **zero
+unresolved calls** across all 79 levels, unchanged.
+
 **7.4, 7.6 and 7.7 were implemented and unverified; they are now verified against the
 renderer's real draw calls, in `render/presentation.test.ts`.** Every assertion names a
 position rather than a count — the lesson this project's tests were written after, where
@@ -720,7 +749,7 @@ them live in `globals.ld`, which the loader already reads. So most kinds run no 
 and wiring without the defaults would leave the great majority of the corpus inert.
 
 - [x] 15.1 Extract a level's Cual program from its parsed `.ld` and `globals.ld` into a value — the level's procedures, and for every kind the resolved draw code, being its own named procedure or the default its picture count selects — as a pure function of the two parsed files, and verify it across all 79 levels
-- [ ] 15.2 Give `Kind` its draw code and `LevelDef` its program, and build both in `LevelLoader`, so a loaded level carries the code it is about to run
+- [x] 15.2 Give `Kind` its draw code and `LevelDef` its program, and build both in `LevelLoader`, so a loaded level carries the code it is about to run
 - [ ] 15.3 Replace `Blob`'s unused `vars: Int32Array` with a real `BlobStore`, allocated per blob against one shared `TimeSlices` per board, so each cell has the variable array `AccessField.at` has to hand back
 - [ ] 15.4 Implement `AccessField` over the live `Board` — `at`, `global`, `semiglobal`, `here`, `hex`, `hexShift`, `mirrored`, `players`, `fallCount` — and verify each against what the addressed access already does on a hand-built field
 - [ ] 15.5 Implement `Animatable` for one blob: its kind's draw code, its own store, and `animate()` as `braucheLeereStapel` then `initSchritt` then the code
