@@ -95,6 +95,7 @@ function subject(
     chainSize: 0,
     baseKind: BLOBART_AUSSERHALB,
     fall: null,
+    fallIndex: 0,
     exploding: 0,
   };
 }
