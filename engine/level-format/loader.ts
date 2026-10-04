@@ -21,7 +21,8 @@ import { parseLd } from "./parser.ts";
 import type { LdDefinition, LdFile } from "./parser.ts";
 import { LdLexError } from "./lexer.ts";
 import { Version } from "./version.ts";
-import { DefinitionScope, rootScope } from "./scope.ts";
+import { DefinitionScope, rootScope, stripPicExtension } from "./scope.ts";
+import { BLOPART_LEER } from "../cual-runtime/store.ts";
 import { buildKinds, UNDEFINED_EXPLODE } from "./kinds.ts";
 import { cssColour, kindDefaultsFrom, readLevelSettings } from "./settings.ts";
 import type { LevelSettings } from "./settings.ts";
@@ -305,7 +306,26 @@ export class LevelLoader {
       // the throw, because a name it cannot resolve is the error being reported, while
       // `LevelDef.levelNumber` wants `null`, because it is one lookup among five namespaces and a
       // miss is the normal case for four of them.
+      // `knoten.cpp:385`'s `speicherKnotenConst`: for `emptypic = Leer` it registers
+      // `VarDefinition("Leer", blopart_keins, vd_konstante, da_nie, 0)` in **`namespace_variable`**.
+      // That is the namespace `parser.yy:738`'s `ausdruck: variable` looks in, so `kind == Leer`
+      // finds a `VarDefinition`, `istKonstante()` is true, and the name is substituted at parse
+      // time as `zahl_acode(-1)`.
+      //
+      // **Answered here rather than in the scope**, and the reason is the port/upstream
+      // difference that matters: upstream keeps `namespace_variable` and sections in *separate*
+      // maps, so the constant and `Baggis`'s `sbNix={ … }` section coexist under one name with no
+      // conflict. This port has one `defs` map per scope, so a `defineNumber("Leer", -1)` would
+      // collide with the section — which is exactly what an earlier attempt did, and it made
+      // three levels fail to *load* with "expected a list of values but found a section".
+      //
+      // The value is `BLOPART_LEER`, which is `blopart_keins` — and which is already this port's
+      // empty-kind index, since `game-core/board.ts`'s `EMPTY` is -1 too. Nothing about the board
+      // or the kind numbering moves.
+      const emptyName =
+        table.emptyArtKey === "" ? null : stripPicExtension(table.emptyArtKey);
       levelNumber = (name: string): number | null => {
+        if (name === emptyName) return BLOPART_LEER;
         try {
           return names(name, scope.positionOf("numexplode"));
         } catch {
