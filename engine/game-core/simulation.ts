@@ -34,6 +34,7 @@ import {
 } from "./constants.ts";
 import type { NeighbourMode } from "./constants.ts";
 import { Blob, Board, EMPTY, componentOf, floats } from "./board.ts";
+import { BlobStore, TimeSlices } from "../cual-runtime/store.ts";
 import type { Position } from "./board.ts";
 import type { LevelDef } from "../level-format/level-data.ts";
 import { Prng } from "../prng.ts";
@@ -93,6 +94,19 @@ export class Simulation {
   readonly board = new Board();
   readonly random: RandomSource;
 
+  /**
+   * `Blop::gZZ`, shared by every blob on the board.
+   *
+   * One instance per simulation, because it is the deferred-write queue and the slice counter
+   * for the whole step: a blob's `@`-read has to see the beginning-of-step values whether the
+   * read happens in the global blob or in the last cell of the board.
+   *
+   * Public because the sharing is a claim worth being able to check: `BlobStore` keeps its
+   * slices private, so the only way to see that two blobs share one counter is to reach this
+   * and watch its queue fill from a blob that does not own it.
+   */
+  readonly slices = new TimeSlices();
+
   score = 0;
   /** Steps elapsed since the level started. */
   time = 0;
@@ -126,6 +140,21 @@ export class Simulation {
   }
 
   /**
+   * A blob with a variable array sized for this level's whole program.
+   *
+   * `DefKnoten::getDatenLaenge` is a per-configuration length, not a per-kind one: a blob can
+   * reach any procedure in the level by calling it, so the array has to hold every node the
+   * program declares — busy flags and user variables alike. Sizing it per kind would overflow
+   * the moment a kind called something declared elsewhere.
+   *
+   * The array is allocated rather than shared because each blob's is its own `mDaten`; the
+   * *slice counter* is shared, which is the part that must not be.
+   */
+  private makeBlob(): Blob {
+    return new Blob(new BlobStore(this.level.program.allocation.slotCount, GRY, this.slices));
+  }
+
+  /**
    * Rebuilds the board from the level's start layout and clears counters.
    *
    * The random source is rewound too, not just the board: a restart has to
@@ -154,9 +183,10 @@ export class Simulation {
         if (cell === undefined || cell === null) continue;
         const kind = this.level.kinds[cell.kind];
         if (kind === undefined) continue;
-        const blob = new Blob();
+        const blob = this.makeBlob();
         blob.initFromKind(kind);
         blob.version = cell.version;
+        blob.store.setSystem("version", cell.version);
         this.board.set(x, y, blob);
       }
     }
@@ -202,11 +232,12 @@ export class Simulation {
   private makePiece(): FallPiece {
     const weights = this.level.kinds.map((k) => k.colourProb);
     const mk = (): Blob => {
-      const blob = new Blob();
+      const blob = this.makeBlob();
       const kind = this.level.kinds[this.random.weighted(weights)];
       if (kind !== undefined) {
         blob.initFromKind(kind);
         blob.version = this.random.int(Math.max(1, kind.versions));
+        blob.store.setSystem("version", blob.version);
       }
       return blob;
     };
@@ -851,9 +882,10 @@ export class Simulation {
       if (pick >= weights.length) continue;
       const kind = this.level.kinds[pick];
       if (kind === undefined) continue;
-      const blob = new Blob();
+      const blob = this.makeBlob();
       blob.initFromKind(kind);
       blob.version = this.random.int(Math.max(1, kind.versions));
+      blob.store.setSystem("version", blob.version);
       this.board.set(column, spawnRow, blob);
       this.pendingGreys--;
       spawned = true;

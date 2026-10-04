@@ -21,6 +21,7 @@ import type { LevelDef } from "../level-format/level-data.ts";
 import { ScriptedPrng } from "../testing/prng-stub.ts";
 import { nasenkugeln } from "../level-format/fixtures.ts";
 
+import { testBlob } from "../testing/blob.ts";
 const GOAL_KIND = 5;
 
 function fixed(value = 0.01, count = 20000): ScriptedPrng {
@@ -28,7 +29,7 @@ function fixed(value = 0.01, count = 20000): ScriptedPrng {
 }
 
 function blobOf(sim: Simulation, kind: number): Blob {
-  const blob = new Blob();
+  const blob = testBlob();
   blob.initFromKind(sim.level.kinds[kind]!);
   return blob;
 }

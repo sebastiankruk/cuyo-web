@@ -6,11 +6,10 @@ import {
   GRX,
   GRY,
 } from "./constants.ts";
-import { Blob } from "./board.ts";
 import { Simulation } from "./simulation.ts";
 import { ScriptedPrng } from "../testing/prng-stub.ts";
 import { hormone, nasenkugeln } from "../level-format/fixtures.ts";
-
+import { testBlob } from "../testing/blob.ts";
 /** A source that always returns the same kinds, for predictable placement. */
 function fixedKindPicker(kindId: number): ScriptedPrng {
   const values: number[] = [];
@@ -139,7 +138,7 @@ describe("Simulation: explosions", () => {
   function layRow(sim: Simulation, kindId: number, count: number, y = 5): void {
     const kind = sim.level.kinds[kindId]!;
     for (let x = 0; x < count; x++) {
-      const blob = new Blob();
+      const blob = testBlob();
       blob.initFromKind(kind);
       sim.board.set(x, y, blob);
     }
@@ -188,7 +187,7 @@ describe("Simulation: explosions", () => {
     const sim = makeSim(hormone(), fixedKindPicker(0));
     const goalRow = sim.level.startDist.length > 0 ? GRY - 1 : GRY - 1;
     for (let x = 0; x < 6; x++) {
-      const blob = new Blob();
+      const blob = testBlob();
       blob.initFromKind(sim.level.kinds[0]!);
       sim.board.set(x, goalRow - 1, blob);
     }
@@ -296,7 +295,7 @@ describe("Simulation: chase border", () => {
     // A fast border and a blob parked near the top make this deterministic.
     const level = { ...nasenkugeln(), topTime: 2 };
     const sim = new Simulation(level, { random: fixedKindPicker(0) });
-    const blocker = new Blob();
+    const blocker = testBlob();
     blocker.initFromKind(level.kinds[5]!); // goal kind, so it is not cleared
     // Floating, so gravity cannot drop it out of the border's path.
     blocker.behaviour |= FLOATS;
