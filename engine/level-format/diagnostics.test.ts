@@ -48,6 +48,7 @@ function kind(over: Partial<Kind> = {}): Kind {
     goalProb: 0,
     distKey: null,
     defaultCode: null,
+    drawCode: null,
     ...over,
   };
 }

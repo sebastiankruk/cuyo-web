@@ -422,6 +422,7 @@ describe("accidentalPairs", () => {
           goalProb: 1,
           distKey: null,
           defaultCode: null,
+          drawCode: null,
         },
       ],
     };

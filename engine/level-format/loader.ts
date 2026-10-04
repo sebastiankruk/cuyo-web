@@ -18,7 +18,7 @@
  */
 
 import { parseLd } from "./parser.ts";
-import type { LdDefinition } from "./parser.ts";
+import type { LdDefinition, LdFile } from "./parser.ts";
 import { LdLexError } from "./lexer.ts";
 import { Version } from "./version.ts";
 import { DefinitionScope, rootScope } from "./scope.ts";
@@ -27,12 +27,15 @@ import { cssColour, kindDefaultsFrom, readLevelSettings } from "./settings.ts";
 import type { LevelSettings } from "./settings.ts";
 import { readStartDist } from "./startdist.ts";
 import { buildStartLayout } from "./startlayout.ts";
+import { buildLevelProgram } from "./cual-program.ts";
+import type { LevelProgram } from "./cual-program.ts";
 import type { LayoutBoard, LayoutCell } from "./startlayout.ts";
 import { needsNumExplode, undefinedExplode } from "./diagnostics.ts";
 import type { DiagnosticOrigin } from "./diagnostics.ts";
 import { ArtKeyError, resolveArtKey } from "./art.ts";
 import type { ArtManifest } from "./art.ts";
 import type {
+  Kind,
   LevelColours,
   LevelDef,
   StartCell,
@@ -119,8 +122,9 @@ export class LevelLoader {
    * work instead of starting its own, whether or not it has finished. A rejected parse
    * is removed again so a failed load is retried rather than cached as a failure.
    */
-  private readonly files = new Map<string, Promise<readonly LdDefinition[]>>();
-  private globals: readonly LdDefinition[] | null = null;
+  private readonly files = new Map<string, Promise<LdFile>>();
+  /** `globals.ld` as a whole file, so its top-level `<< >>` code is kept. */
+  private globalsFile: LdFile | null = null;
   /** Fetch calls, for the cache test and for a diagnostics readout. */
   fetches = 0;
 
@@ -150,7 +154,7 @@ export class LevelLoader {
   reset(): void {
     this.clear();
     this.files.clear();
-    this.globals = null;
+    this.globalsFile = null;
   }
 
   /**
@@ -178,7 +182,13 @@ export class LevelLoader {
       twoPlayers: two,
     };
 
-    const definitions = await this.parseFile(filename);
+    // The whole file, not just its definitions. `parseLd(...).definitions` is what this used to
+    // take, and it threw away `file.code` — the `<< >>` blocks written outside any definition.
+    // For a level that is nearly nothing; for `globals.ld` it is *everything*, because
+    // `schema16` and `default1` through `default3` all live there, so the discarded half was
+    // the whole of the Cual the corpus depends on.
+    const file = await this.parseFile(filename);
+    const definitions = file.definitions;
     const def = definitions.find(
       (d) => d.value.type === "section" && d.name === id,
     );
@@ -189,19 +199,20 @@ export class LevelLoader {
       );
     }
 
+    const globals = await this.parseGlobals();
     const root = rootScope(filename, version);
-    root.defineAll(await this.parseGlobals());
+    root.defineAll(globals.definitions);
     root.defineAll(definitions);
     const scope = new DefinitionScope(id, root, version, filename);
     scope.defineAll(def.value.definitions);
 
-    const loaded = this.compile(scope, origin, { track, difficulty, version });
+    const loaded = this.compile(scope, origin, { track, difficulty, version }, file, globals);
     this.cache.set(key, loaded);
     return loaded;
   }
 
   /** Lexes and parses a file, once however many callers ask at the same time. */
-  private parseFile(filename: string): Promise<readonly LdDefinition[]> {
+  private parseFile(filename: string): Promise<LdFile> {
     const cached = this.files.get(filename);
     if (cached !== undefined) return cached;
     const started = this.parseFileUncached(filename);
@@ -214,9 +225,7 @@ export class LevelLoader {
     return started;
   }
 
-  private async parseFileUncached(
-    filename: string,
-  ): Promise<readonly LdDefinition[]> {
+  private async parseFileUncached(filename: string): Promise<LdFile> {
     let source: string;
     try {
       this.fetches++;
@@ -233,9 +242,9 @@ export class LevelLoader {
         { cause },
       );
     }
-    let definitions: readonly LdDefinition[];
+    let file: LdFile;
     try {
-      definitions = parseLd(source, filename).definitions;
+      file = parseLd(source, filename);
     } catch (cause) {
       const e = cause as LdLexError | Error;
       throw new LevelLoadError(
@@ -244,14 +253,14 @@ export class LevelLoader {
         { cause },
       );
     }
-    return definitions;
+    return file;
   }
 
-  private async parseGlobals(): Promise<readonly LdDefinition[]> {
-    if (this.globals !== null) return this.globals;
-    const definitions = await this.parseFile("globals.ld");
-    this.globals = definitions;
-    return definitions;
+  private async parseGlobals(): Promise<LdFile> {
+    if (this.globalsFile !== null) return this.globalsFile;
+    const file = await this.parseFile("globals.ld");
+    this.globalsFile = file;
+    return file;
   }
 
   /** Turns a resolved scope into a playable `LevelDef`. */
@@ -263,6 +272,8 @@ export class LevelLoader {
       readonly difficulty: Difficulty;
       readonly version: Version;
     },
+    levelFile: LdFile,
+    globalsFile: LdFile,
   ): LoadedLevel {
     const { art } = this.deps;
     let settings;
@@ -278,10 +289,27 @@ export class LevelLoader {
       throw new LevelLoadError(origin, (cause as Error).message, { cause });
     }
 
+    // The level's Cual, and the join that groups 2 and 3 never had. Built from the two
+    // *parsed files* rather than from `scope`, because the `<< >>` blocks the code lives in are
+    // tokens on the parse tree and `scope` holds only resolved data words — and from the kinds
+    // just built, because which code a kind runs is decided by its name.
+    let program: LevelProgram;
+    try {
+      program = buildLevelProgram(levelFile, globalsFile, table.kinds);
+    } catch (cause) {
+      throw new LevelLoadError(origin, (cause as Error).message, { cause });
+    }
+    // The very arrays, not copies: `Kind.drawCode` is documented as a view of the program's,
+    // and there is a test asserting the references match rather than merely the contents.
+    const kindsWithCode: Kind[] = table.kinds.map((kind, index) => ({
+      ...kind,
+      drawCode: program.drawCode[index] ?? null,
+    }));
+
     // Resolving the keys here means a missing picture is a load failure with a
     // diagnostic, rather than a blank cell a player notices.
     const goalArtKeys: string[] = [];
-    for (const kind of table.kinds) {
+    for (const kind of kindsWithCode) {
       if (kind.artKey === "") continue;
       try {
         const entry = resolveArtKey(art, kind.artKey, kind.name, origin.file);
@@ -323,7 +351,7 @@ export class LevelLoader {
       name: settings.name,
       author: settings.author,
       description: settings.description,
-      kinds: table.kinds,
+      kinds: kindsWithCode,
       emptyKind: table.emptyKind,
       neighbours: settings.neighbours,
       chainGrass: settings.chainGrass,
@@ -342,6 +370,7 @@ export class LevelLoader {
       // thing and are not carried here; keeping both would mean two representations of
       // a start layout in one object, and only one of them is ever played.
       startDist: toStartRows(rows, table.emptyKind),
+      program,
     };
 
     return {

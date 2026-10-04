@@ -19,6 +19,7 @@ import {
 } from "../game-core/constants.ts";
 import type { Kind, KindRole, LevelDef, StartRow } from "./level-data.ts";
 import { defaultBehaviour } from "./level-data.ts";
+import { EMPTY_PROGRAM } from "./cual-program.ts";
 
 let nextId = 0;
 
@@ -53,6 +54,9 @@ function makeKinds(specs: readonly KindSpec[], chainGrass: boolean): Kind[] {
       // `mBilddateien.size() > 0`, so `null` is what the transcription says. A spec that does
       // model pictures sets it, because a kind with pictures and no code is not inert.
       defaultCode: s.defaultCode ?? null,
+      // A fixture models no `<< >>` code, so a kind has none — which is also what a kind with
+      // no pictures gets, and what the loader fills in for a real level.
+      drawCode: null,
     } satisfies Kind;
   });
 }
@@ -105,6 +109,7 @@ export function nasenkugeln(): LevelDef {
     },
     // startdist = "**********": ten goal blobs, each of the single goal kind.
     startDist: layout([[5, 5, 5, 5, 5, 5, 5, 5, 5, 5]]),
+    program: EMPTY_PROGRAM,
   };
 }
 
@@ -147,6 +152,7 @@ export function hormone(): LevelDef {
     },
     // One row of goal blobs, as `startdist = "AAAAAAAAAA"` for one player.
     startDist: layout([[4, 4, 4, 4, 4, 4, 4, 4, 4, 4]]),
+    program: EMPTY_PROGRAM,
   };
 }
 

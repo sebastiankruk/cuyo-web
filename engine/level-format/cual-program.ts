@@ -104,6 +104,27 @@ export interface LevelProgram {
 }
 
 /**
+ * A program with nothing in it: no procedures, no kind with code, no global or semiglobal.
+ *
+ * For the hand-written fixtures in `fixtures.ts`, which transcribe a level's *data* and never
+ * had its Cual — they predate the `.ld` parser and exist so the engine and renderer are
+ * playable. Exported rather than cast at the use site, so that "this level has no code" is a
+ * value with a name and a fixture that later grows real code has somewhere to put it.
+ *
+ * The allocation is over an empty tree, which yields the special variables and nothing else:
+ * the smallest array `getDatenLaenge` can be, since `speicherGlobaleVordefinierte` reserves
+ * those before anything else is parsed. A fixture blob therefore gets a valid array with no
+ * user variables in it, which is the truth about a fixture.
+ */
+export const EMPTY_PROGRAM: LevelProgram = {
+  procedures: new Map(),
+  drawCode: [],
+  globalCode: null,
+  semiglobalCode: null,
+  allocation: allocateSlots([]),
+  unresolved: [],
+};
+/**
  * The `<< >>` blocks of a file, in the order upstream would read them.
  *
  * Recursive, because a kind's code is not at the top level: `Baggis={ … << level code >>
