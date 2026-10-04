@@ -69,7 +69,6 @@ function loader() {
 
 /** The program's own code and the real kinds that will run it. */
 async function programFor(
-  filename: string,
   id: string,
 ): Promise<{ program: LevelProgram; kinds: readonly Kind[] }> {
   const entry = LEVEL_INDEX.levels.find((candidate) => candidate.id === id);
@@ -82,8 +81,15 @@ async function programFor(
     difficulty.track,
     difficulty.difficulty,
   );
-  const file = parseLd(readFileSync(resolve(DATA_DIR, filename), "latin1"), filename);
-  return { program: buildLevelProgram(file, GLOBALS, loaded.level.kinds), kinds: loaded.level.kinds };
+  // The loader's own program, rather than a second `buildLevelProgram` call here.
+  //
+  // This used to re-parse the file and rebuild the program, which meant the suite was checking
+  // a *different* build from the one the game loads — and it broke when `buildLevelProgram`
+  // grew a fourth argument. `konstante`'s name lookup needs a resolved `DefinitionScope`, which
+  // only the loader has, so the honest arrangement is that there is one build and the test reads
+  // it. What this costs is nothing: the assertions below are about the program, and the loader
+  // produces exactly the program `buildLevelProgram` would.
+  return { program: loaded.level.program, kinds: loaded.level.kinds };
 }
 
 /** Every level and its first difficulty, as the catalogue addresses them. */
@@ -121,7 +127,7 @@ const syntheticKind = (name: string): Kind[] => [
 
 describe("a kind runs the procedure named after it", () => {
   it("baggis.ld's kinds each have their own, and it is what they call", async () => {
-    const { program, kinds } = await programFor("baggis.ld", "Baggis");
+    const { program, kinds } = await programFor("Baggis");
 
     // `sbKaese = {geblitzt;schema16;sungl};` — three calls spliced into one body, so the tree
     // holds what all three do and no `call` survives.
@@ -154,7 +160,7 @@ describe("a kind runs the procedure named after it", () => {
   });
 
   it("and the level's own procedures are in scope, not only its kinds'", async () => {
-    const { program } = await programFor("baggis.ld", "Baggis");
+    const { program } = await programFor("Baggis");
     // `geblitzt`, `sunglasx` and `sungl` are the level's; `schema16` is globals'.
     expect([...program.procedures.keys()]).toEqual(
       expect.arrayContaining(["geblitzt", "sunglasx", "sungl", "schema16", "default3"]),
@@ -166,7 +172,7 @@ describe("a kind runs the procedure named after it", () => {
     // regression here would otherwise show up as one level's blob throwing at run time.
     const unresolved: string[] = [];
     for (const { entry, difficulty } of everyLevel()) {
-      const { program } = await programFor(entry.filename, entry.id);
+      const { program } = await programFor(entry.id);
       for (const miss of program.unresolved) {
         unresolved.push(`${entry.id}: ${miss.owner} calls ${miss.name}`);
       }
@@ -181,7 +187,7 @@ describe("a kind runs the procedure named after it", () => {
     // fail the first time a blob of that kind animated.
     const survivors: string[] = [];
     for (const { entry } of everyLevel()) {
-      const { program, kinds } = await programFor(entry.filename, entry.id);
+      const { program, kinds } = await programFor(entry.id);
       program.drawCode.forEach((code, index) => {
         if (code === null) return;
         for (const name of callsIn(code)) {
@@ -225,7 +231,7 @@ describe("a kind with no code of its own runs a default", () => {
     const found: string[] = [];
     const wrongDefault: string[] = [];
     for (const { entry } of everyLevel()) {
-      const { program, kinds } = await programFor(entry.filename, entry.id);
+      const { program, kinds } = await programFor(entry.id);
       for (const [index, kind] of kinds.entries()) {
         if (program.drawCode[index] === null) continue;
         if (program.procedures.has(kind.name)) continue;
@@ -278,7 +284,7 @@ describe("a kind with no code of its own runs a default", () => {
     const counts = new Map<string, number>();
     let run = 0;
     for (const { entry } of everyLevel()) {
-      const { program, kinds } = await programFor(entry.filename, entry.id);
+      const { program, kinds } = await programFor(entry.id);
       for (const [index, kind] of kinds.entries()) {
         if (kind.defaultCode === null) continue;
         counts.set(kind.defaultCode, (counts.get(kind.defaultCode) ?? 0) + 1);
@@ -299,7 +305,7 @@ describe("a kind with no code of its own runs a default", () => {
 
   it("default1 is a bare draw, because a single-icon file has nothing to choose", async () => {
     // `default1 = *;` — a draw, and nothing else.
-    const { program, kinds } = await programFor("pfeile.ld", "Pfeile");
+    const { program, kinds } = await programFor("Pfeile");
     const grey = kinds.find((kind) => kind.name === "ipGrau");
     expect(grey?.defaultCode).toBe("default1");
     expect(nodeKinds(program.drawCode[indexOfKind(kinds, "ipGrau")] ?? [])).toEqual(["draw"]);
@@ -310,7 +316,7 @@ describe("a kind with no code of its own runs a default", () => {
     // shows which of them it is rather than always the first. Asserted as a draw plus an
     // assignment to `pos`, because "default1 vs default2g" is invisible in the finished
     // picture and is exactly the kind of difference a test has to name.
-    const { program, kinds } = await programFor("ziehlen.ld", "Ziehlen");
+    const { program, kinds } = await programFor("Ziehlen");
     const gras = kinds.find((kind) => kind.name === "gras");
     expect(gras?.defaultCode).toBe("default2g");
     expect(gras?.pictures).toEqual(["mziAlle.xpm"]);
@@ -324,7 +330,7 @@ describe("a kind with no code of its own runs a default", () => {
     // so the default is never consulted for them. The lookup is the kind's name first and only
     // then the default — a resolution that took the default first would quietly replace every
     // level's own drawing with `schema16`.
-    const { program, kinds } = await programFor("pfeile.ld", "Pfeile");
+    const { program, kinds } = await programFor("Pfeile");
     const own = kinds.filter((kind) => program.procedures.has(kind.name));
     expect(own).toHaveLength(7);
     // The three defaults all appear in one level, which is a better test than a single one:
@@ -380,7 +386,7 @@ describe("a kind with no code of its own runs a default", () => {
     // `sorte.cpp:104`'s condition starts `mBilddateien.size() > 0`, so a kind with an empty
     // `artKey` gets nothing rather than a default that would try to draw. 49 of the corpus's
     // 556 kinds are in this state.
-    const { program, kinds } = await programFor("himmel.ld", "Himmel");
+    const { program, kinds } = await programFor("Himmel");
     const empties = kinds.filter((kind) => kind.defaultCode === null);
     expect(empties.length).toBeGreaterThan(0);
     for (const kind of empties) {
@@ -394,7 +400,7 @@ describe("the global and semiglobal blobs", () => {
     // `Sorte("global")` and `Sorte("semiglobal")` from `leveldaten.cpp:520-521`, and
     // `sorte.cpp:104` excludes both from the default. So a level with no `global` procedure
     // has a global blob that does nothing, which is the common case.
-    const { program } = await programFor("baggis.ld", "Baggis");
+    const { program } = await programFor("Baggis");
     expect(program.globalCode).toBeNull();
     expect(program.semiglobalCode).toBeNull();
   });
@@ -405,7 +411,7 @@ describe("the global and semiglobal blobs", () => {
     let withGlobal = 0;
     let withSemiglobal = 0;
     for (const { entry } of everyLevel()) {
-      const { program } = await programFor(entry.filename, entry.id);
+      const { program } = await programFor(entry.id);
       if (program.globalCode !== null) withGlobal += 1;
       if (program.semiglobalCode !== null) withSemiglobal += 1;
     }
@@ -419,7 +425,7 @@ describe("a blob's variable array is long enough for the whole configuration", (
     // out of a run: `speicherGlobaleVordefinierte` reserves the special variables before
     // anything is parsed, every `var` takes a whole int, and `allocateBool` takes a new int
     // every 32 flags.
-    const { program } = await programFor("baggis.ld", "Baggis");
+    const { program } = await programFor("Baggis");
     const expected =
       SPECIAL_VARIABLE_COUNT +
       program.allocation.declaredCount +
@@ -431,23 +437,31 @@ describe("a blob's variable array is long enough for the whole configuration", (
     // `allocateSlots` discarded the index of each declaration, so a name could not be resolved
     // at run time at all: a user variable reaches the evaluator as `{ kind: "variable", name }`
     // and `EvalContext.variable(name)` is the only thing that turns it into an array index.
-    const { program } = await programFor("baggis.ld", "Baggis");
+    const { program } = await programFor("Baggis");
     // `var blitz,blitzt; var sunglas;` — three, and no more.
     expect([...program.allocation.declaredSlots.keys()].sort()).toEqual([
       "blitz",
       "blitzt",
       "sunglas",
     ]);
-    // **Not at 14.** The special variables occupy 0-13, and then `globals.ld`'s own `var`
-    // lines take theirs before this level's — because globals are read first, and upstream
-    // numbers them in one configuration. So baggis's three land at 23, 24 and 25: after the
-    // special variables, after globals' declarations, contiguous, in declaration order.
+    // **After the special variables, contiguous, in declaration order — and not at a pinned
+    // number any more.** They used to be asserted at 23, 24 and 25, which was measured and
+    // which was *wrong*: it depended on the 9 `int`s of busy flags that `globals.ld`'s own
+    // procedures took, numbered once from the parsed blocks. 15.5 numbers the linked copies as
+    // well, so baggis's three now sit at 14, 15 and 16 — still after the special variables,
+    // still contiguous, still in declaration order, and that is everything a caller's slot
+    // number can be relied on to be.
+    //
+    // `globals.ld` declares no variables of its own (measured), so there is nothing above them
+    // to displace; the earlier 23 was a side effect of flag placement, not of any declaration.
     const slots: [string, number][] = [...program.allocation.declaredSlots.entries()];
-    expect(slots).toEqual([
-      ["blitz", 23],
-      ["blitzt", 24],
-      ["sunglas", 25],
-    ]);
+    expect(slots.map(([name]) => name)).toEqual(["blitz", "blitzt", "sunglas"]);
+    expect(slots.map(([, slot]) => slot)).toEqual(
+      slots.map(([, slot]) => slot).slice().sort((a, b) => a - b),
+    );
+    expect(slots[0]?.[1]).toBe(SPECIAL_VARIABLE_COUNT);
+    expect(slots[1]?.[1]).toBe(SPECIAL_VARIABLE_COUNT + 1);
+    expect(slots[2]?.[1]).toBe(SPECIAL_VARIABLE_COUNT + 2);
     expect(Math.min(...slots.map((entry) => entry[1]))).toBeGreaterThanOrEqual(
       SPECIAL_VARIABLE_COUNT,
     );
@@ -456,7 +470,7 @@ describe("a blob's variable array is long enough for the whole configuration", (
   it("and the same for every level in the corpus", async () => {
     const wrong: string[] = [];
     for (const { entry } of everyLevel()) {
-      const { program } = await programFor(entry.filename, entry.id);
+      const { program } = await programFor(entry.id);
       const expected =
         SPECIAL_VARIABLE_COUNT +
         program.allocation.declaredCount +
@@ -607,7 +621,7 @@ describe("the corpus, measured", () => {
     let fallback = 0;
     let none = 0;
     for (const { entry } of everyLevel()) {
-      const { program, kinds } = await programFor(entry.filename, entry.id);
+      const { program, kinds } = await programFor(entry.id);
       for (const [index, kind] of kinds.entries()) {
         if (program.drawCode[index] === null) none += 1;
         else if (program.procedures.has(kind.name)) own += 1;
@@ -621,25 +635,41 @@ describe("the corpus, measured", () => {
   it("and every call in all 79 levels resolves", async () => {
     let unresolved = 0;
     for (const { entry } of everyLevel()) {
-      const { program } = await programFor(entry.filename, entry.id);
+      const { program } = await programFor(entry.id);
       unresolved += program.unresolved.length;
     }
     expect(unresolved).toBe(0);
   });
 
-  it("the largest variable array in the corpus is 112 slots", async () => {
+  it("the largest variable array in the corpus is 807 slots", async () => {
     // What 15.3 sizes every blob's array from, so the ceiling is worth knowing: `globals.ld`
     // contributes most of it, since its procedures are in every level's namespace.
     let largest = 0;
     let largestLevel = "";
     for (const { entry } of everyLevel()) {
-      const { program } = await programFor(entry.filename, entry.id);
+      const { program } = await programFor(entry.id);
       if (program.allocation.slotCount > largest) {
         largest = program.allocation.slotCount;
         largestLevel = entry.id;
       }
     }
-    expect([largest, largestLevel]).toEqual([112, "BoniMali2"]);
+    // **764, and this figure moved in 15.5 — it used to be 112, which was wrong.**
+    //
+    // `Blop::Blop` sizes every blob's array with `ld->mLevelKnoten->getDatenLaenge()`
+    // (`blop.cpp:59`), read *after* the level has been loaded. Loading a level copies each
+    // kind's draw code with `neueBusyNummern`, and each copy's fresh busy flags come from
+    // `knoten->neueBoolVariable()` (`code.cpp:192`), which walks up to the parent — the level
+    // knoten itself (`knoten.cpp:545`). So the level knoten **grows by every kind's copy**, and
+    // the figure is read afterwards.
+    //
+    // The port sized the array from the *parsed* blocks instead, which is 112 for `BoniMali2`: the
+    // 44 kinds' copies' busy flags were never counted. 15.5 found it, because allocating
+    // over the linked trees is the first thing a run needs — a comma sequence in any spliced
+    // procedure had no busy slot at all, so **no level's draw code could run**. Measured now:
+    // 68 declared variables and 23184 busy flags, which is 725 ints of flags plus the
+    // variables — measured on this file, and the reason the corpus's largest blob carries an
+    // 807-entry array rather than 112.
+    expect([largest, largestLevel]).toEqual([807, "BoniMali2"]);
   });
 });
 

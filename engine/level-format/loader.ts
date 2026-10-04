@@ -295,7 +295,13 @@ export class LevelLoader {
     // just built, because which code a kind runs is decided by its name.
     let program: LevelProgram;
     try {
-      program = buildLevelProgram(levelFile, globalsFile, table.kinds);
+      // `scope.nameResolver()` is `konstante`'s name lookup — `getVerwandten` for the active
+      // version — which is how a `reapply` default naming a level constant (`jump.ld`'s
+      // `var farbe = farben : reapply`) folds to a number.
+      const names = scope.nameResolver();
+      program = buildLevelProgram(levelFile, globalsFile, table.kinds, (name) =>
+        names(name, scope.positionOf("numexplode")),
+      );
     } catch (cause) {
       throw new LevelLoadError(origin, (cause as Error).message, { cause });
     }

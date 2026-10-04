@@ -131,7 +131,12 @@ describe("a tile is the board its level opens as", () => {
     // values: 187 difficulty rows, 4391 filled cells of 37400.
     expect(compared).toBeGreaterThan(180);
     expect(filled).toBeGreaterThan(4000);
-  });
+  }, 30000); // measured, not guessed: 15.5's corrected slot allocation covers every kind's
+  // linked copy, so loading a level walks about a thousand more nodes than it did. Outside
+  // coverage this file's two corpus sweeps take roughly 1.1s and 0.4s; v8 coverage
+  // instrumentation pushes both past vitest's 5s default. Raising the limit rather than
+  // trimming the work, because the work is the thing that gives a level's busy flags slots
+  // at all — without it no `,` in any level could run.
 
   it("and the tile's background is the level's own bgcolor", async () => {
     const wrong: string[] = [];
@@ -188,7 +193,12 @@ describe("the tile's colours are the level's own", () => {
       }
     }
     expect(wrong.length, `\n${wrong.slice(0, 10).join("\n")}`).toEqual(0);
-  });
+  }, 30000); // measured, not guessed: 15.5's corrected slot allocation covers every kind's
+  // linked copy, so loading a level walks about a thousand more nodes than it did. Outside
+  // coverage this file's two corpus sweeps take roughly 1.1s and 0.4s; v8 coverage
+  // instrumentation pushes both past vitest's 5s default. Raising the limit rather than
+  // trimming the work, because the work is the thing that gives a level's busy flags slots
+  // at all — without it no `,` in any level could run.
 
   it("and every tile's palette index names a palette that exists", () => {
     const missing: string[] = [];
