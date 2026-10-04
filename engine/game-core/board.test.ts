@@ -19,6 +19,7 @@ const COLOUR: Kind = {
   role: "colour",
   artKey: "colour",
   pictures: [],
+  pictureCounts: [],
   versions: 1,
   weight: 1,
   behaviour: 9, // explodes_on_size | calculate_size

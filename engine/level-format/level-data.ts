@@ -44,6 +44,21 @@ export interface Kind {
    * declares `pics`.
    */
   readonly pictures: readonly string[];
+
+  /**
+   * How many icons each of {@link pictures} holds, in the same order.
+   *
+   * The picture's, not the level's: upstream reads it from the image (`anzBildchen`,
+   * `src/bilddatei.cpp:205`) and this project ships no images, so the figure is transcribed per
+   * key in `picture-icons.ts` and resolved through the art manifest **here, at load**, so that
+   * nothing in the game needs the manifest at run time.
+   *
+   * `PictureSource.pictureCount(kind, file)` is `this[file]`, which is how Cual's `file`
+   * variable reaches a picture. Empty for a kind with no picture file, and a `0` entry is
+   * impossible here: a key the table records as 0 is not a picture, and `artKey`'s
+   * documentation says why such a kind never gets one.
+   */
+  readonly pictureCounts: readonly number[];
   /** Number of distinct appearances, chosen at random as `version`. */
   readonly versions: number;
   /** Contribution to component size. */

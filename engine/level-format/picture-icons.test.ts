@@ -36,7 +36,13 @@ const PICS = resolve(import.meta.dirname, "../../.context/upstream-cuyo/data/pic
 /** Whether the upstream tree is here at all. Gitignored, so absent on CI and on a fresh clone. */
 const hasUpstream = existsSync(PICS);
 
-/** Keys recorded as "not a picture", which must be kind names rather than file names. */
+/**
+ * Kind names, not picture names, which an earlier sweep recorded as keys.
+ *
+ * A kind declared by a `greypic` or `startpic` *word* has no picture file unless its own
+ * section declares `pics`, and upstream opens no image for one. These four were swept as keys
+ * before the sweep read `kind.pictures` instead of `kind.artKey`, and none of them is a key now.
+ */
 const NOT_A_PICTURE = ["Grau", "Starr", "Start", "start_dummy"];
 
 /**
@@ -130,12 +136,23 @@ describe("the picture icon counts", () => {
     expect(unreadable).toEqual([]);
   });
 
-  it("and record exactly the four keys that are not pictures, as zero", () => {
-    // A kind named by a `greypic` or `startpic` word has no picture file unless its own section
-    // declares `pics`. Zero says so, and zero is a value rather than a gap: `defaultCodeFor`
-    // never asks about a kind with no pictures, and `PictureSource` refuses a count of 0.
+  it("and hold no key that is not a picture", () => {
+    // **This was four keys, and they are gone.** An earlier version of the sweep collected
+    // `kind.artKey`, which for a kind declared by a `greypic` or `startpic` *word* falls back to
+    // the kind's own name — so `Grau`, `Starr`, `Start` and `start_dummy` were swept as picture
+    // keys, had no image, and were recorded as 0. They are not pictures: upstream's
+    // `Sorte::Sorte` opens no image for a kind with no `pics` list of its own, which is the same
+    // fact that reaches the code as `defaultCode = null`.
+    //
+    // So the sweep reads `kind.pictures`, which holds only declared picture files, and the table
+    // has **no zeros at all**. Asserted rather than assumed, because a zero is a live value
+    // meaning "this key is not a picture" and `defaultCodeFor` reads it as a figure.
     const zeros = [...PICTURE_ICONS.entries()].filter(([, n]) => n === 0).map(([k]) => k);
-    expect(zeros.sort()).toEqual([...NOT_A_PICTURE].sort());
+    expect(zeros).toEqual([]);
+    // And none of the four names is a key, which is the other half of the claim.
+    for (const key of NOT_A_PICTURE) {
+      expect(PICTURE_ICONS.has(key), `${key} is a kind name, not a picture key`).toBe(false);
+    }
   });
 
   it("with no figure below zero and a spread that says which pictures are not kind icons", () => {
@@ -144,33 +161,36 @@ describe("the picture icon counts", () => {
     //
     // **The upper bound is 512, not 16, and that is a finding rather than a typo.** The first
     // version of this test asserted `<= 16` on the reasoning that `schema16` is the widest schema
-    // in the corpus and so no picture needs more. Measured, 46 of the 222 keys exceed 16, up to
-    // `mbSchmelz1.xpm` at 512×1024 — which is 512 icons. Those are the level's *lettersets*,
+    // in the corpus and so no picture needs more. Measured, 82 of the keys exceed 16, up to
+    // `mbSchmelz1.xpm` at 512×1024 — which is 512 icons. Those are the levels' *lettersets*,
     // backgrounds and full-picture sets (`mpAlle.xpm`, `mflAlles.xpm`, `btScore.xpm`,
     // `spLabyrinth.xpm`), which are drawn by index too and are not bounded by any schema.
     //
-    // So the assertion is a floor at zero and an integer check, and the **distribution** is
-    // asserted rather than a maximum: 40 keys have exactly 16 — the `schema16` count, which is
-    // the number group 8's compositor has to produce for a kind whose picture is 16 icons — and
-    // 30 have exactly 1, which is `default1`'s whole population.
+    // So the assertion is a floor and an integer check, and the **distribution** is asserted
+    // rather than a maximum. The two figures that matter are the counts `schema16` and
+    // `default1` care about: 164 keys have exactly sixteen icons, which is the number group 8's
+    // compositor has to produce for a kind whose picture is 16, and 22 have exactly one, which is
+    // every kind `default1` can apply to.
     const values = [...PICTURE_ICONS.values()];
-    expect(Math.min(...values)).toBe(0);
-    expect(values.every((n) => Number.isInteger(n) && n >= 0)).toBe(true);
+    // One, not zero: every key here is a real picture, so a zero would mean the sweep had
+    // picked up a kind name — see the test above.
+    expect(Math.min(...values)).toBe(1);
+    expect(values.every((n) => Number.isInteger(n) && n >= 1)).toBe(true);
     const at = (n: number): number => values.filter((v) => v === n).length;
-    expect(at(16), "keys with schema16's sixteen icons").toBe(40);
-    expect(at(1), "keys with a single icon, which is default1's whole population").toBe(30);
+    expect(at(16), "keys with schema16's sixteen icons").toBe(164);
+    expect(at(1), "keys with a single icon, which is every kind default1 can apply to").toBe(22);
     // And the tail is named rather than bounded, so a picture far past 16 is a known thing
-    // instead of a surprise. Only the largest is pinned: a bound that moved would be a bound.
+    // instead of a surprise.
     const largest = Math.max(...values);
     expect(PICTURE_ICONS.get("mbSchmelz1.xpm")).toBe(largest);
-    expect(largest).toBeGreaterThan(16);
+    expect(largest).toBe(512);
   });
 
   it("and the count for an unknown key is null, not zero", () => {
-    // The distinction the refusal in `defaultCodeFor` turns on: "this key names a picture whose
-    // count nobody has stated" and "this key is not a picture" must not read the same.
+    // The distinction `defaultCodeFor`'s refusal turns on: a key nobody has stated a count for
+    // must be `null` and not 0, because 0 is now a value the table never holds.
     expect(iconCountOf("notAKeyAtAll.xpm")).toBeNull();
-    expect(iconCountOf("Grau")).toBe(0);
+    expect(iconCountOf("Grau"), "a kind name is not a key").toBeNull();
     expect(iconCountOf("ipGrau.xpm")).toBe(1);
   });
 });

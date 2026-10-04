@@ -243,7 +243,7 @@ because it moves with it.
 
 | Tier      | Files | Statements | Branches | Floor                         |
 | --------- | ----: | ---------: | -------: | ----------------------------- |
-| `engine/` |    44 |     94.0 % |   88.2 % | ≥ 90 % stmts, ≥ 85 % branches |
+| `engine/` |    45 |     93.2 % |   87.1 % | ≥ 90 % stmts, ≥ 85 % branches |
 | `render/` |     5 |     97.6 % |   87.5 % | ≥ 80 % statements             |
 | `app/`    |     6 |     81.9 % |   84.8 % | none                          |
 

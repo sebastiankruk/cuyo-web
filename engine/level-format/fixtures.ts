@@ -46,6 +46,8 @@ function makeKinds(specs: readonly KindSpec[], chainGrass: boolean): Kind[] {
       // `artKey` above is the kind's name rather than a picture. That is the same shape as a
       // real kind declared by a `greypic` word, which is what a fixture with no `pics` is.
       pictures: [],
+      // No fixture models a picture list, so there are no counts to state.
+      pictureCounts: [],
       versions: s.versions ?? 1,
       weight: s.weight ?? 1,
       behaviour: defaultBehaviour(role, chainGrass),

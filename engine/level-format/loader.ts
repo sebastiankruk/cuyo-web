@@ -309,19 +309,39 @@ export class LevelLoader {
     // Resolving the keys here means a missing picture is a load failure with a
     // diagnostic, rather than a blank cell a player notices.
     const goalArtKeys: string[] = [];
+    const kinds: Kind[] = [];
     for (const kind of kindsWithCode) {
-      if (kind.artKey === "") continue;
-      try {
-        const entry = resolveArtKey(art, kind.artKey, kind.name, origin.file);
-        if (kind.role === "grass") goalArtKeys.push(entry.key);
-      } catch (cause) {
-        throw new LevelLoadError(origin, (cause as Error).message, { cause });
-      }
       // Upstream refuses to load a kind that detonates on size with no threshold.
       if (kind.numexplode === UNDEFINED_EXPLODE && needsNumExplode(kind)) {
         const d = undefinedExplode(kind, origin);
         throw new LevelLoadError(origin, d.message);
       }
+      // **Every picture file the kind declares, with its icon count** — and *only* those.
+      //
+      // Not `artKey`. A kind declared by a `greypic` or `startpic` *word* rather than an entry
+      // in `pics` has no picture file at all: upstream's `Sorte::Sorte` opens no image for one,
+      // which is why `sorte.cpp:104`'s condition starts `mBilddateien.size() > 0` and why such a
+      // kind's `defaultCode` is null and it draws nothing. `artKey` nevertheless falls back to
+      // the kind's own name, and for `unterwasser.ld`'s `greypic=ibwSchuh.xpm` that name happens
+      // to be a real file on disk — so validating `artKey` found a picture where upstream has
+      // none, and a kind whose name is *not* a file (`Hormone`'s `ihGrau`) failed to load at all.
+      // `artKey` is the renderer's colour key and is passed through untouched.
+      const counts: number[] = [];
+      for (const key of kind.pictures) {
+        const entry = resolveArtKey(art, key, kind.name, origin.file);
+        if (entry.icons < 1) {
+          throw new LevelLoadError(
+            origin,
+            `kind ${kind.name} names picture "${key}", which is recorded as having no ` +
+              `icons. A picture with no icons is not a picture, so either the transcription ` +
+              `or the level's \`pics\` list is wrong.`,
+          );
+        }
+        counts.push(entry.icons);
+      }
+      const first = kind.pictures[0];
+      if (first !== undefined && kind.role === "grass") goalArtKeys.push(first);
+      kinds.push({ ...kind, pictureCounts: counts });
     }
 
     let dist;
@@ -351,7 +371,7 @@ export class LevelLoader {
       name: settings.name,
       author: settings.author,
       description: settings.description,
-      kinds: kindsWithCode,
+      kinds,
       emptyKind: table.emptyKind,
       neighbours: settings.neighbours,
       hexFlip: settings.hexFlip,

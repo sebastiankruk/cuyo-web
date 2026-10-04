@@ -105,6 +105,7 @@ const syntheticKind = (name: string): Kind[] => [
     role: "colour",
     artKey: name,
     pictures: [],
+    pictureCounts: [],
     versions: 1,
     weight: 1,
     behaviour: 0,

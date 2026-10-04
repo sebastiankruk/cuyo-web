@@ -342,6 +342,14 @@ describe("LevelLoader: what it produces", () => {
   it("fails when a picture is not in the manifest, naming the key", async () => {
     // The art check happens at load, so a missing key is a diagnostic rather than a
     // blank cell discovered by a player.
+    //
+    // **The missing key is on a kind's *own* `pics` list**, which is the only place a picture
+    // is looked up from. This used to put `fehlt.xpm` in the *level's* list, which declared
+    // the three kinds but attached no picture to any of them — so with the lookup moved to
+    // `kind.pictures` the test stopped failing, which is the correct behaviour and made the
+    // test a lie. Upstream reads a kind's pictures from its own section (`getKind` does not
+    // look at the parent), so that is where the key has to be.
+    //
     // Real `.ld` syntax, copied from a level file: definitions are `Name={` with no
     // spaces, lists are comma-separated, and a picture name may or may not carry an
     // extension - both forms occur upstream.
@@ -350,11 +358,12 @@ describe("LevelLoader: what it produces", () => {
       '  name="Test"',
       '  author="Nobody"',
       "  numexplode=4",
-      "  pics=inGruen.xpm,inGelb.xpm,fehlt.xpm",
+      "  pics=inGruen.xpm,inGelb.xpm,inGras.xpm",
       "  greypic=inGrau.xpm",
       "  startpic=inGras.xpm",
       "  emptypic=Grau",
       '  startdist=".........."',
+      "  inGruen={ pics=fehlt.xpm }",
       "}",
       "",
     ].join("\n");

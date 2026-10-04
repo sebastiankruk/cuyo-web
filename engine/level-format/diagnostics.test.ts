@@ -40,6 +40,7 @@ function kind(over: Partial<Kind> = {}): Kind {
     role: "colour",
     artKey: "inGruen.xpm",
     pictures: ["inGruen.xpm"],
+    pictureCounts: [16],
     versions: 1,
     weight: 1,
     behaviour: EXPLODES_ON_SIZE,

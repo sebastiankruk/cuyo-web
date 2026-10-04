@@ -54,7 +54,7 @@ export interface ArtEntry {
   readonly key: string;
   readonly source: ArtSource;
   /**
-   * How many icons this picture has, or 0 when the key is not a picture at all.
+   * How many icons this picture has.
    *
    * `Bilddatei::anzBildchen()`, which is `(breite/gric) * (hoehe/gric)` at `gric` = 32 —
    * upstream computes it from the image and this project does not ship the images, so the
@@ -70,9 +70,11 @@ export interface ArtEntry {
    * - `BildStapel::speichereBild` refuses a `pos` outside it, because blitting past the end of
    *   a file would draw whatever follows it there.
    *
-   * Zero rather than absent for a key that names no picture, because a kind declared by a
-   * `greypic` or `startpic` *word* has no picture file unless its own section declares `pics`,
-   * and "this kind draws nothing" is a value rather than a missing one.
+   * **Never zero for a key that is in the manifest.** A kind declared by a `greypic` or
+   * `startpic` *word* has no picture file at all unless its own section declares `pics`, and
+   * upstream opens no image for one — so such a kind has no key here rather than a key with no
+   * icons. That is the fix for a confusing earlier state, where `artKey` fell back to the kind's
+   * own name and four kind names were registered as pictures with zero icons.
    */
   readonly icons: number;
   /**

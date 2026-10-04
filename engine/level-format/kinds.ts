@@ -408,6 +408,10 @@ function makeKind(
     role,
     artKey,
     pictures,
+    // Filled in by the loader, which is the only place with the art manifest to resolve the
+    // counts through. `buildKinds` reads `scope`, and a `.ld` says how many icons a picture
+    // holds only by pointing at a file this project does not ship. See `Kind.pictureCounts`.
+    pictureCounts: [],
     versions,
     weight: 1,
     behaviour: defaultBehaviour(role, defaults.chainGrass),

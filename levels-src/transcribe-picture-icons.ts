@@ -53,10 +53,10 @@ import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { constants as Z, createGunzip, gunzipSync } from "node:zlib";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { collectReferences } from "./picture-keys.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PICS = resolve(HERE, "../.context/upstream-cuyo/data/pics");
-const MANIFEST = resolve(HERE, "generated/art-manifest.ts");
 const OUT = resolve(HERE, "../engine/level-format/picture-icons.ts");
 
 /** `gric`, the cell size in pixels. Every icon is one cell. */
@@ -141,12 +141,6 @@ async function read(key: string): Promise<{ size: { width: number; height: numbe
   return null;
 }
 
-/** The keys the committed manifest carries, which is the set that has to be covered. */
-function manifestKeys(): string[] {
-  const source = readFileSync(MANIFEST, "utf8");
-  return [...source.matchAll(/^\s*key:\s*"([^"]*)",/gm)].map((m) => m[1] as string);
-}
-
 async function main(): Promise<void> {
   if (!existsSync(PICS)) {
     throw new Error(
@@ -154,11 +148,16 @@ async function main(): Promise<void> {
         `reads image dimensions and there is nothing to read them from.`,
     );
   }
-  const keys = manifestKeys();
+  // **The key set comes from the level files, not from the committed manifest.** It used to be
+  // read out of the manifest, which made this step unable to bootstrap the emitter: a newly
+  // referenced key could not be measured because the manifest listing it could not be emitted
+  // without a count for it. `picture-keys.ts` is the shared answer, so the two steps have a
+  // one-way dependency that can actually be run.
+  const keys = collectReferences().refs.map((ref) => ref.key);
   if (keys.length === 0) {
     throw new Error(
-      "The committed art manifest carries no keys, so there is nothing to transcribe. " +
-        "Run `make art-manifest` first.",
+      "No picture keys found in the bundled levels, so there is nothing to transcribe. " +
+        "Either the vendored levels are missing or the parser stopped recognising `pics`.",
     );
   }
 
