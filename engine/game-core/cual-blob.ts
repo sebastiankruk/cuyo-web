@@ -58,7 +58,7 @@ import type { ExecutionContext } from "../cual-runtime/execute.ts";
 import { PictureStack } from "../cual-runtime/draw.ts";
 import type { PictureSource } from "../cual-runtime/draw.ts";
 import type { Animatable } from "../cual-runtime/global.ts";
-import type { AccessField, Here } from "../cual-runtime/access.ts";
+import type { AccessField, Here, ResolvedOrt } from "../cual-runtime/access.ts";
 import { resolveConstant } from "../cual-runtime/const-tables.ts";
 import { readConstant } from "../cual-runtime/constants.ts";
 import type { ConstantSubject } from "../cual-runtime/constants.ts";
@@ -113,7 +113,7 @@ export interface BlobAnimationDeps {
    * named 'falling'" — which is 15.5's error message working, on a name its `valueOf` did not
    * know about.
    */
-  constantSubject(): ConstantSubject;
+  constantSubject(at: ResolvedOrt, store: BlobStore | null): ConstantSubject;
   /** `bonus`, `message`, `explode`, `sound` and `lose`, already bound to this blob. */
   effects(here: Here): EffectContext;
   /**
@@ -336,10 +336,26 @@ export class BlobAnimation implements Animatable {
       },
       random: (limit) => this.deps.random(limit),
       addressed: (name, position, evaluateExpression) => {
-        const slot = this.slotFor(name);
-        if (slot === null) throw new Error(`Cual: no variable named '${name}' in this level`);
         const resolved = resolveOrt(field, position, evaluateExpression);
-        return readAddressed(field, resolved, slot, 0);
+        const slot = this.slotFor(name);
+        if (slot !== null) return readAddressed(field, resolved, slot, 0);
+        // **A read-only constant has no slot, so it is recomputed for the target.**
+        //
+        // `angst.ld` writes `basekind@(tauschrichtung,0)` and `kachelnR.ld`
+        // `basekind@(1,-0.5)`, so a `spezconst_*` really is read *through an address* — and
+        // `addressed` resolved only through `slotFor`, which never asks `readConstant`. A plain
+        // `basekind` worked and `basekind@(…)` threw "no variable named 'basekind'", which is
+        // three corpus levels' first failure and the plainest possible statement of a missing
+        // case.
+        //
+        // The *target's* subject, not the asking blob's: `basekind@(1,0)` is a question about
+        // the neighbour. So the address is resolved first, the target's store fetched, and a
+        // subject built for it — which is the same subject the asking blob gets, just asked about
+        // somebody else.
+        const target = storeAt(field, resolved);
+        const value = readConstant(name, this.deps.constantSubject(resolved, target));
+        if (value === null) throw new Error(`Cual: no variable named '${name}' in this level`);
+        return value;
       },
       neighbour: neighbourReader(field),
     };
@@ -418,8 +434,31 @@ export class BlobAnimation implements Animatable {
    *   a `var` after a kind's name, so the order is unobservable for all 79 — and a variable
    *   winning is the answer that makes such a collision a visible bug rather than a silent one.
    */
+  /** This blob's own constant subject, which is `ownResolved` plus this blob's own store. */
+  private ownConstantSubject(): ConstantSubject {
+    return this.deps.constantSubject(this.ownResolved(), this.store);
+  }
+
+  /**
+   * The asking blob's own position as a `ResolvedOrt`.
+   *
+   * `Here` is the richer shape — it distinguishes a cell from a fall, a global and an info blob
+   * by name — and `ResolvedOrt` is the flatter one the effects and the constants both want. The
+   * three positions with no coordinates on a board become `nowhere`, which is upstream's
+   * `absort_nirgends`, and `loc_p`'s refusal for it is 5.x's and already there.
+   */
+  private ownResolved(): ResolvedOrt {
+    const here = this.deps.here();
+    return {
+      kind: here.kind === "cell" || here.kind === "fall" ? here.kind : "nowhere",
+      x: "x" in here ? here.x : 0,
+      y: "y" in here ? here.y : 0,
+      right: "right" in here ? here.right : false,
+    };
+  }
+
   private valueOf(name: string): number | null {
-    const readOnly = readConstant(name, this.deps.constantSubject());
+    const readOnly = readConstant(name, this.ownConstantSubject());
     if (readOnly !== null) return readOnly;
     const constant = resolveConstant(name);
     if (constant !== null) return constant;

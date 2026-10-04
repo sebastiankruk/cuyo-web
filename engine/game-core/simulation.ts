@@ -795,7 +795,7 @@ export class Simulation {
       here,
       field: () => accessFieldFor(this, here()),
       random: (limit) => this.random.int(limit),
-      constantSubject: () => this.constantSubjectFor(store, here()),
+      constantSubject: (at, target) => this.constantSubjectFor(at, target),
       effects: (asked) => this.effectsFor(store, asked),
       slices: this.slices,
       stackAt: (_field, x, y) => this.stackAt(x, y),
@@ -865,7 +865,23 @@ export class Simulation {
    *   be wrong. Recorded rather than guessed: upstream's own comment beside it calls the fourth
    *   quarter a latent bug, and inventing a value would hide the gap rather than show it.
    */
-  private constantSubjectFor(store: BlobStore, here: Here): ConstantSubject {
+  /**
+   * A blob's constant subject, for **any** blob and not only the asking one.
+   *
+   * The `at`/`store` pair is what makes that possible: `addressed` resolves an address, fetches
+   * the target's store and asks here, so `basekind@(1,0)` is answered about the *neighbour*.
+   * The asking blob passes its own position and its own store, so the ordinary case and the
+   * addressed case go through one function and cannot disagree.
+   *
+   * `store` is null for a position with no blob — an empty cell, or a fall — and then `baseKind`
+   * and `exploding` are the defaults a blob that is not there would have, which is upstream's
+   * `da_keinblob`.
+   */
+  private constantSubjectFor(at: ResolvedOrt, store: BlobStore | null): ConstantSubject {
+    const here: Here =
+      at.kind === "cell" || at.kind === "fall"
+        ? { kind: at.kind, x: at.x, y: at.y, right: at.right }
+        : { kind: "global" };
     const hex = hexGeometry(this.level.neighbours, this.level.hexFlip);
     const blob = here.kind === "cell" ? this.board.at(here.x, here.y) : null;
     /** The piece a falling blob belongs to, or null for anything that is not falling. */
@@ -893,7 +909,10 @@ export class Simulation {
       // `getSorte(vergangenheit)->getBasekind()` — from the *shadow*, like `verbindetMit` in
       // 3.10, so a blob that changed kind this step still reports the old base kind. A negative
       // shadow kind is one of the three singletons, which have no base kind of their own.
-      baseKind: this.level.kinds[store.getSpecial("kind")]?.baseKind ?? BLOBART_AUSSERHALB,
+      baseKind:
+        store === null
+          ? BLOBART_AUSSERHALB
+          : (this.level.kinds[store.getSpecial("kind")]?.baseKind ?? BLOBART_AUSSERHALB),
       // A blob of the *next* piece is a `blopart_fall` too, so `Fall::getSpezConst` answers it
       // exactly as it answers the piece in play — `falling` is 1 for both. Reading `this.fall`
       // for a next-piece blob would answer 0, and then `loc_*`'s refusal below would fire on a
@@ -914,7 +933,7 @@ export class Simulation {
           ? undefined
           : this.fallCoordinates(fallish.piece, here.x, fallish.unplaced),
       // `getVariableVergangenheit(spezvar_am_platzen)`, slot 13.
-      exploding: store.getAlt(13),
+      exploding: store?.getAlt(13) ?? 0,
     };
   }
 
