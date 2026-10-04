@@ -95,6 +95,8 @@ export function nasenkugeln(): LevelDef {
     kinds: withExplode,
     emptyKind: -1,
     neighbours: NeighbourMode.Rect,
+    // `hexflip` defaults to 0 and is only read in a hex mode; neither fixture is one.
+    hexFlip: 0,
     chainGrass: false,
     topTime: DEFAULT_TOPTIME,
     hetzrandStop: 0,
@@ -138,6 +140,7 @@ export function hormone(): LevelDef {
     kinds: withExplode,
     emptyKind: -1,
     neighbours: NeighbourMode.Diagonal,
+    hexFlip: 0,
     chainGrass: true,
     topTime: DEFAULT_TOPTIME,
     hetzrandStop: 0,

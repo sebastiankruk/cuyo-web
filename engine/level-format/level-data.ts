@@ -104,6 +104,25 @@ export interface LevelDef {
   /** Board-wide neighbour mode; an individual kind may override it. */
   readonly neighbours: NeighbourMode;
 
+  /**
+   * `hexflip`, 0 to 3: which way the hex column offset alternates.
+   *
+   * Added by task 15.4, and it is here rather than in `LevelSettings` alone because
+   * `getHexShift` needs it: `LevelDaten::getHexShift(bool rechts, int x)` reads `mSechseck`
+   * *and* `mSechseckFlip`, so a level's hex column parity is level data the engine has to
+   * carry. `settings.ts` parsed and range-checked it from the start and the value was then
+   * dropped on the way to a `LevelDef`, which is the same shape of gap `presentation.test.ts`
+   * records for the renderer — there, `hexflip=2` agrees with the default `0` because
+   * `columnShift` reads bit 1 only for a right-hand field and no hex board in this port is
+   * two-player. **This field is what makes that gap reachable to close**, and 15.4 needs it:
+   * `AccessField.hexShift` has to answer per column and per side, and "the default every
+   * time" would be a member that is not implemented.
+   *
+   * Only meaningful when {@link neighbours} is a hex mode; `columnShift` ignores it in a
+   * rectangular board, which is upstream's `if (!ld->mSechseck) return false`.
+   */
+  readonly hexFlip: number;
+
   /** Goal blobs need a chain reaction to be destroyed. */
   readonly chainGrass: boolean;
   /** Border descent, in steps per pixel. */

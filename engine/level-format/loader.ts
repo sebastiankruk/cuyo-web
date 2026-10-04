@@ -354,6 +354,7 @@ export class LevelLoader {
       kinds: kindsWithCode,
       emptyKind: table.emptyKind,
       neighbours: settings.neighbours,
+      hexFlip: settings.hexFlip,
       chainGrass: settings.chainGrass,
       topTime: settings.topTime,
       hetzrandStop: settings.topStop,

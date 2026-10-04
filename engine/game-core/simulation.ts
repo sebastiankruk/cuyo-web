@@ -35,6 +35,7 @@ import {
 import type { NeighbourMode } from "./constants.ts";
 import { Blob, Board, EMPTY, componentOf, floats } from "./board.ts";
 import { BlobStore, TimeSlices } from "../cual-runtime/store.ts";
+import { BLOPART_GLOBAL, BLOPART_SEMIGLOBAL } from "../cual-runtime/global.ts";
 import type { Position } from "./board.ts";
 import type { LevelDef } from "../level-format/level-data.ts";
 import { Prng } from "../prng.ts";
@@ -89,6 +90,21 @@ export interface SimulationOptions {
   readonly random?: RandomSource;
 }
 
+/**
+ * `Cuyo::getSpielerZahl()`, and it is 1.
+ *
+ * Two-player is a documented non-goal (design.md, *Non-Goals*): `[2]` definitions still
+ * parse, but no second board is driven and there is no AI opponent. `rechts_ok` is
+ * `(!rechts) || (getSpielerZahl() > 1)`, so with one player every right-hand address
+ * resolves to nothing — which is why `@(x,y;>)` does not fail on a one-player level, it
+ * simply has no right-hand field to reach.
+ *
+ * A constant rather than a constructor option, because an option would let a caller set 2
+ * and then find out at the first `at(true, …)`: this `Simulation` has exactly one `Board`
+ * and no second field to point at. Making the claim structural is the point.
+ */
+export const PLAYER_COUNT = 1;
+
 export class Simulation {
   readonly level: LevelDef;
   readonly board = new Board();
@@ -106,6 +122,24 @@ export class Simulation {
    * and watch its queue fill from a blob that does not own it.
    */
   readonly slices = new TimeSlices();
+
+  /**
+   * `Spielfeld::getFallAnz()`, which `absort_fall`'s validity check asks.
+   *
+   * `Fall::getAnz()` is `mPos.getAnz()`, and `FallPos::getAnz` is a three-way switch:
+   * `richtung_keins` gives 0, `richtung_einzel` gives 1, and waag/senk/unplatziert give 2.
+   * That maps exactly onto this simulation's fall being absent, `single`, or a pair — which
+   * is why the translation has three cases rather than one plus a special case.
+   *
+   * A function rather than a field because it changes within a step: a horizontal piece that
+   * splits becomes `single`, and `@(1)` has to stop being reachable in the same step that
+   * blob 1 stopped existing.
+   */
+  fallCount(): number {
+    const piece = this.fall;
+    if (piece === null) return 0;
+    return piece.orientation === "single" ? 1 : 2;
+  }
 
   score = 0;
   /** Steps elapsed since the level started. */
@@ -133,6 +167,47 @@ export class Simulation {
    */
   private settledAboveMargin = false;
 
+  /**
+   * `Blop::gGlobalBlop`'s variables — the one blob every player shares.
+   *
+   * Created in {@link reset} rather than in the constructor, because upstream creates it in
+   * `LevelDaten::startLevel` and says why: `Blop::gGlobalBlop = Blop(blopart_global)` followed
+   * by `gGlobalBlob.setBesitzer(0, ort_absolut(absort_global))`, the second line commented
+   * "Damit Code ausgefuehrt werden darf" — *so that code is allowed to run*. A blob without
+   * an owner is inert, so the owner is what makes it a participant, and a level started twice
+   * gets a fresh one. Only the store is here; 15.5 is what turns it into something that runs
+   * code.
+   *
+   * Public because `accessField` hands it out and a test has to be able to say "the `@()`
+   * address is *this* store" rather than "some store with the right numbers in it" — identity
+   * is the claim, and a private field would make it unassertable.
+   */
+  global!: BlobStore;
+
+  /**
+   * `Spielfeld::mSemiglobal` for each side, indexed by it.
+   *
+   * One per field and never shared between players, which with {@link PLAYER_COUNT} of 1
+   * leaves exactly one entry and the right-hand slot null. Its kind is
+   * `blopart_semiglobal` (-3), so a level reading `kind` in its semiglobal code sees
+   * upstream's value rather than a fresh blob's `blopart_ausserhalb` (-5).
+   *
+   * A table rather than one store because the side is not decoration: `@@(x,y;>)` and
+   * `@@(x,y;<)` address a semiglobal by side, and a lookup that could not answer for a side
+   * would make those two spellings mean the same thing. It answers about *which fields
+   * exist*; whether an address may name one is `rechts_ok`, which `cual-field.ts` applies and
+   * which is deliberately not decided in two places.
+   */
+  private semiglobals: readonly (BlobStore | null)[] = [];
+
+  /** `Spielfeld::mSemiglobal` for a side, or null when this simulation has no such field. */
+  semiglobal(right: boolean): BlobStore | null {
+    return this.semiglobals[right ? 1 : 0] ?? null;
+  }
+
+  /** `Cuyo::getSpielerZahl()`; see {@link PLAYER_COUNT}. */
+  readonly players = PLAYER_COUNT;
+
   constructor(level: LevelDef, options: SimulationOptions = {}) {
     this.level = level;
     this.random = options.random ?? new Prng([options.seed ?? 0x9e3779b9]);
@@ -155,6 +230,33 @@ export class Simulation {
   }
 
   /**
+   * `LevelDaten::startLevel`'s global blob and `Spielfeld`'s semiglobal, as variable arrays.
+   *
+   * Both allocated against **this simulation's** `TimeSlices`, which is the part that is not
+   * obvious. `@` reads a target's beginning-of-step value, and the global and semiglobal read
+   * board blobs through it — so a global blob on a counter of its own would read the board as
+   * it was when the global blob happened to open its window, which is the failure
+   * `blob-store.test.ts` describes for a second counter and which this placement prevents.
+   *
+   * Their own kinds are set to `blopart_global` (-2) and `blopart_semiglobal` (-3), so a level
+   * reading `kind` in its global code sees upstream's value rather than a blob's default of
+   * `blopart_ausserhalb` (-5). `globalCode` is looked up separately by name and never gets a
+   * picture default (`sorte.cpp:98-131`), which is why these two exist as their own kinds.
+   */
+  private makeSingletons(): void {
+    this.global = new BlobStore(this.level.program.allocation.slotCount, GRY, this.slices);
+    this.global.setSystem("kind", BLOPART_GLOBAL);
+    // One semiglobal per side that has a field, and only the left side has one. Written as a
+    // fill rather than a two-element literal so that a two-player port cannot leave the
+    // second slot null by accident.
+    this.semiglobals = Array.from({ length: Math.max(1, this.players) }, () => {
+      const store = new BlobStore(this.level.program.allocation.slotCount, GRY, this.slices);
+      store.setSystem("kind", BLOPART_SEMIGLOBAL);
+      return store;
+    });
+  }
+
+  /**
    * Rebuilds the board from the level's start layout and clears counters.
    *
    * The random source is rewound too, not just the board: a restart has to
@@ -173,6 +275,10 @@ export class Simulation {
     this.chainReaction = false;
     this.settledAboveMargin = false;
     this.phase = "falling";
+    // `LevelDaten::startLevel`, which is where upstream creates the global blob. A restart is a
+    // new level, so the global blob's variables start over — a `var` in `global` must not
+    // carry its value from the game that was just abandoned.
+    this.makeSingletons();
 
     const dist = this.level.startDist;
     const firstRow = GRY - dist.length;

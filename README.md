@@ -243,14 +243,14 @@ because it moves with it.
 
 | Tier      | Files | Statements | Branches | Floor                         |
 | --------- | ----: | ---------: | -------: | ----------------------------- |
-| `engine/` |    41 |     93.7 % |   87.4 % | ≥ 90 % stmts, ≥ 85 % branches |
-| `render/` |     4 |     91.7 % |   84.0 % | ≥ 80 % statements             |
+| `engine/` |    43 |     93.9 % |   88.2 % | ≥ 90 % stmts, ≥ 85 % branches |
+| `render/` |     5 |     97.6 % |   87.5 % | ≥ 80 % statements             |
 | `app/`    |     6 |     81.9 % |   84.8 % | none                          |
 
-Measured on the `coverage-floors` branch at 1445 passing tests. The test count is
-not part of the measurement: `coverage.test.ts` imports nothing under `engine/`,
-`render/` or `app/`, so adding tests to it does not move these figures — only code
-does.
+Measured on the `cual-runtime-over-the-board` branch at 1632 passing tests. The
+test count is not part of the measurement: `coverage.test.ts` imports nothing
+under `engine/`, `render/` or `app/`, so adding tests to it does not move these
+figures — only code does.
 
 Re-measure and update this table when it moves. That is the point of recording it:
 a fall shows up in a review diff instead of being discovered later.
