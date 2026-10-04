@@ -12,6 +12,7 @@ import { Board, Blob, componentOf, connected } from "./board.ts";
 import { FLOATS, NeighbourMode, hexGeometry } from "./constants.ts";
 import type { Kind } from "../level-format/level-data.ts";
 
+import { testBlob } from "../testing/blob.ts";
 const COLOUR: Kind = {
   id: 0,
   name: "colour",
@@ -32,7 +33,7 @@ const COLOUR: Kind = {
 const OTHER: Kind = { ...COLOUR, id: 1, name: "other", artKey: "other" };
 
 function blob(kind: Kind, inhibit = 0): Blob {
-  const b = new Blob();
+  const b = testBlob();
   b.initFromKind(kind);
   b.inhibit = inhibit;
   return b;

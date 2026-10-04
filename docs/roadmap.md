@@ -6,7 +6,7 @@ reasoning behind the sequence.
 
 ## Where we are
 
-107 of 173 tasks. Two groups are done, and the difference matters:
+108 of 173 tasks. Two groups are done, and the difference matters:
 
 |                  Group |       | What it means                                                       |
 | ---------------------- | ----- | ------------------------------------------------------------------- |
@@ -18,7 +18,7 @@ reasoning behind the sequence.
 |           6. Catalogue |  7/12 | Loadable, gated, tracked, introduced — and now visible.             |
 |        7. Presentation |  3/14 | Colours, hex, mirror and explosions verified; draw-op order is not. |
 |       12. Verification |   3/8 | One real level played to a win and a loss; Cual still unwired.      |
-| 15. Wiring the runtime |   2/7 | A loaded level carries its code; nothing runs it yet.               |
+| 15. Wiring the runtime |   3/7 | Code extracted, carried, and stored per blob; still not run.        |
 
 Everything else is untouched: 8 (art), 9 (shell), 10 (mobile), 11 (PWA).
 

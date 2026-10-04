@@ -21,6 +21,7 @@ import {
 } from "./constants.ts";
 import type { HexGeometry } from "./constants.ts";
 import type { Kind, LevelDef } from "../level-format/level-data.ts";
+import { BlobStore } from "../cual-runtime/store.ts";
 
 /** Index of the empty kind, used as the "no blob" sentinel. */
 export const EMPTY = -1;
@@ -48,11 +49,32 @@ export class Blob {
   exploding = 0;
   /** Latest component size, as seen by this blob. */
   chainSize = 0;
-  /** Per-blob variable storage for Cual. */
-  readonly vars: Int32Array;
+  /**
+   * This blob's Cual variables: `Blop::mDaten`.
+   *
+   * Task 15.3. This was an `Int32Array` named `vars`, allocated by `board.ts` and **read by
+   * nobody** — a placeholder for exactly this, left since the variable storage was written. It is
+   * a real `BlobStore` now, because `AccessField.at` has to hand one back for every cell on the
+   * board and a bare array is not the thing the runtime reads: the store also owns the
+   * beginning-of-step shadow, the busy flags' home and the fourteen special slots.
+   *
+   * ## The fields above duplicate four of those slots, and that is a known debt
+   *
+   * `kind`, `version`, `weight`, `behaviour` and `inhibit` are `spezvar_*` in the store *and*
+   * plain fields here. Upstream has one array and reads all of them out of it. Keeping the
+   * fields means `Simulation`, `board.ts` and the renderer are untouched, but two copies can
+   * drift, and they will first be able to when 15.5 lets Cual assign `kind`. The fix is to make
+   * the fields accessors onto the store — same names, same call sites, one copy — and it is
+   * deliberately *not* folded in here, because it reaches every reader of `blob.kind` and
+   * belongs in its own reviewed change.
+   *
+   * {@link initFromKind} is the single writer of both copies, so as long as that holds they
+   * cannot disagree about a blob's initial state.
+   */
+  readonly store: BlobStore;
 
-  constructor(variableCount = 0) {
-    this.vars = new Int32Array(variableCount);
+  constructor(store: BlobStore) {
+    this.store = store;
   }
 
   /** True when this cell holds a blob rather than being empty. */
@@ -60,11 +82,20 @@ export class Blob {
     return this.kind !== EMPTY;
   }
 
-  /** Copies kind defaults into this blob, as upstream does on creation. */
+  /**
+   * Copies kind defaults into this blob, as upstream does on creation.
+   *
+   * Writes both copies of the shared values — the fields above and the store's special slots —
+   * because this is the one place a blob's initial state is set. See {@link store} for why there
+   * are two.
+   */
   initFromKind(kind: Kind): void {
     this.kind = kind.id;
     this.weight = kind.weight;
     this.behaviour = kind.behaviour;
+    this.store.setSystem("kind", kind.id);
+    this.store.setSystem("weight", kind.weight);
+    this.store.setSystem("behaviour", kind.behaviour);
   }
 
   has(behaviourBit: number): boolean {

@@ -22,6 +22,7 @@ import type { LevelDef } from "../level-format/level-data.ts";
 import { ScriptedPrng } from "../testing/prng-stub.ts";
 import { nasenkugeln } from "../level-format/fixtures.ts";
 
+import { testBlob } from "../testing/blob.ts";
 /** Keeps handing out one kind, so pieces are predictable. */
 function fixedPicker(): ScriptedPrng {
   return new ScriptedPrng(new Array(20000).fill(0.01));
@@ -399,7 +400,7 @@ describe("5.8 landing", () => {
 
 /** Builds a blob of `kind`. */
 function makeBlob(sim: Simulation, kind: number): Blob {
-  const blob = new Blob();
+  const blob = testBlob();
   blob.initFromKind(sim.level.kinds[kind]!);
   return blob;
 }

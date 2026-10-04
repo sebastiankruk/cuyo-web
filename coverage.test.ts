@@ -151,6 +151,7 @@ describe("every source file is inside the measured set", () => {
     expect(skip).toEqual([
       "app/build-stamp.d.ts",
       "app/testing/manual-clock.ts",
+      "engine/testing/blob.ts",
       "engine/testing/prng-stub.ts",
     ]);
   });

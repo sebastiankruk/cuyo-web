@@ -24,13 +24,14 @@ import type { RandomSource } from "../prng.ts";
 import { RecordingPrng, ScriptedPrng } from "../testing/prng-stub.ts";
 import { nasenkugeln } from "../level-format/fixtures.ts";
 
+import { testBlob } from "../testing/blob.ts";
 /** A source that keeps returning the same value, for deterministic draws. */
 function fixed(value: number, count = 20000): ScriptedPrng {
   return new ScriptedPrng(new Array(count).fill(value));
 }
 
 function blobOf(sim: Simulation, kind: number): Blob {
-  const blob = new Blob();
+  const blob = testBlob();
   blob.initFromKind(sim.level.kinds[kind]!);
   return blob;
 }

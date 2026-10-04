@@ -314,6 +314,47 @@ game-core tests were exercising something no real level does.
 Re-measured through the loader rather than trusted from 15.1: **502 / 5 / 49** and **zero
 unresolved calls** across all 79 levels, unchanged.
 
+**15.3's real content was a duplication the honest answer does not remove.**
+`Blob` keeps `kind`, `version`, `weight`, `behaviour` and `inhibit` as plain fields *and* has a
+`BlobStore` whose `spezvar_*` slots hold the same values. Upstream has one array and reads all of
+them out of it. Making the fields accessors would touch every reader of `blob.kind` in
+`board.ts`, `simulation.ts`, `render/` and dozens of tests, so it is **not** folded in here; it is
+documented on `Blob.store` as known debt, with `initFromKind` as the single writer so the two
+cannot disagree about a blob's initial state. **The two copies can first drift when 15.5 lets Cual
+assign `kind`**, and that is the moment to do it.
+
+**The array is sized per *configuration*, not per kind**, and that is worth stating because per
+kind would overflow immediately: a blob can reach any procedure in the level by calling it, so the
+array holds every node the program declares. `baggis.ld`'s kinds all call `geblitzt` and
+`schema16`, both declared at the level's top.
+
+**The sharing is proved behaviourally, because it cannot be proved structurally.**
+`BlobStore` keeps its `TimeSlices` private, so "do two blobs share one counter?" has no structural
+answer. `hasShadow` is `#altSlice === #slices.current`, so opening a second window on the
+simulation must drop a blob's snapshot — and with a per-blob counter it would not. My first
+version of that test used `testBlob()`, which gives each blob **its own** counter and so proved
+nothing while reading as though it did.
+
+**Two assertions of mine were wrong and the probe caught both.** I asserted `getAlt` returned the
+value just written; it returns the value from **before** the write, because `set` snapshots before
+it writes. That is the entire point of the window, and a test expecting the new value would be
+asserting that `@`-reads see writes made earlier in the same step — the bug the machinery exists
+to prevent. And I asserted `pending` was 0 after `close()`; `close()` applies the queue and
+`open()` clears it, which is upstream's division of labour, so `pending` is still 1 until the next
+window.
+
+**A fixture blob's array is exactly `SPECIAL_VARIABLE_COUNT` long**, so index 14 — the first
+*user* slot — is one past its end, and a test using it reads `undefined`. `EMPTY_PROGRAM` allocates
+over an empty tree, so a fixture has no user variables at all. Worth knowing before a test uses a
+fixture and wonders.
+
+`engine/testing/blob.ts` is a new test helper, so it is on `coverage.test.ts`'s by-name exclusion
+list — that list is the whole exclusion set, asserted exactly, so a new helper that is not added
+fails the gate.
+
+Mutation-checked: every blob given its own `TimeSlices` · the array sized per kind instead of per
+configuration · `initFromKind` writing only the fields and not the array.
+
 **7.4, 7.6 and 7.7 were implemented and unverified; they are now verified against the
 renderer's real draw calls, in `render/presentation.test.ts`.** Every assertion names a
 position rather than a count — the lesson this project's tests were written after, where
@@ -750,7 +791,7 @@ and wiring without the defaults would leave the great majority of the corpus ine
 
 - [x] 15.1 Extract a level's Cual program from its parsed `.ld` and `globals.ld` into a value — the level's procedures, and for every kind the resolved draw code, being its own named procedure or the default its picture count selects — as a pure function of the two parsed files, and verify it across all 79 levels
 - [x] 15.2 Give `Kind` its draw code and `LevelDef` its program, and build both in `LevelLoader`, so a loaded level carries the code it is about to run
-- [ ] 15.3 Replace `Blob`'s unused `vars: Int32Array` with a real `BlobStore`, allocated per blob against one shared `TimeSlices` per board, so each cell has the variable array `AccessField.at` has to hand back
+- [x] 15.3 Replace `Blob`'s unused `vars: Int32Array` with a real `BlobStore`, allocated per blob against one shared `TimeSlices` per board, so each cell has the variable array `AccessField.at` has to hand back
 - [ ] 15.4 Implement `AccessField` over the live `Board` — `at`, `global`, `semiglobal`, `here`, `hex`, `hexShift`, `mirrored`, `players`, `fallCount` — and verify each against what the addressed access already does on a hand-built field
 - [ ] 15.5 Implement `Animatable` for one blob: its kind's draw code, its own store, and `animate()` as `braucheLeereStapel` then `initSchritt` then the code
 - [ ] 15.6 Run the blobs' code at the end of `Simulation.step()`, through `runStep`, in the order `cuyo.cpp:473` uses — and with the picture stacks cleared and one window opened around it
