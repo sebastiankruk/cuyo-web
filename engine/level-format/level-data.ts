@@ -29,6 +29,21 @@ export interface Kind {
   readonly role: KindRole;
   /** Logical art key; may be empty for a kind that draws nothing. */
   readonly artKey: string;
+  /**
+   * Every picture file this kind has, in the order `pics` lists them.
+   *
+   * `artKey` is this list's first entry, and it used to be the *only* thing kept: `kinds.ts`
+   * read `pics` in full, took entry zero as `artKey` and discarded the rest, which is why the
+   * file count and the first file's icon count were unavailable where they were needed.
+   *
+   * Both are needed now. `Sorte::ladeCualEvents` chooses a kind's default draw code from
+   * `mBilddateien.size()` — one file is `default1` or `default2`, several is `default3` — and
+   * `PictureSource.pictureCount(kind, file)` resolves Cual's `file` variable through this
+   * list to reach a picture's icon count. Empty for a kind that has no picture file at all,
+   * which is what a kind named by a `greypic` or `startpic` *word* is unless its own section
+   * declares `pics`.
+   */
+  readonly pictures: readonly string[];
   /** Number of distinct appearances, chosen at random as `version`. */
   readonly versions: number;
   /** Contribution to component size. */

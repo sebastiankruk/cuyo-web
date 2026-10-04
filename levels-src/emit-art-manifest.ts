@@ -33,6 +33,7 @@ import {
 } from "../engine/level-format/settings.ts";
 import { artManifest } from "../engine/level-format/art.ts";
 import type { ArtEntry, ArtManifest } from "../engine/level-format/art.ts";
+import { iconCountOf } from "../engine/level-format/picture-icons.ts";
 import {
   availableLevelFiles,
   readGlobals,
@@ -183,6 +184,7 @@ function emit(
         return `  {
     key: ${JSON.stringify(entry.key)},
     source: { kind: "image", path: ${JSON.stringify(entry.source.path)} },
+    icons: ${entry.icons},
     firstKind: ${JSON.stringify(entry.firstKind)},
   },`;
       }
@@ -194,6 +196,7 @@ function emit(
       saturation: ${entry.source.saturation},
       lightness: ${entry.source.lightness},
     },
+    icons: ${entry.icons},
     firstKind: ${JSON.stringify(entry.firstKind)},
   },`;
     });
@@ -206,6 +209,12 @@ function emit(
 //
 // The artwork is generated from each key rather than authored, and upstream's
 // spritesheets are deliberately not shipped - see scripts/check-no-upstream-art.sh.
+//
+// \`icons\` is the one number here that is not derivable from the key text: how many icons
+// the picture has, which decides both the default draw code a kind runs and whether a
+// \`pos\` Cual asks for is in range. It comes from engine/level-format/picture-icons.ts,
+// which is transcribed from upstream's image dimensions and committed, because there is no
+// image at run time to measure.
 
 import { artManifest } from "../../engine/level-format/art.ts";
 import type { ArtEntry } from "../../engine/level-format/art.ts";
@@ -240,6 +249,11 @@ function main(): void {
   const entries: ArtEntry[] = [...byKey.values()].map((ref) => ({
     key: ref.key,
     source: generatedSource(ref.key),
+    // The one number the key text does not determine. See the emitted file's header and
+    // `engine/level-format/picture-icons.ts`; a key the table does not carry is 0, which
+    // means "this kind names no picture" — the four such keys are kind names that a
+    // `greypic` or `startpic` word produced and that no section gave a `pics` list to.
+    icons: iconCountOf(ref.key) ?? 0,
     firstKind: ref.kind,
   }));
 

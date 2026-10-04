@@ -7,6 +7,12 @@
 //
 // The artwork is generated from each key rather than authored, and upstream's
 // spritesheets are deliberately not shipped - see scripts/check-no-upstream-art.sh.
+//
+// `icons` is the one number here that is not derivable from the key text: how many icons
+// the picture has, which decides both the default draw code a kind runs and whether a
+// `pos` Cual asks for is in range. It comes from engine/level-format/picture-icons.ts,
+// which is transcribed from upstream's image dimensions and committed, because there is no
+// image at run time to measure.
 
 import { artManifest } from "../../engine/level-format/art.ts";
 import type { ArtEntry } from "../../engine/level-format/art.ts";
@@ -20,6 +26,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 55,
     },
+    icons: 0,
     firstKind: "Grau",
   },
   {
@@ -30,6 +37,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 57,
     },
+    icons: 0,
     firstKind: "Starr",
   },
   {
@@ -40,6 +48,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 57,
     },
+    icons: 0,
     firstKind: "Start",
   },
   {
@@ -50,6 +59,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 63,
       lightness: 55,
     },
+    icons: 9,
     firstKind: "symbol",
   },
   {
@@ -60,6 +70,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 53,
     },
+    icons: 18,
     firstKind: "aCantorSet",
   },
   {
@@ -70,6 +81,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 63,
       lightness: 49,
     },
+    icons: 8,
     firstKind: "greyblob",
   },
   {
@@ -80,6 +92,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 48,
     },
+    icons: 8,
     firstKind: "Alien",
   },
   {
@@ -90,6 +103,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 52,
     },
+    icons: 2,
     firstKind: "Blue",
   },
   {
@@ -100,6 +114,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 61,
       lightness: 46,
     },
+    icons: 2,
     firstKind: "Green",
   },
   {
@@ -110,6 +125,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 50,
     },
+    icons: 2,
     firstKind: "Red",
   },
   {
@@ -120,6 +136,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 63,
       lightness: 52,
     },
+    icons: 2,
     firstKind: "Yellow",
   },
   {
@@ -130,6 +147,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 54,
     },
+    icons: 12,
     firstKind: "bbBonus",
   },
   {
@@ -140,6 +158,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 55,
     },
+    icons: 200,
     firstKind: "All",
   },
   {
@@ -150,6 +169,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 63,
       lightness: 48,
     },
+    icons: 12,
     firstKind: "All",
   },
   {
@@ -160,6 +180,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 69,
       lightness: 48,
     },
+    icons: 27,
     firstKind: "Letter1",
   },
   {
@@ -170,6 +191,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 64,
       lightness: 46,
     },
+    icons: 1,
     firstKind: "blFragezeichen",
   },
   {
@@ -180,6 +202,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 52,
     },
+    icons: 30,
     firstKind: "bm",
   },
   {
@@ -190,6 +213,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 61,
       lightness: 52,
     },
+    icons: 1,
     firstKind: "bmTisch",
   },
   {
@@ -200,6 +224,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 54,
     },
+    icons: 8,
     firstKind: "Eis",
   },
   {
@@ -210,6 +235,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 64,
       lightness: 47,
     },
+    icons: 5,
     firstKind: "Freezing",
   },
   {
@@ -220,6 +246,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 61,
       lightness: 46,
     },
+    icons: 16,
     firstKind: "Iglu",
   },
   {
@@ -230,6 +257,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 50,
     },
+    icons: 16,
     firstKind: "Empty",
   },
   {
@@ -240,6 +268,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 47,
     },
+    icons: 4,
     firstKind: "Schnee",
   },
   {
@@ -250,6 +279,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 49,
     },
+    icons: 1,
     firstKind: "bpStein",
   },
   {
@@ -260,6 +290,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 56,
     },
+    icons: 16,
     firstKind: "Grey",
   },
   {
@@ -270,6 +301,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 58,
       lightness: 52,
     },
+    icons: 20,
     firstKind: "Score",
   },
   {
@@ -280,6 +312,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 48,
     },
+    icons: 7,
     firstKind: "Tetris",
   },
   {
@@ -290,6 +323,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 53,
     },
+    icons: 1,
     firstKind: "All",
   },
   {
@@ -300,6 +334,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 60,
       lightness: 56,
     },
+    icons: 16,
     firstKind: "dnStart",
   },
   {
@@ -310,6 +345,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 64,
       lightness: 46,
     },
+    icons: 16,
     firstKind: "dnStart",
   },
   {
@@ -320,6 +356,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 63,
       lightness: 57,
     },
+    icons: 16,
     firstKind: "dnBlue",
   },
   {
@@ -330,6 +367,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 57,
     },
+    icons: 16,
     firstKind: "dnGray",
   },
   {
@@ -340,6 +378,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 53,
     },
+    icons: 16,
     firstKind: "dnGreen",
   },
   {
@@ -350,6 +389,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 55,
     },
+    icons: 16,
     firstKind: "dnRed",
   },
   {
@@ -360,6 +400,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 46,
     },
+    icons: 16,
     firstKind: "elBlack",
   },
   {
@@ -370,6 +411,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 54,
     },
+    icons: 16,
     firstKind: "elBlue",
   },
   {
@@ -380,6 +422,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 54,
     },
+    icons: 1,
     firstKind: "elGray",
   },
   {
@@ -390,6 +433,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 60,
       lightness: 56,
     },
+    icons: 16,
     firstKind: "elGreen",
   },
   {
@@ -400,6 +444,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 47,
     },
+    icons: 16,
     firstKind: "elRed",
   },
   {
@@ -410,6 +455,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 58,
       lightness: 49,
     },
+    icons: 16,
     firstKind: "elYellow",
   },
   {
@@ -420,6 +466,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 50,
     },
+    icons: 27,
     firstKind: "Dreieck",
   },
   {
@@ -430,6 +477,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 65,
       lightness: 56,
     },
+    icons: 27,
     firstKind: "Gitter",
   },
   {
@@ -440,6 +488,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 46,
     },
+    icons: 10,
     firstKind: "Box",
   },
   {
@@ -450,6 +499,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 48,
     },
+    icons: 27,
     firstKind: "Kreis",
   },
   {
@@ -460,6 +510,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 56,
     },
+    icons: 27,
     firstKind: "Plus",
   },
   {
@@ -470,6 +521,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 64,
       lightness: 54,
     },
+    icons: 27,
     firstKind: "Quadrat",
   },
   {
@@ -480,6 +532,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 53,
     },
+    icons: 27,
     firstKind: "Stern",
   },
   {
@@ -490,6 +543,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 48,
     },
+    icons: 8,
     firstKind: "i6Blau",
   },
   {
@@ -500,6 +554,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 48,
     },
+    icons: 8,
     firstKind: "i6Gelb",
   },
   {
@@ -510,6 +565,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 52,
     },
+    icons: 1,
     firstKind: "i6Grau",
   },
   {
@@ -520,6 +576,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 57,
     },
+    icons: 2,
     firstKind: "i6Gross",
   },
   {
@@ -530,6 +587,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 60,
       lightness: 55,
     },
+    icons: 8,
     firstKind: "i6Lila",
   },
   {
@@ -540,6 +598,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 64,
       lightness: 49,
     },
+    icons: 8,
     firstKind: "i6Rot",
   },
   {
@@ -550,6 +609,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 48,
     },
+    icons: 8,
     firstKind: "i6Weiss",
   },
   {
@@ -560,6 +620,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 46,
     },
+    icons: 9,
     firstKind: "iaAusdruck",
   },
   {
@@ -570,6 +631,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 55,
     },
+    icons: 9,
     firstKind: "iaBefehl",
   },
   {
@@ -580,6 +642,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 63,
       lightness: 52,
     },
+    icons: 10,
     firstKind: "iaError",
   },
   {
@@ -590,6 +653,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 46,
     },
+    icons: 1,
     firstKind: "iaGrau",
   },
   {
@@ -600,6 +664,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 52,
     },
+    icons: 9,
     firstKind: "iaString",
   },
   {
@@ -610,6 +675,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 50,
     },
+    icons: 9,
     firstKind: "iaZahl",
   },
   {
@@ -620,6 +686,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 69,
       lightness: 49,
     },
+    icons: 16,
     firstKind: "Baelle1",
   },
   {
@@ -630,6 +697,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 65,
       lightness: 52,
     },
+    icons: 1,
     firstKind: "ibGrauball",
   },
   {
@@ -640,6 +708,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 51,
     },
+    icons: 4,
     firstKind: "ibKegel",
   },
   {
@@ -650,6 +719,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 64,
       lightness: 56,
     },
+    icons: 20,
     firstKind: "motiv",
   },
   {
@@ -660,6 +730,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 57,
     },
+    icons: 3,
     firstKind: "frame",
   },
   {
@@ -670,6 +741,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 48,
     },
+    icons: 8,
     firstKind: "Tintenfisch",
   },
   {
@@ -680,6 +752,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 46,
     },
+    icons: 1,
     firstKind: "ibwSchuh",
   },
   {
@@ -690,6 +763,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 69,
       lightness: 53,
     },
+    icons: 20,
     firstKind: "ieGelb",
   },
   {
@@ -700,6 +774,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 58,
       lightness: 48,
     },
+    icons: 12,
     firstKind: "ieGras",
   },
   {
@@ -710,6 +785,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 56,
     },
+    icons: 12,
     firstKind: "ieGrau",
   },
   {
@@ -720,6 +796,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 55,
     },
+    icons: 20,
     firstKind: "ieGruen",
   },
   {
@@ -730,6 +807,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 56,
     },
+    icons: 20,
     firstKind: "ieRosa",
   },
   {
@@ -740,6 +818,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 63,
       lightness: 56,
     },
+    icons: 20,
     firstKind: "ieRot",
   },
   {
@@ -750,6 +829,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 50,
     },
+    icons: 1,
     firstKind: "igGo",
   },
   {
@@ -760,6 +840,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 65,
       lightness: 53,
     },
+    icons: 3,
     firstKind: "Stein",
   },
   {
@@ -770,6 +851,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 50,
     },
+    icons: 2,
     firstKind: "ihBlau",
   },
   {
@@ -780,6 +862,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 51,
     },
+    icons: 1,
     firstKind: "ihBunt",
   },
   {
@@ -790,6 +873,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 57,
     },
+    icons: 1,
     firstKind: "ihGrau",
   },
   {
@@ -800,6 +884,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 51,
     },
+    icons: 2,
     firstKind: "ihGruen",
   },
   {
@@ -810,6 +895,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 53,
     },
+    icons: 2,
     firstKind: "ihLila",
   },
   {
@@ -820,6 +906,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 63,
       lightness: 56,
     },
+    icons: 2,
     firstKind: "ihRot",
   },
   {
@@ -830,6 +917,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 50,
     },
+    icons: 21,
     firstKind: "blase",
   },
   {
@@ -840,6 +928,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 47,
     },
+    icons: 6,
     firstKind: "ding",
   },
   {
@@ -850,6 +939,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 46,
     },
+    icons: 40,
     firstKind: "tuer",
   },
   {
@@ -860,6 +950,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 47,
     },
+    icons: 12,
     firstKind: "vogel",
   },
   {
@@ -870,6 +961,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 64,
       lightness: 49,
     },
+    icons: 16,
     firstKind: "inGelb",
   },
   {
@@ -880,6 +972,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 63,
       lightness: 52,
     },
+    icons: 12,
     firstKind: "inGras",
   },
   {
@@ -890,6 +983,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 58,
       lightness: 48,
     },
+    icons: 8,
     firstKind: "inGrau",
   },
   {
@@ -900,6 +994,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 54,
     },
+    icons: 16,
     firstKind: "inGruen",
   },
   {
@@ -910,6 +1005,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 64,
       lightness: 51,
     },
+    icons: 16,
     firstKind: "inOrangeNasen",
   },
   {
@@ -920,6 +1016,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 46,
     },
+    icons: 16,
     firstKind: "inRosaNasen",
   },
   {
@@ -930,6 +1027,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 60,
       lightness: 53,
     },
+    icons: 16,
     firstKind: "inSchwarz",
   },
   {
@@ -940,6 +1038,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 64,
       lightness: 53,
     },
+    icons: 1,
     firstKind: "ipGrau",
   },
   {
@@ -950,6 +1049,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 61,
       lightness: 50,
     },
+    icons: 6,
     firstKind: "ipHoch",
   },
   {
@@ -960,6 +1060,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 56,
     },
+    icons: 6,
     firstKind: "ipHochRunter",
   },
   {
@@ -970,6 +1071,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 52,
     },
+    icons: 6,
     firstKind: "ipLinks",
   },
   {
@@ -980,6 +1082,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 60,
       lightness: 49,
     },
+    icons: 6,
     firstKind: "ipLinksRechts",
   },
   {
@@ -990,6 +1093,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 60,
       lightness: 56,
     },
+    icons: 6,
     firstKind: "ipRechts",
   },
   {
@@ -1000,6 +1104,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 52,
     },
+    icons: 6,
     firstKind: "ipRunter",
   },
   {
@@ -1010,6 +1115,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 57,
     },
+    icons: 24,
     firstKind: "ipStart",
   },
   {
@@ -1020,6 +1126,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 53,
     },
+    icons: 4,
     firstKind: "isLaeufer",
   },
   {
@@ -1030,6 +1137,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 60,
       lightness: 54,
     },
+    icons: 2,
     firstKind: "isKoenig",
   },
   {
@@ -1040,6 +1148,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 46,
     },
+    icons: 5,
     firstKind: "isSpringer",
   },
   {
@@ -1050,6 +1159,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 51,
     },
+    icons: 30,
     firstKind: "tier",
   },
   {
@@ -1060,6 +1170,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 54,
     },
+    icons: 30,
     firstKind: "gras",
   },
   {
@@ -1070,6 +1181,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 47,
     },
+    icons: 30,
     firstKind: "grau",
   },
   {
@@ -1080,6 +1192,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 60,
       lightness: 47,
     },
+    icons: 9,
     firstKind: "gelb",
   },
   {
@@ -1090,6 +1203,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 49,
     },
+    icons: 27,
     firstKind: "wuerfel",
   },
   {
@@ -1100,6 +1214,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 65,
       lightness: 54,
     },
+    icons: 16,
     firstKind: "ivDrachen",
   },
   {
@@ -1110,6 +1225,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 64,
       lightness: 52,
     },
+    icons: 16,
     firstKind: "Baum",
   },
   {
@@ -1120,6 +1236,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 47,
     },
+    icons: 5,
     firstKind: "Erde",
   },
   {
@@ -1130,6 +1247,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 61,
       lightness: 54,
     },
+    icons: 4,
     firstKind: "iwKreis",
   },
   {
@@ -1140,6 +1258,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 63,
       lightness: 50,
     },
+    icons: 4,
     firstKind: "iwQuadrat",
   },
   {
@@ -1150,6 +1269,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 69,
       lightness: 49,
     },
+    icons: 4,
     firstKind: "iwRaute",
   },
   {
@@ -1160,6 +1280,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 60,
       lightness: 48,
     },
+    icons: 12,
     firstKind: "bad",
   },
   {
@@ -1170,6 +1291,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 50,
     },
+    icons: 12,
     firstKind: "gras",
   },
   {
@@ -1180,6 +1302,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 55,
     },
+    icons: 12,
     firstKind: "parkett",
   },
   {
@@ -1190,6 +1313,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 56,
     },
+    icons: 12,
     firstKind: "teppich",
   },
   {
@@ -1200,6 +1324,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 58,
       lightness: 55,
     },
+    icons: 16,
     firstKind: "jhBallons",
   },
   {
@@ -1210,6 +1335,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 55,
     },
+    icons: 16,
     firstKind: "Blitz",
   },
   {
@@ -1220,6 +1346,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 69,
       lightness: 57,
     },
+    icons: 16,
     firstKind: "jhDrachensteigen",
   },
   {
@@ -1230,6 +1357,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 69,
       lightness: 57,
     },
+    icons: 1,
     firstKind: "jhGraueWolke",
   },
   {
@@ -1240,6 +1368,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 64,
       lightness: 55,
     },
+    icons: 16,
     firstKind: "jhHelleWolken",
   },
   {
@@ -1250,6 +1379,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 48,
     },
+    icons: 15,
     firstKind: "jhSonne",
   },
   {
@@ -1260,6 +1390,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 61,
       lightness: 57,
     },
+    icons: 16,
     firstKind: "Voegel",
   },
   {
@@ -1270,6 +1401,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 56,
     },
+    icons: 16,
     firstKind: "jjBaum",
   },
   {
@@ -1280,6 +1412,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 57,
     },
+    icons: 16,
     firstKind: "jsGelbFlach",
   },
   {
@@ -1290,6 +1423,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 53,
     },
+    icons: 16,
     firstKind: "jsGrauLoch",
   },
   {
@@ -1300,6 +1434,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 54,
     },
+    icons: 6,
     firstKind: "jsGruenGras",
   },
   {
@@ -1310,6 +1445,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 48,
     },
+    icons: 6,
     firstKind: "jsOrangeKetten",
   },
   {
@@ -1320,6 +1456,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 47,
     },
+    icons: 2,
     firstKind: "jsOrangeKreuz",
   },
   {
@@ -1330,6 +1467,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 53,
     },
+    icons: 4,
     firstKind: "jsRotHexen",
   },
   {
@@ -1340,6 +1478,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 54,
     },
+    icons: 1,
     firstKind: "bier",
   },
   {
@@ -1350,6 +1489,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 46,
     },
+    icons: 1,
     firstKind: "muell",
   },
   {
@@ -1360,6 +1500,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 49,
     },
+    icons: 6,
     firstKind: "pizza",
   },
   {
@@ -1370,6 +1511,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 63,
       lightness: 48,
     },
+    icons: 12,
     firstKind: "sofa",
   },
   {
@@ -1380,6 +1522,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 52,
     },
+    icons: 16,
     firstKind: "tasse",
   },
   {
@@ -1390,6 +1533,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 69,
       lightness: 49,
     },
+    icons: 1,
     firstKind: "lbBlack",
   },
   {
@@ -1400,6 +1544,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 53,
     },
+    icons: 5,
     firstKind: "lbBomb",
   },
   {
@@ -1410,6 +1555,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 49,
     },
+    icons: 1,
     firstKind: "lbGray",
   },
   {
@@ -1420,6 +1566,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 61,
       lightness: 57,
     },
+    icons: 72,
     firstKind: "Colour3",
   },
   {
@@ -1430,6 +1577,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 63,
       lightness: 52,
     },
+    icons: 72,
     firstKind: "Colour1",
   },
   {
@@ -1440,6 +1588,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 51,
     },
+    icons: 4,
     firstKind: "Start",
   },
   {
@@ -1450,6 +1599,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 55,
     },
+    icons: 72,
     firstKind: "Gray",
   },
   {
@@ -1460,6 +1610,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 49,
     },
+    icons: 72,
     firstKind: "Colour2",
   },
   {
@@ -1470,6 +1621,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 63,
       lightness: 48,
     },
+    icons: 5,
     firstKind: "lrEisFallend",
   },
   {
@@ -1480,6 +1632,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 63,
       lightness: 51,
     },
+    icons: 52,
     firstKind: "lrKamin",
   },
   {
@@ -1490,6 +1643,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 65,
       lightness: 55,
     },
+    icons: 4,
     firstKind: "lrOfen",
   },
   {
@@ -1500,6 +1654,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 51,
     },
+    icons: 28,
     firstKind: "lrWasser",
   },
   {
@@ -1510,6 +1665,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 63,
       lightness: 48,
     },
+    icons: 18,
     firstKind: "_0",
   },
   {
@@ -1520,6 +1676,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 52,
     },
+    icons: 10,
     firstKind: "Cannon",
   },
   {
@@ -1530,6 +1687,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 47,
     },
+    icons: 1,
     firstKind: "Gray",
   },
   {
@@ -1540,6 +1698,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 55,
     },
+    icons: 9,
     firstKind: "Paratrooper",
   },
   {
@@ -1550,6 +1709,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 60,
       lightness: 46,
     },
+    icons: 1,
     firstKind: "lwBroken",
   },
   {
@@ -1560,6 +1720,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 53,
     },
+    icons: 1,
     firstKind: "lwGray",
   },
   {
@@ -1570,6 +1731,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 49,
     },
+    icons: 16,
     firstKind: "lwGreen",
   },
   {
@@ -1580,6 +1742,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 53,
     },
+    icons: 16,
     firstKind: "lwRed",
   },
   {
@@ -1590,6 +1753,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 55,
     },
+    icons: 16,
     firstKind: "lwRolladen",
   },
   {
@@ -1600,6 +1764,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 69,
       lightness: 51,
     },
+    icons: 8,
     firstKind: "Sorte",
   },
   {
@@ -1610,6 +1775,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 63,
       lightness: 57,
     },
+    icons: 12,
     firstKind: "m6Gras",
   },
   {
@@ -1620,6 +1786,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 49,
     },
+    icons: 1,
     firstKind: "m6Grau",
   },
   {
@@ -1630,6 +1797,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 64,
       lightness: 52,
     },
+    icons: 8,
     firstKind: "Auge",
   },
   {
@@ -1640,6 +1808,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 60,
       lightness: 50,
     },
+    icons: 4,
     firstKind: "Kugel",
   },
   {
@@ -1650,6 +1819,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 48,
     },
+    icons: 4,
     firstKind: "Gras",
   },
   {
@@ -1660,6 +1830,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 65,
       lightness: 55,
     },
+    icons: 4,
     firstKind: "Grau",
   },
   {
@@ -1670,6 +1841,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 53,
     },
+    icons: 16,
     firstKind: "Blob",
   },
   {
@@ -1680,6 +1852,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 46,
     },
+    icons: 136,
     firstKind: "bunt",
   },
   {
@@ -1690,6 +1863,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 48,
     },
+    icons: 512,
     firstKind: "schmelz",
   },
   {
@@ -1700,6 +1874,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 65,
       lightness: 50,
     },
+    icons: 17,
     firstKind: "unbunt",
   },
   {
@@ -1710,6 +1885,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 53,
     },
+    icons: 3,
     firstKind: "Band",
   },
   {
@@ -1720,6 +1896,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 64,
       lightness: 48,
     },
+    icons: 3,
     firstKind: "Gras",
   },
   {
@@ -1730,6 +1907,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 69,
       lightness: 52,
     },
+    icons: 3,
     firstKind: "Grau",
   },
   {
@@ -1740,6 +1918,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 64,
       lightness: 51,
     },
+    icons: 10,
     firstKind: "Kurz",
   },
   {
@@ -1750,6 +1929,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 58,
       lightness: 50,
     },
+    icons: 1,
     firstKind: "Wand",
   },
   {
@@ -1760,6 +1940,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 58,
       lightness: 57,
     },
+    icons: 6,
     firstKind: "Bildschirm",
   },
   {
@@ -1770,6 +1951,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 49,
     },
+    icons: 6,
     firstKind: "Cabbage",
   },
   {
@@ -1780,6 +1962,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 48,
     },
+    icons: 15,
     firstKind: "Cattle",
   },
   {
@@ -1790,6 +1973,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 57,
     },
+    icons: 6,
     firstKind: "Maize",
   },
   {
@@ -1800,6 +1984,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 58,
       lightness: 55,
     },
+    icons: 16,
     firstKind: "Road",
   },
   {
@@ -1810,6 +1995,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 55,
     },
+    icons: 6,
     firstKind: "Water",
   },
   {
@@ -1820,6 +2006,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 49,
     },
+    icons: 6,
     firstKind: "Wheat",
   },
   {
@@ -1830,6 +2017,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 60,
       lightness: 50,
     },
+    icons: 28,
     firstKind: "fisch",
   },
   {
@@ -1840,6 +2028,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 53,
     },
+    icons: 192,
     firstKind: "Blob",
   },
   {
@@ -1850,6 +2039,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 56,
     },
+    icons: 7,
     firstKind: "muschel",
   },
   {
@@ -1860,6 +2050,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 60,
       lightness: 50,
     },
+    icons: 3,
     firstKind: "qualle",
   },
   {
@@ -1870,6 +2061,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 48,
     },
+    icons: 4,
     firstKind: "gold",
   },
   {
@@ -1880,6 +2072,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 55,
     },
+    icons: 2,
     firstKind: "silber",
   },
   {
@@ -1890,6 +2083,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 58,
       lightness: 50,
     },
+    icons: 1,
     firstKind: "mgsWeiss",
   },
   {
@@ -1900,6 +2094,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 58,
       lightness: 52,
     },
+    icons: 9,
     firstKind: "stein",
   },
   {
@@ -1910,6 +2105,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 61,
       lightness: 51,
     },
+    icons: 1,
     firstKind: "mihLoch",
   },
   {
@@ -1920,6 +2116,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 60,
       lightness: 48,
     },
+    icons: 1,
     firstKind: "mihStein",
   },
   {
@@ -1930,6 +2127,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 67,
       lightness: 54,
     },
+    icons: 15,
     firstKind: "Avatar",
   },
   {
@@ -1940,6 +2138,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 52,
     },
+    icons: 16,
     firstKind: "kolben",
   },
   {
@@ -1950,6 +2149,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 49,
     },
+    icons: 84,
     firstKind: "Kachel",
   },
   {
@@ -1960,6 +2160,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 64,
       lightness: 55,
     },
+    icons: 6,
     firstKind: "Block",
   },
   {
@@ -1970,6 +2171,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 58,
       lightness: 50,
     },
+    icons: 42,
     firstKind: "Kachel",
   },
   {
@@ -1980,6 +2182,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 57,
     },
+    icons: 70,
     firstKind: "Kachel",
   },
   {
@@ -1990,6 +2193,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 55,
     },
+    icons: 16,
     firstKind: "Gras",
   },
   {
@@ -2000,6 +2204,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 65,
       lightness: 51,
     },
+    icons: 16,
     firstKind: "Grau",
   },
   {
@@ -2010,6 +2215,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 71,
       lightness: 50,
     },
+    icons: 16,
     firstKind: "Sorte",
   },
   {
@@ -2020,6 +2226,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 46,
     },
+    icons: 8,
     firstKind: "maennchen",
   },
   {
@@ -2030,6 +2237,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 69,
       lightness: 53,
     },
+    icons: 2,
     firstKind: "grau",
   },
   {
@@ -2040,6 +2248,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 61,
       lightness: 56,
     },
+    icons: 4,
     firstKind: "Blop",
   },
   {
@@ -2050,6 +2259,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 49,
     },
+    icons: 4,
     firstKind: "anemone",
   },
   {
@@ -2060,6 +2270,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 56,
     },
+    icons: 1,
     firstKind: "moFisch",
   },
   {
@@ -2070,6 +2281,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 65,
       lightness: 46,
     },
+    icons: 9,
     firstKind: "octopus",
   },
   {
@@ -2080,6 +2292,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 69,
       lightness: 50,
     },
+    icons: 180,
     firstKind: "Stein",
   },
   {
@@ -2090,6 +2303,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 50,
     },
+    icons: 2,
     firstKind: "grau",
   },
   {
@@ -2100,6 +2314,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 48,
     },
+    icons: 26,
     firstKind: "zahl",
   },
   {
@@ -2110,6 +2325,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 53,
     },
+    icons: 8,
     firstKind: "Fee",
   },
   {
@@ -2120,6 +2336,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 66,
       lightness: 56,
     },
+    icons: 5,
     firstKind: "fastslime",
   },
   {
@@ -2130,6 +2347,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 61,
       lightness: 52,
     },
+    icons: 5,
     firstKind: "slowslime",
   },
   {
@@ -2140,6 +2358,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 52,
     },
+    icons: 200,
     firstKind: "Fuehler",
   },
   {
@@ -2150,6 +2369,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 58,
       lightness: 57,
     },
+    icons: 256,
     firstKind: "Grey",
   },
   {
@@ -2160,6 +2380,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 59,
       lightness: 57,
     },
+    icons: 256,
     firstKind: "Two",
   },
   {
@@ -2170,6 +2391,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 69,
       lightness: 56,
     },
+    icons: 3,
     firstKind: "Yellow",
   },
   {
@@ -2180,6 +2402,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 69,
       lightness: 48,
     },
+    icons: 1,
     firstKind: "mtWall",
   },
   {
@@ -2190,6 +2413,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 54,
     },
+    icons: 6,
     firstKind: "Graph",
   },
   {
@@ -2200,6 +2424,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 70,
       lightness: 57,
     },
+    icons: 1,
     firstKind: "mtrGras",
   },
   {
@@ -2210,6 +2435,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 61,
       lightness: 50,
     },
+    icons: 1,
     firstKind: "mtrGrau",
   },
   {
@@ -2220,6 +2446,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 49,
     },
+    icons: 27,
     firstKind: "Zahn",
   },
   {
@@ -2230,6 +2457,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 62,
       lightness: 54,
     },
+    icons: 10,
     firstKind: "gruen",
   },
   {
@@ -2240,6 +2468,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 56,
     },
+    icons: 3,
     firstKind: "sbKaese",
   },
   {
@@ -2250,6 +2479,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 69,
       lightness: 48,
     },
+    icons: 20,
     firstKind: "spLabyrinth",
   },
   {
@@ -2260,6 +2490,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 69,
       lightness: 57,
     },
+    icons: 20,
     firstKind: "spUp",
   },
   {
@@ -2270,6 +2501,7 @@ const ENTRIES: ArtEntry[] = [
       saturation: 68,
       lightness: 56,
     },
+    icons: 0,
     firstKind: "start_dummy",
   },
 ];

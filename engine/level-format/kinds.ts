@@ -55,6 +55,7 @@ import type { DefinitionScope, KindList } from "./scope.ts";
 import { Version, VersionSet } from "./version.ts";
 import { implicitLength } from "./values.ts";
 import type { ResolvedRun } from "./values.ts";
+import { iconCountOf } from "./picture-icons.ts";
 
 /**
  * The level-wide values a kind's defaults depend on.
@@ -385,14 +386,17 @@ function makeKind(
   // read here would be asking the *level's* `pics` for the wrong thing and then
   // finding nothing.
   const ownPics = own?.ownRuns("pics", true);
-  const artKey = ownPics !== undefined && ownPics.runs.length > 0
-    ? (ownPics.runs[0] as ResolvedRun).word
-    : picture;
+  // `pics[1]`, `pics[2]` and so on are **version specifiers, not further entries of the same
+  // list** — `pics[1]=dnBlack.xpm` in `darken.ld` is that level's `pics` for version `[1]`,
+  // and at every resolved version the kind has the one picture. So the run list is the file
+  // list and its length is upstream's `mBilddateien.size()`.
+  const pictures: string[] =
+    ownPics === undefined ? [] : ownPics.runs.map((run) => (run as ResolvedRun).word);
+  const artKey = pictures.length > 0 ? (pictures[0] as string) : picture;
 
   // `src/sorte.cpp:98-131`, transcribed. Read here because this is the last place the picture
-  // list exists in full: `artKey` above kept only its first entry, so the file count and the
-  // first file's icon count had to be taken before they were dropped.
-  const defaultCode = defaultCodeFor(ownPics?.runs, role);
+  // list exists in full.
+  const defaultCode = defaultCodeFor(pictures, role);
 
   const distKeyDefault = role === "grass" ? DEFAULT_DIST_KEY : "";
   const distKeyWord = own?.ownWord("distkey", distKeyDefault) ?? distKeyDefault;
@@ -403,6 +407,7 @@ function makeKind(
     name,
     role,
     artKey,
+    pictures,
     versions,
     weight: 1,
     behaviour: defaultBehaviour(role, defaults.chainGrass),
@@ -427,18 +432,61 @@ function makeKind(
  * picture list gets `null`, because upstream's condition starts `mBilddateien.size() > 0` and
  * a kind with no pictures has no code to run and nothing to draw.
  *
- * The counts are a run's `count` rather than its length: `pics = apple * 3` is one file with
- * three icons, which is `default2`, while `pics = apple, pear` is two files, which is
- * `default3`. Reading the run count as a file count would make every repeated kind look
- * multi-file and pick the wrong default.
+ * **The icon count is the picture's, not the level's, and getting that wrong chose the wrong
+ * default for three of the five corpus kinds that use one.** The first version of this function
+ * took a run's `count` as the icon count, which looks plausible and is not what `* N` means:
+ * `getVielfachheit` is *multiplicity*, and `ladSorten` uses it to create that many `Sorte`
+ * objects sharing one picture — `for (int i = picsnamen->getVielfachheit(n)-1; i>0; i--)
+ * mSorten.neueSorte(nr, mSorten[nr-1], false); // false = ist nur kopie`. The real icon count
+ * is `anzBildchen()`, computed from the image, and it is transcribed per picture key in
+ * `picture-icons.ts`.
+ *
+ * Measured over the corpus's constant-count `pics` entries: **914 of 936** disagree with their
+ * image's real icon count. The two numbers are not related, which is why this was not caught by
+ * reading the code alone. What it cost, over the five kinds that fall back to a default — and
+ * **three of the five drew the wrong picture**, which is why the table rather than a count:
+ *
+ * | kind                     | picture           | icons | was      | is          |
+ * | ------------------------ | ----------------- | ----: | -------- | ----------- |
+ * | `Pfeile/ipGrau`          | `ipGrau.xpm`      |     1 | default1 | default1    |
+ * | `Explosive/lbBlack`      | `lbBlack.xpm`     |     1 | default1 | default1    |
+ * | `Embroidery/jsGruenGras` | `jsGruenGras.xpm` |     6 | default1 | **default2g** |
+ * | `Ziehlen/gras`           | `mziAlle.xpm`     |    10 | default1 | **default2g** |
+ * | `Darken/dnStart`         | `dnBlack.xpm`     |    16 | default1 | **default2g** |
+ *
+ * The three wrong ones are all grass, and that is what makes it visible rather than cosmetic:
+ * `default1 = *` draws icon 0 and `default2g = {pos=version; *}` draws the version, so a goal
+ * blob with six or ten or sixteen faces would have shown the same one every time.
+ *
+ * **`default3` is chosen by 318 corpus kinds and run by none of them**, and that is now a
+ * measurement rather than an artefact. The earlier note claiming it was unreachable gave the
+ * wrong reason — that no level writes a kind with one multi-icon picture file — which was
+ * false, and it survived only because the rule computing the file count was itself wrong.
+ * `default3` is every kind with more than one picture file, and all of those define their own
+ * procedure, so the default is never consulted. The case that looks like a counterexample is
+ * `darken.ld`'s `pics=dnBlack2.xpm  pics[1]=dnBlack.xpm`, where `pics[1]` is a **version
+ * specifier** rather than a second entry and the kind has one picture at every version.
  */
 export function defaultCodeFor(
-  runs: readonly ResolvedRun[] | undefined,
+  pictures: readonly string[],
   role: KindRole,
 ): string | null {
-  if (runs === undefined || runs.length === 0) return null;
-  if (runs.length > 1) return "default3";
-  const icons = runs[0]?.count ?? 1;
+  if (pictures.length === 0) return null;
+  if (pictures.length > 1) return "default3";
+  const key = pictures[0] as string;
+  const icons = iconCountOf(key);
+  // A picture the table does not carry is a stale table, and upstream's answer for it was
+  // computed from an image this project does not have. Guessing `default1` would be the one
+  // silent failure available, and it is also the wrong picture; naming the key is the failure
+  // somebody can act on.
+  if (icons === null) {
+    throw new Error(
+      `Cual: picture '${key}' has no stated icon count. It is referenced by a level but ` +
+        `missing from engine/level-format/picture-icons.ts - re-run ` +
+        `\`node levels-src/transcribe-picture-icons.ts\` after \`make fetch-corpus\`, or add ` +
+        `the figure by hand if the artwork is new.`,
+    );
+  }
   if (icons > 1) return role === "grass" ? "default2g" : "default2";
   return "default1";
 }

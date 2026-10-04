@@ -24,6 +24,10 @@ function entry(key: string, over: Partial<ArtEntry> = {}): ArtEntry {
   return {
     key,
     source: { kind: "generated", hue: 120, saturation: 62, lightness: 52 },
+    // One icon unless a test says otherwise: the smallest count that is still a picture, and
+    // the one a single-icon sprite has. Zero would mean "not a picture", which is a different
+    // claim and is exercised on its own.
+    icons: 1,
     firstKind: key.replace(/\.xpm(\.gz)?$/, ""),
     ...over,
   };

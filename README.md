@@ -243,11 +243,11 @@ because it moves with it.
 
 | Tier      | Files | Statements | Branches | Floor                         |
 | --------- | ----: | ---------: | -------: | ----------------------------- |
-| `engine/` |    43 |     93.9 % |   88.2 % | ≥ 90 % stmts, ≥ 85 % branches |
+| `engine/` |    44 |     94.0 % |   88.2 % | ≥ 90 % stmts, ≥ 85 % branches |
 | `render/` |     5 |     97.6 % |   87.5 % | ≥ 80 % statements             |
 | `app/`    |     6 |     81.9 % |   84.8 % | none                          |
 
-Measured on the `cual-runtime-over-the-board` branch at 1632 passing tests. The
+Measured on the `cual-runtime-over-the-board` branch at 1648 passing tests. The
 test count is not part of the measurement: `coverage.test.ts` imports nothing
 under `engine/`, `render/` or `app/`, so adding tests to it does not move these
 figures — only code does.

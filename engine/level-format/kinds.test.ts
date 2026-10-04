@@ -254,16 +254,24 @@ describe("the declaration lists", () => {
   });
 
   it("uses the kind's own pics list for its picture when it has a section", () => {
+    // `ipGrau.xpm` rather than an invented name: a picture a kind declares has to carry a
+    // stated icon count, because that count is what picks the kind's default draw code. The
+    // block at the end of this file is where that refusal is pinned.
     const { kinds } = kindsOf(
       `Level = {
         pics = plain, other
         other = {
-          pics = fancy.xpm
+          pics = ipGrau.xpm
         }
       }`,
     );
     expect(kinds.find((k) => k.name === "plain")?.artKey).toBe("plain");
-    expect(kinds.find((k) => k.name === "other")?.artKey).toBe("fancy.xpm");
+    expect(kinds.find((k) => k.name === "other")?.artKey).toBe("ipGrau.xpm");
+    // And the whole list, not just its first entry: `pics[1]`, `pics[2]` are further entries of
+    // the same list rather than versions of it, so the run list *is* the file list and its
+    // length is upstream's `mBilddateien.size()`.
+    expect(kinds.find((k) => k.name === "other")?.pictures).toEqual(["ipGrau.xpm"]);
+    expect(kinds.find((k) => k.name === "plain")?.pictures).toEqual([]);
   });
 
   it("strips the extension from the kind's name but not from its art key", () => {
@@ -471,5 +479,76 @@ describe("levels with no kinds at all", () => {
     });
     expect(kinds[0]?.numexplode).toBe(UNDEFINED_EXPLODE);
     expect(UNDEFINED_EXPLODE).toBe(-1);
+  });
+});
+
+describe("`pics = name * N` is a kind repetition, not an icon count", () => {
+  // The mistake `defaultCodeFor` made until 15.5's investigation, pinned here so it cannot
+  // come back. `getVielfachheit` is *multiplicity*: `ladSorten` creates N `Sorte` objects that
+  // share one picture (`mSorten.neueSorte(nr, mSorten[nr-1], false); // false = ist nur kopie`),
+  // so a repeated entry says how many kinds there are and nothing about how many icons the
+  // picture holds. The icon count is `anzBildchen()`, from the image.
+  //
+  // Measured over the corpus's constant-count `pics` entries, **914 of 936** disagree with
+  // their image's real icon count — so the two numbers are not related, which is why reading
+  // one as the other passed every test in this file and still picked the wrong default for
+  // three of the five corpus kinds that fall back to one.
+  it("makes N kinds sharing one picture file", () => {
+    // `ipGrau.xpm` is a real key in the committed icon table with one icon, so the expected
+    // default is `default1` and would be `default2` if the `* 3` were read as an icon count.
+    const { kinds } = kindsOf(`Level = {
+      pics = bolzer * 3
+      bolzer = { pics = ipGrau.xpm }
+    }`);
+    const repeated = kinds.filter((kind) => kind.name === "bolzer");
+    expect(repeated).toHaveLength(3);
+    for (const kind of repeated) {
+      expect(kind.pictures).toEqual(["ipGrau.xpm"]);
+      expect(kind.defaultCode).toBe("default1");
+    }
+  });
+
+  it("and the same picture repeated with no section of its own has no picture at all", () => {
+    // `Sorte::Sorte` reads *its own* section's `pics`; `getKind` does not look at the parent.
+    // So a kind the level only names in `pics` has no picture file, no icon count to consult
+    // and nothing to draw — which is upstream's condition `mBilddateien.size() > 0`.
+    const { kinds } = kindsOf(`Level = { pics = bolzer * 2 }`);
+    for (const kind of kinds) {
+      expect(kind.pictures).toEqual([]);
+      expect(kind.defaultCode).toBeNull();
+    }
+  });
+
+  it("and a kind with two picture files is default3 whatever the first holds", () => {
+    // The file count is tested first upstream (`sorte.cpp:113`), so a multi-icon first file
+    // does not rescue it. `aDragon.xpm` has 8 icons and `dnBlack.xpm` has 16.
+    const { kinds } = kindsOf(`Level = {
+      pics = apfel, birne
+      apfel = { pics = aDragon.xpm, dnBlack.xpm }
+    }`);
+    expect(kinds.find((kind) => kind.name === "apfel")?.pictures).toEqual([
+      "aDragon.xpm",
+      "dnBlack.xpm",
+    ]);
+    expect(kinds.find((kind) => kind.name === "apfel")?.defaultCode).toBe("default3");
+  });
+
+  it("and one picture file's icon count decides between default1 and default2", () => {
+    // Both keys are real entries in the committed table: `ipGrau.xpm` has 1 icon,
+    // `jsGruenGras.xpm` has 6.
+    const single = kindsOf(`Level = { pics = apfel  apfel = { pics = ipGrau.xpm } }`);
+    expect(single.kinds[0]?.defaultCode).toBe("default1");
+    const many = kindsOf(`Level = { pics = apfel  apfel = { pics = jsGruenGras.xpm } }`);
+    expect(many.kinds[0]?.defaultCode).toBe("default2");
+  });
+
+  it("and refuses a picture the icon table does not carry, naming the key", () => {
+    // The failure this rule has to have. Upstream read the count from an image this project
+    // does not ship, so a key with no stated figure is a stale table — and `default1` is both
+    // the available guess and the wrong picture, since `default1 = *` draws icon 0 of whatever
+    // the level was choosing between.
+    expect(() => kindsOf(`Level = { pics = apfel  apfel = { pics = neverHeardOfIt.xpm } }`)).toThrow(
+      /neverHeardOfIt\.xpm/,
+    );
   });
 });

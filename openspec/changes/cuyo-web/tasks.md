@@ -250,20 +250,26 @@ failed quietly rather than loudly, which is the worse kind.
 own" and that the defaults were therefore the main path, from a probe whose classification was
 wrong: it counted a kind as "using a default" whenever its `defaultCode` was non-null, which is
 true of nearly every kind whether or not its own procedure won. Measured properly: of 556 kinds,
-**502 define a procedure of their own, 5 fall back to `default1`, none to `default3`, and 49 have
-no code at all**. The fallback is a tail. It is still implemented — five corpus kinds need it —
-but the module no longer claims to be arranged around it. The five are named in the test
+**502 define a procedure of their own, 5 fall back to a default, and 49 have no code at all**.
+The fallback is a tail. It is still implemented — five corpus kinds need it — but the module no
+longer claims to be arranged around it. The five are named in the test
 (`Pfeile/ipGrau`, `Ziehlen/gras`, `Embroidery/jsGruenGras`, `Darken/dnStart`,
 `Explosive/lbBlack`) rather than counted, so two of them silently changing default would fail.
+**The defaults all five took at the time were `default1`, and three of them should not have
+been** — that was reading a `pics` run's multiplicity as an icon count, and group 15 has the
+correction and the measurement behind it.
 
-**`default2` and `default2g` are unreachable from the corpus**, because no level writes a kind
-with exactly one multi-icon picture file, and **no level uses `pics = name * count` at all**. That
-last one was a coverage hole mutation found: collapsing `runs.length > 1` into `sum(counts) > 1`
-left all 24 tests green while the two disagree on `pics = bolzer * 3`, which is one file with
-three icons (`default2`) and not three files (`default3`). `defaultCodeFor` is now exported and
-unit-tested on run lists written out by hand, because the loader cannot be used for it — the art
-manifest is keyed by **filename**, so a synthetic level cannot borrow another level's picture
-names and fails before the default is ever chosen.
+**`default2` and `default2g` are reachable from the corpus**, by three kinds — `Ziehlen/gras`,
+`Embroidery/jsGruenGras` and `Darken/dnStart` — because their pictures have 10, 6 and 16 icons.
+An earlier version of this note said they were unreachable because no level writes a kind with
+exactly one multi-icon picture file, and that was an artefact of reading a `pics` run's
+multiplicity as its icon count; see group 15. `default3` is reachable too, by 318 kinds, and
+like `default2` is never actually run because those kinds all define their own procedure.
+
+`defaultCodeFor` is exported and unit-tested on picture lists naming real keys from the committed
+icon table, because the loader cannot be used for it — the art manifest is keyed by **filename**,
+so a synthetic level cannot borrow another level's picture names and fails before the default is
+ever chosen.
 
 **`allocateSlots` discarded the index of each declared variable**, so a user variable could not
 be resolved at all: it reaches the evaluator as `{ kind: "variable", name }` and
@@ -775,6 +781,96 @@ runs a level's Cual. `loader.ts` does not import the Cual compiler, `LevelDef` h
 a program, `Simulation` has no step that runs one, nothing implements `cual-runtime`'s
 `Animatable` or `AccessField`, and nothing calls `runStep` outside its own test. `Blob.vars` is
 allocated by `board.ts` and read by nobody — a placeholder left for exactly this.
+
+**15.4 turned up a bug that had been sitting in the checklist since 15.1, and fixing it is a
+prerequisite for 15.5.** `defaultCodeFor` read a `pics` run's `count` as an icon count. It is
+`getVielfachheit` — *multiplicity*, the number of `Sorte` objects `ladSorten` creates sharing one
+picture (`mSorten.neueSorte(nr, mSorten[nr-1], false); // false = ist nur kopie`) — and the real
+icon count is `anzBildchen()` from the image. **Measured over the corpus's constant-count
+entries: 914 of 936 disagree with their image.** So three of the five kinds that fall back to a
+default were drawing the wrong picture:
+
+| kind                     | picture           | icons | was      | is          |
+| ------------------------ | ----------------- | ----: | -------- | ----------- |
+| `Pfeile/ipGrau`          | `ipGrau.xpm`      |     1 | default1 | default1    |
+| `Explosive/lbBlack`      | `lbBlack.xpm`     |     1 | default1 | default1    |
+| `Embroidery/jsGruenGras` | `jsGruenGras.xpm` |     6 | default1 | **default2g** |
+| `Ziehlen/gras`           | `mziAlle.xpm`     |    10 | default1 | **default2g** |
+| `Darken/dnStart`         | `dnBlack.xpm`     |    16 | default1 | **default2g** |
+
+All three wrong ones are grass, which is what makes it visible rather than cosmetic:
+`default1 = *` draws icon 0 and `default2g = {pos=version; *}` draws the version, so those
+goal blobs showed the same face every time whatever their `version` was.
+
+**The note 15.1 recorded about `default2`/`default2g`/`default3` being "unreachable from the
+corpus" was an artefact of that bug and was wrong on all three counts.** Measured across all 79
+levels at the version `cual-program.test.ts` loads, by how many kinds each default is chosen for:
+**`default1` 5, `default2` 142, `default2g` 29, `default3` 318** — all four reached, and only
+two ever *run*, because every `default2` and `default3` kind in the corpus defines its own
+procedure and takes precedence. `default3` is every kind with more than one picture file.
+(The figures depend on the version loaded: the same census over every track and difficulty gives
+250 and 322, because the version decides which kinds exist at all. The test asserts one basis
+and says which, rather than quoting a number that is true of some load and not others.)
+
+**Where the icon counts come from, and why not the `.ld`.** Upstream reads them from the pixels —
+`(breite/gric) * (hoehe/gric)` at `gric` 32, `src/bilddatei.cpp:205` — and this project does not
+ship those spritesheets, so at run time there is no image to measure and no way to recover the
+number. So the count is *ours* to state, since the artwork is ours, and it is stated in
+`engine/level-format/picture-icons.ts`: one entry per manifest key, **222 measured and 4 recorded
+as 0**, transcribed by `levels-src/transcribe-picture-icons.ts` from upstream's image headers and
+committed. Transcribing upstream is the honest starting value because upstream's icons and
+Cual's `pos` values are a matched pair — a level asks for `pos = 7` because the file had at
+least eight icons.
+
+  **The four zeroes are not gaps, and saying so was worth the measurement.** `Grau`, `Starr`,
+  `Start` and `start_dummy` are *kind names, not picture names*: a kind declared by a `greypic`
+  or `startpic` **word** has no picture file unless its own section declares `pics`, and upstream
+  opens no image for one. The same fact reaches the code as `defaultCode = null`, reached from
+  the other side. An earlier version of the transcriber *threw* on them, which would have been
+  the wrong reaction to a correct answer.
+
+  **Two of upstream's own spritesheets defeated the reader, and both fixes are about not being
+  fooled by a uniform corpus.** `aDragon.xpm` writes `"128 64 2 1 "` — the numbers are *not*
+  followed immediately by the closing quote — so a header pattern anchored on `"` found nothing
+  in that file and silently dropped 21 keys. And the uncompressed files carry the full GPL notice
+  before the header, putting it around line 15 rather than 4. And `itGras.xpm.gz` has a valid
+  gzip header and a deflate stream Node's one-shot `gunzipSync` rejects outright, while a
+  streaming inflate recovers the first 16 kB — which is all the script needs, since the XPM header
+  sits about 60 bytes in. Upstream's data is allowed to be slightly broken; the script's job is
+  to say what it could read and refuse to guess about the rest.
+
+  **`Kind` now carries `pictures`, not just `artKey`.** `kinds.ts` read `pics` in full and kept
+  entry zero, which is why the file count and the first file's icon count were unavailable where
+  they were needed. `pics[1]=` is a **version specifier**, not a second entry — `darken.ld`'s
+  `pics=dnBlack2.xpm  pics[1]=dnBlack.xpm` looks like two files and is one, so `default3` is
+  reached by 318 kinds and none of them is `dnStart`. I wrote the opposite in a comment first and
+  the test caught it.
+
+  **`defaultCodeFor` refuses a key with no stated figure, naming it.** The available guess is
+  `default1`, and it is both a guess and the wrong picture, since `default1 = *` draws icon 0 of
+  whatever the level was choosing between. This is what makes the committed table's coverage a
+  hard requirement rather than a nicety.
+
+  14 mutations, all caught: the run count read as an icon count again · one icon treated as
+  several and several as one · grass given `default2` · the file-count rule removed · the refusal
+  turned into a guess · the refusal losing the key · a picture-less kind given a default ·
+  `pictures` keeping only the first file · the table losing its largest entry · a wrong figure ·
+  a missing key · an invented fourth zero · an unknown key answering 0 rather than null.
+
+  **One thing this could not check, and says so.** `picture-icons.test.ts` re-derives every figure
+  from the image where `.context/upstream-cuyo` exists, and prints that it did not where it does
+  not rather than returning quietly. That is a live skip of the kind 12.8 removed from
+  `render/palette.test.ts`, and the difference is that this one *cannot* be lifted — the tree is
+  gitignored and CI has no images — so coverage of the table is checked unconditionally and only
+  the figures are conditional.
+
+  **And a bound I guessed wrong.** The first version of the distribution test asserted no picture
+  exceeds 16 icons, reasoning that `schema16` is the widest schema. Measured: 46 of 222 exceed
+  16, up to `mbSchmelz1.xpm` at 512×1024 — 512 icons. Those are lettersets, backgrounds and
+  full-picture sets (`mpAlle.xpm`, `mflAlles.xpm`, `btScore.xpm`, `spLabyrinth.xpm`) which are
+  drawn by index too and are bounded by no schema. So the assertion is a distribution: 40 keys
+  have exactly 16 (the count group 8's compositor must produce for a `schema16` kind) and 30 have
+  exactly 1 (`default1`'s entire population), with the largest named rather than bounded.
 
 The order within a step is upstream's, not a guess. `cuyo.cpp:422-542` runs the border, random
 greys, the falling piece, the row transfer and the explosion test, then `Spielfeld::spielSchritt`,

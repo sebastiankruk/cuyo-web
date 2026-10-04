@@ -413,6 +413,7 @@ describe("accidentalPairs", () => {
           name: "solo",
           role: "grass",
           artKey: "solo",
+          pictures: [],
           versions: 1,
           weight: 1,
           behaviour: 0,

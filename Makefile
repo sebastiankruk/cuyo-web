@@ -114,6 +114,8 @@ help:
 	@echo "  make check-version - Assert package.json and CHANGELOG.md agree"
 	@echo "  make art-digests  - Regenerate the committed upstream-artwork digests"
 	@echo "  make fetch-corpus - Fetch upstream Cuyo, to compare the vendored levels"
+	@echo "  make picture-icons - Re-transcribe icon counts from upstream's images"
+	@echo "                      (needs 'make fetch-corpus' first; not in 'make check')"
 	@echo ""
 	@echo "Testing and building:"
 	@echo "  make test         - Vitest suite"
@@ -207,6 +209,17 @@ NODE_TS_FLAGS := --experimental-transform-types --disable-warning=ExperimentalWa
 art-manifest:
 	$(AI_ECHO) "Emitting the art-key manifest..."
 	@node $(NODE_TS_FLAGS) levels-src/emit-art-manifest.ts
+
+# Re-transcribes every picture's icon count out of upstream's spritesheets, into
+# engine/level-format/picture-icons.ts.
+#
+# **Needs the upstream tree and so is not in `make check`.** The output is committed,
+# which is what makes the property the game depends on checkable without the tree: CI
+# asserts the table covers the manifest, and only asserts the figures are right where the
+# images are present. This target is how the table is refreshed after `make fetch-corpus`.
+picture-icons:
+	$(AI_ECHO) "Transcribing picture icon counts..."
+	@node $(NODE_TS_FLAGS) levels-src/transcribe-picture-icons.ts
 
 # Copies the level files into public/levels/ so the browser can fetch them. Generated
 # and gitignored: it is upstream data, and its provenance is already recorded.
