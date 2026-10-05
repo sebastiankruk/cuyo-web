@@ -228,6 +228,14 @@ level-data:
 
 # Parses and compiles every level in summary.ld, and fails on the first error. This
 # is the gate that makes "the real levels work" a fact rather than an assumption.
+#
+# Also run inside `npm run build` as `build:levels`, since 12.4 asks for the build itself to
+# refuse a broken level - a gate that only CI invokes is a gate a developer's `npm run build`
+# skips. It runs twice in `make check` for that reason, and twice costs 0.7s. It is kept listed
+# separately so that `check`'s target list still says what it checks.
+#
+# `levels-src/validate-levels-gate.test.ts` is what proves the gate can fail: it points the gate
+# at a temporary corpus with one deliberately broken level, via CUYO_LEVELS_DIR.
 validate-levels:
 	$(AI_ECHO) "Validating every level..."
 	@node $(NODE_TS_FLAGS) levels-src/validate-levels.ts

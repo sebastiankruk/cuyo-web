@@ -694,7 +694,19 @@ long enough that scrolling to the bottom is the only way to see what exists.
 - [x] 12.1 Encode the man page's worked examples as tests: division/modulo table, neighbour pattern, six `@`-assignment cases, busy switch, apple/orange kind constants, and `startdist` rows
 - [x] 12.2 Encode the source-derived constants as a single documented module and assert each value against `src/spielfeld.cpp`, `src/leveldaten.h` and `src/code.h` in comments
 - [x] 12.3 Add engine scenario tests driving real input sequences and asserting board state for one level end to end, including a win and a loss
-- [ ] 12.4 Make the build gate compile all bundled levels and verify `npm run build` fails on any level that does not parse or compile
+- [x] 12.4 Make the build gate compile all bundled levels and verify `npm run build` fails on any level that does not parse or compile
+
+  **The gate already existed; it was simply not in the build.** `levels-src/validate-levels.ts` compiles every level `summary.ld` indexes and failed on the first error, but nothing invoked it as part of `npm run build`, so the one command a developer and a release both run skipped it. It is now `npm run build:levels`, and **both `build` and `build:terse` run it before `tsc`** — levels first, because a level that does not parse is a more specific failure than a type error and it is the one this gate exists for.
+
+  **A gate nobody has watched fail is an assumption wearing a test's clothes**, so `levels-src/validate-levels-gate.test.ts` makes it refuse: a temporary corpus holding upstream's own `maennchen.ld` — 1.3 KB, the smallest in the corpus, genuinely compilable — with one token replaced. `numexplode = 10` becomes `numexplode = kaputt`, which **parses and then fails to compile**, and the gate is watched exiting non-zero *and* naming both the setting and the offending word, because "the build failed" is not a diagnosis. A second case truncates the file mid-section for the **parse** path, since that is a separate route to the exit code and either could have lost it.
+
+  **The passing case is tested first, and uses a real level rather than a synthetic one.** A hand-written level would have to be valid for the passing case to mean anything, and the quiet failure mode is that the gate refuses the *harness* and the obvious fix is to relax the assertion. Copying a real level makes the passing case true by construction. The substitution is itself asserted — if `maennchen.ld` ever stops containing `numexplode = 10` the replacement becomes a silent no-op and every "gate refuses" test starts failing for an unrelated reason.
+
+  **`CUYO_LEVELS_DIR` overrides both committed level directories**, following the existing `CUYO_DATA_DIR` pattern. Breaking one of the 79 in place would be racy — other files read the same paths in parallel workers — and a failure that leaves the corpus modified is a bad thing to automate. The override affects only this gate and its test, never the game.
+
+  **`CUYO_AI_MODE` is stripped from the child.** `validate-levels.ts:163` reads it to suppress the success report under `make`'s terse mode, and vitest inherits it — so these tests passed when run directly and failed under `make check`, which is the worst shape a test can have. Caught by running `make check`, not by `vitest run`.
+
+  **The gate runs twice in `make check` now** — once listed, once inside `build` — which costs **0.7s**. It is kept listed so the target list still says what `check` checks.
 - [ ] 12.5 Measure frame time with the development overlay on a mid-range device profile and verify the board stays within budget with a full board and active animations
 - [ ] 12.6 Verify the Standard track is playable end to end on a real phone, including touch controls, orientation change and offline start
 - [x] 12.7 Verify every track loads and each level reaches a running state without a runtime error in its first steps

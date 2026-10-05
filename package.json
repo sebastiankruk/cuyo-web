@@ -6,8 +6,9 @@
   "license": "GPL-2.0-or-later",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "build:terse": "tsc --noEmit --pretty false && vite build --logLevel warn",
+    "build:levels": "node --experimental-transform-types --disable-warning=ExperimentalWarning levels-src/validate-levels.ts",
+    "build": "npm run build:levels && tsc --noEmit && vite build",
+    "build:terse": "npm run build:levels && tsc --noEmit --pretty false && vite build --logLevel warn",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
