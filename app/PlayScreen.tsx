@@ -24,10 +24,16 @@ import {
 } from "./gestures.ts";
 import type { TouchState } from "./gestures.ts";
 import { goalSummary, goalSummaryLines } from "./goals.ts";
+import { HoldRepeat, actionForKey } from "./hold-repeat.ts";
+import type { HeldAction } from "./hold-repeat.ts";
 
-/** Held-direction repeat timings, in ms. */
-const DAS_DELAY = 170;
-const DAS_RATE = 55;
+/*
+ * The held-direction repeat timings live in `hold-repeat.ts` as `DAS_DELAY` and `DAS_RATE`, next to
+ * the machine that uses them. They used to be here, wrapped around `window.setTimeout` and
+ * `window.setInterval` inside a `useCallback`, which meant 13.5's four claims — immediate move,
+ * delayed repeat, rate, cancellation on the opposite direction — were untestable: every one of them
+ * is about time, and a real timer makes each either slow or flaky in the direction that hides bugs.
+ */
 
 /**
  * The kind constant for a goal kind's name.
@@ -83,7 +89,13 @@ const INITIAL_HUD: Hud = {
 export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const loopRef = useRef<GameLoop | null>(null);
-  const heldTimers = useRef<number[]>([]);
+  /**
+   * The held-key machine, in a ref because it outlives renders and must not be rebuilt.
+   *
+   * A `useState` would be wrong on both counts: re-creating it on every render would drop a held
+   * key, and putting it in state would mean a render per repeat for something no render reads.
+   */
+  const held = useRef(new HoldRepeat());
   /**
    * Cell size in CSS pixels, shared with the gesture decoder.
    *
@@ -111,6 +123,47 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
   // stop, and the loop lives outside React. A dialog that paused the game by itself would
   // have to know about the loop, which is the coupling worth avoiding.
   const [rulesOpen, setRulesOpen] = useState(false);
+
+  const release = useCallback(() => {
+    held.current.clear();
+  }, []);
+
+  useEffect(() => release, [release]);
+
+  const hold = useCallback(
+    (dir: -1 | 1) => {
+      // **Applied by the machine, not by a timer.** The touch buttons press and the keyboard
+      // releases feed the same `HoldRepeat`, so the on-screen left button and the arrow key repeat
+      // identically — which they did not before, because the touch path had its own `setInterval`
+      // and the keyboard path had none at all.
+      for (const event of held.current.press(performance.now(), dir === -1 ? "left" : "right")) {
+        if (event.action === "left") sim.moveLeft();
+        else sim.moveRight();
+      }
+    },
+    [sim],
+  );
+
+  /**
+   * One repeat per frame, driven from the frame loop's own listener.
+   *
+   * **In the loop rather than in an interval**, because the loop is already the thing that knows
+   * what time it is and already stops when the game is paused. An interval would keep firing while
+   * the dialog is open, and would need its own lifecycle to stop — which is how the old version
+   * ended up with a `heldTimers` ref whose only job was cleaning up after itself.
+   */
+  const applyAction = useCallback(
+    (action: HeldAction): void => {
+      if (action === "left") sim.moveLeft();
+      else if (action === "right") sim.moveRight();
+      else sim.rotate();
+    },
+    [sim],
+  );
+
+  const drainHeld = useCallback(() => {
+    for (const event of held.current.advanceTo(performance.now())) applyAction(event.action);
+  }, [applyAction]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -179,6 +232,10 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
     let lastHud = 0;
     loop.subscribe((s) => {
       render(ctx, s, size);
+      // **The repeat is pumped here, so it obeys the loop.** A held arrow key moves the piece at
+      // `DAS_RATE`, and it stops when the game is paused — an interval would have kept firing
+      // behind the rules dialog.
+      drainHeld();
       const now = performance.now();
       if (now - lastHud >= HUD_INTERVAL_MS) {
         lastHud = now;
@@ -198,9 +255,10 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
     return () => {
       observer.disconnect();
       loop.stop();
+      held.current.clear();
       loopRef.current = null;
     };
-  }, [sim]);
+  }, [sim, drainHeld]);
 
   // Pause the loop while the dialog is open.
   //
@@ -212,28 +270,6 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
     if (loopRef.current !== null) loopRef.current.paused = rulesOpen;
   }, [rulesOpen]);
 
-  const release = useCallback(() => {
-    for (const t of heldTimers.current) {
-      window.clearTimeout(t);
-      window.clearInterval(t);
-    }
-    heldTimers.current = [];
-  }, []);
-
-  useEffect(() => release, [release]);
-
-  const hold = useCallback(
-    (dir: -1 | 1) => {
-      const apply = () => (dir === -1 ? sim.moveLeft() : sim.moveRight());
-      apply();
-      heldTimers.current.push(
-        window.setTimeout(() => {
-          heldTimers.current.push(window.setInterval(apply, DAS_RATE));
-        }, DAS_DELAY),
-      );
-    },
-    [sim],
-  );
 
   // Touch, on the board itself. `touch-action: none` on the canvas means the
   // browser hands over the whole gesture instead of scrolling, and pointer capture
@@ -295,18 +331,18 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
   // Keyboard, so the game is playable on a desktop too.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // **`e.repeat` is passed through, and it is the whole point.** A browser synthesises
+      // keydown events for as long as a key is held, at a rate nobody chose; this handler used to
+      // apply a move on *every* one of them, so holding an arrow key moved the piece at whatever
+      // the operating system decided. `HoldRepeat` applies the first press and then repeats at
+      // `DAS_RATE`, and ignores the synthesised ones.
+      const action = actionForKey(e.key);
+      if (action !== null) {
+        for (const event of held.current.press(performance.now(), action, e.repeat)) applyAction(event.action);
+        e.preventDefault();
+        return;
+      }
       switch (e.key) {
-        case "ArrowLeft":
-          sim.moveLeft();
-          break;
-        case "ArrowRight":
-          sim.moveRight();
-          break;
-        case "ArrowUp":
-        case "x":
-        case "X":
-          sim.rotate();
-          break;
         case "ArrowDown":
         case " ":
           sim.toggleFast();
@@ -324,9 +360,21 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
       }
       e.preventDefault();
     };
+    // **Without this, a key released while the tab was hidden repeats forever.** `blur` fires
+    // without a `keyup`, so the machine would still believe the key is down and keep moving the
+    // piece off the edge of the board.
+    const onBlur = (): void => held.current.clear();
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [sim, onExit, onRestart]);
+    window.addEventListener("keyup", (e: KeyboardEvent) => {
+      const action = actionForKey(e.key);
+      if (action !== null) held.current.release(action);
+    });
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [sim, onExit, onRestart, applyAction]);
 
   const finished = hud.phase === "won" || hud.phase === "lost";
   const goals = goalSummary(level, {
