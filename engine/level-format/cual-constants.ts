@@ -126,8 +126,14 @@ export const CUAL_CONSTANTS: ReadonlyMap<string, number> = new Map([
   ["semiglobal", SEMIGLOBAL],
   ["info", INFO],
 
-  // Richtungskonstanten fuer inhibit.
-  ...Object.entries(DIR),
+  // Richtungskonstanten fuer inhibit. **With the `DIR_` prefix, which is part of the name.**
+  //
+  // `Object.entries(DIR)` yields `U`, `UR`, `R`, ... because that is how `DIR` is keyed, and
+  // spreading it registered the bare words rather than the names upstream lists — so `DIR_U` was
+  // undefined in every scope and `kachelnR.ld:43`'s `inhibit_alle = <DIR_U+DIR_UR+...>` did not
+  // resolve. Upstream's `knoten.cpp:99` names all eighteen `DIR_*` in this order, which is the order
+  // `DIR` declares them, so the prefix is applied here rather than in the object.
+  ...Object.entries(DIR).map(([suffix, value]) => [`DIR_${suffix}`, value] as const),
 
   // Bits fuer spezvar_verhalten.
   ["explodes_on_size", EXPLODES_ON_SIZE],

@@ -98,6 +98,28 @@ describe("the predefined names", () => {
     expect(DIR.B).toBe(0x1000000);
   });
 
+  it("registers the direction constants under their prefixed names", () => {
+    // **The name is `DIR_U`, not `U`.** Upstream's `knoten.cpp:99` lists all eighteen as
+    // `"DIR_U", "DIR_UR", ... "DIR_B"`, and the port builds them by spreading `Object.entries(DIR)`
+    // — whose keys are the bare suffixes. That registered `U`, `UR`, `R`, ... and left every
+    // `DIR_*` name undefined in every scope, which is invisible here and visible only where a
+    // level uses one: `kachelnR.ld:43` writes `inhibit_alle = <DIR_U+DIR_UR+DIR_DR+DIR_D+DIR_DL+
+    // DIR_UL>`, and with `DIR_U` missing that expression does not resolve, so one kind in one level
+    // read an unset variable where it meant a direction mask.
+    //
+    // The test that would not have caught it is the one above: it checks the *values* in `DIR` and
+    // `DIR.U` is perfectly correct. What matters is the name the rest of the program looks up.
+    for (const [suffix, value] of Object.entries(DIR)) {
+      expect(CUAL_CONSTANTS.get(`DIR_${suffix}`), `DIR_${suffix}`).toBe(value);
+    }
+    // And nothing is registered under the bare suffix, which is what went wrong. `U` and `D` are
+    // short enough that some future level could plausibly use them as an ordinary name, so a
+    // stray entry is a real hazard rather than a cosmetic one.
+    expect(CUAL_CONSTANTS.has("U")).toBe(false);
+    expect(CUAL_CONSTANTS.has("D")).toBe(false);
+    expect([...CUAL_CONSTANTS.keys()].filter((name) => name.startsWith("DIR_"))).toHaveLength(18);
+  });
+
   it("is in scope for a level, unqualified and at every version", () => {
     // The property levels actually rely on: `aliens.ld` writes
     // `neighbours = <neighbours_none>` inside a kind's own section, where

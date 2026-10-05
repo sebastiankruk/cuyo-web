@@ -196,22 +196,7 @@ describe("every name a level's Cual mentions", () => {
     // **This is the assertion group 15 was for.** Before it, 18 levels threw "no variable named
     // 'x'" at the moment their code first ran; there are now none, and there is a cheap test
     // standing in front of the expensive one.
-    // **One known gap, asserted rather than excluded**, so this file is a tripwire for the *next*
-    // one instead of a rubber stamp. Found by this check, which is the argument for having it.
-    //
-    // `kachelnR.ld:43` writes `inhibit_alle = <DIR_U+DIR_UR+DIR_DR+DIR_D+DIR_DL+DIR_UL>` — a
-    // `.ld` definition whose value is **arithmetic over the predefined constants**. The port folds
-    // `<neighbours_hex6>`, a single name, because `resolveRuns` handles `name` and `name * count`
-    // — but not `<A+B>`, so `inhibit_alle` resolves to nothing and the level reads an unset
-    // variable where it means a direction mask.
-    //
-    // `Kacheln_azyklisch` is the same file's other section, and it is also one of the two
-    // division-by-zero levels in the survey, so this is very likely a *cause* of that rather than a
-    // separate thing. It is left here rather than absorbed: the fix belongs in `values.ts`, not in
-    // a test, and it is recorded in tasks.md under 15.7.
-    expect([...new Set(unresolved)]).toEqual([
-      "Kacheln_azyklisch/Kachel: inhibit_alle",
-    ]);
+    expect([...new Set(unresolved)]).toEqual([]);
     // And the check is not vacuous: it looked at a real number of names.
     expect(checked, "names checked across the corpus").toBeGreaterThan(500);
   });
