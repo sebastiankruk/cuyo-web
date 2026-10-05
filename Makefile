@@ -305,6 +305,19 @@ test-engine:
 # The second command is what turns vitest's single total into the per-tier table the
 # README records, and it is a separate program so that a run of it can be read as a
 # check in its own right. It exits non-zero when a tier is under its floor.
+# The 79-level survey: every level driven with no input, no step cap lowered.
+#
+# Not part of `check`, and deliberately. It takes about eighty seconds — stepping is ~84 000ms
+# where loading is ~470ms — and six test files already load every level, so adding it to the
+# parallel set pushed `check` past five minutes. The cheap half of the same rot-catcher,
+# engine/game-core/name-resolution.test.ts, costs about 90ms and does run in `check`.
+#
+# So this is the *measurement* half, and it says which levels act on themselves, which `check` has
+# no opinion about. Run it before claiming anything about the corpus.
+survey:
+	$(AI_ECHO) "Driving all 79 levels with no input (about 90s)..."
+	@CUYO_SURVEY=1 $(NPM) $(NPM_RUN) run test -- engine/game-core/corpus-run.test.ts
+
 coverage:
 	$(AI_ECHO) "Running tests with coverage..."
 	@$(NPM) $(NPM_RUN) run test:coverage

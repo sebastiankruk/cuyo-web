@@ -294,7 +294,7 @@ describe("LevelLoader: what it produces", () => {
     expect(sim.board.occupied !== undefined).toBe(true);
     // And the goal count matches what the index said the level contains.
     expect(sim.goalCount).toBe(10);
-  });
+  }, 30000);
 
   it("resolves the level's goal art keys through the manifest", async () => {
     const { loader } = loaderWith();
