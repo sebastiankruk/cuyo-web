@@ -137,6 +137,16 @@ export default defineConfig({
     // precisely so they can be tested without a browser; excluding `app/` would
     // leave those numbers untestable, which is the thing the split was for.
     // Component tests that need a DOM are a separate environment, not this one.
+    //
+    // **13.5 and 13.8 are what this is for**, and neither existed before: both need a real DOM,
+    // and `jsdom` is what supplies one. It is scoped to the files that ask for it by name rather
+    // than made the project default, for the reason the paragraph above gives — the engine must
+    // stay runnable in plain Node, and a global DOM would quietly let an engine test reach for
+    // `document` and pass.
+    //
+    // Deliberately `jsdom` and not `happy-dom`: it implements more of the platform, and the two
+    // tests that use it care about `PointerEvent`, `setPointerCapture` and `performance.now`,
+    // all of which `happy-dom` handles less completely.
     // The root `*.test.ts` is for whole-repository facts that belong to no one
     // directory - currently the licence, which has to agree across the README, the
     // badge, the script headers and the prose, and which no per-directory test can see.
