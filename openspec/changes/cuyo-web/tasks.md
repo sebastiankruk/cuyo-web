@@ -580,6 +580,12 @@ long enough that scrolling to the bottom is the only way to see what exists.
 - [ ] 7.13 Implement text rendering with a bundled font that scales with the board, and verify legibility at small viewport sizes
 - [ ] 7.14 Implement a deterministic fallback icon for an out-of-range `pos` index, and verify a level requesting a missing index renders rather than failing
 
+  **Deliberately not started, and the reason is a decision that is not mine to make.** Upstream does *not* fall back: `bildstapel.cpp:130` throws `Fehler("Position pos=%d out of range (allowed for file=%d: 0 - %d)")` unconditionally, with no clamp and no default, and this port's check at `cual-runtime/draw.ts:218` is deliberately identical to it. So "renders rather than failing" is a **divergence from the original**, and it is the divergence that keeps four of the survey's ten throws (`Antarctic`, `Dungeon`, `Fische`, `Flechtwerk`) from being fixed.
+
+  **But it is very likely blocked rather than wrong, and that is why it waits.** `pos`'s range depends on the *level's* `pics` count, not on the artwork — so as things stand the range is identical to upstream's and there is nothing new to fall back *from*. Group 8 replaces the art set wholesale (8.5, 8.6), and if the new tiles give a file **fewer icons than upstream's**, then an icon index which was valid becomes out of range *here only*, and a fallback is exactly the right answer — with the fallback's own icon being group 8's to design.
+
+  So this waits on **8.0's shape and 8.5/8.6's icon counts**, and doing it before then would mean inventing machinery for a case that does not yet exist, against an upstream behaviour that currently has none.
+
 ## 8. Art Pipeline
 
 - [ ] 8.0 Make kinds distinguishable by **shape**, not only colour
@@ -691,7 +697,17 @@ long enough that scrolling to the bottom is the only way to see what exists.
 - [ ] 12.4 Make the build gate compile all bundled levels and verify `npm run build` fails on any level that does not parse or compile
 - [ ] 12.5 Measure frame time with the development overlay on a mid-range device profile and verify the board stays within budget with a full board and active animations
 - [ ] 12.6 Verify the Standard track is playable end to end on a real phone, including touch controls, orientation change and offline start
-- [ ] 12.7 Verify every track loads and each level reaches a running state without a runtime error in its first steps
+- [x] 12.7 Verify every track loads and each level reaches a running state without a runtime error in its first steps
+
+  **The catalogue is not 79 levels on one track — it is 187 (level, difficulty) pairs across 5 tracks** (`main`, `all`, `contrib`, `nofx`, `weird`), and `difficulties` is a `Map` keyed by difficulty *name*, so `weird` and `nofx` levels are only reachable through their entry. `loader.test.ts` loads one difficulty per level and therefore cannot see a version-conditioned definition changing a level's kinds on one track only. `engine/level-format/tracks.test.ts` drives all 187 for 30 steps each — a little over three seconds of game time, enough for the border to descend and for draw code to run on real blobs — in **~9 seconds**, so it is in `make check` where the 84-second survey is not.
+
+  **20 of the 187 raise, across 8 levels, and all 20 are pinned by level, track and difficulty.** Six divide by zero (`BoniMali2` and `Kacheln_azyklisch`, on all three of their difficulties); fourteen address a picture that does not exist (`Antarctic`, `Elemente`, `Fische`, `Flechtwerk`, `Hormone`, `Wachsen`). Every cause is upstream's own undefined behaviour or upstream raising the same error this port raises.
+
+  **The single-track survey understated this**, and the multi-track view is what shows it: `Antarctic`'s `pos = version` reaches its out-of-range picture on `all/normal` within 30 steps, while the survey only saw it on the first difficulty and much later. `Hormone`, `Wachsen` and `Elemente` surface as `pos=0 out of range (allowed for file=0: 0 - -1)` — a **kind with draw code and no picture at all**, so the permitted range is the degenerate `0 - -1`.
+
+  **`Baggis` and `Dungeon` are absent here and that is not an oversight** — they raise in the survey but not within 30 steps, which is the whole difference between the two files: this one runs in nine seconds and is in every run; that one runs in eighty-four and is on `make survey`.
+
+  **`expect(throwing).toHaveLength(20)` makes the two lists exhaustive**, so a fourth pair in either group or a throw from a third cause fails with the newcomer's name instead of quietly moving the survey's tally. That is the failure mode that let ten survey throws go unreported.
 - [x] 12.8 Delete the last corpus-absence skip, in `render/palette.test.ts`
 
   The suite reads the level files and returns early when they are missing, which reads
