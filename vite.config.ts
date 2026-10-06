@@ -155,7 +155,12 @@ export default defineConfig({
     // The root `*.test.ts` is for whole-repository facts that belong to no one
     // directory - currently the licence, which has to agree across the README, the
     // badge, the script headers and the prose, and which no per-directory test can see.
-    include: ["{app,engine,levels-src,render}/**/*.test.ts", "*.test.ts"],
+    //
+    // `*.test.tsx` is here for one file: `app/PlayScreen.dom.test.tsx`, the mounted component test
+    // (13.8). JSX cannot live in a `.ts` file, and renaming the file rather than writing the
+    // component tree with `createElement` is the smaller of the two costs — a test that renders
+    // through `createElement` reads nothing like the component it renders.
+    include: ["{app,engine,levels-src,render}/**/*.test.ts", "**/*.test.tsx", "*.test.ts"],
 
     /**
      * The coverage floors, which are design.md decision 12's and not mine.

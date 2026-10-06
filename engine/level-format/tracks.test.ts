@@ -128,10 +128,13 @@ describe("every track of every level", () => {
 
       // **Every pair loads.** A load failure is reported as a throw, so it would otherwise be
       // indistinguishable from a step failure — and the two want different fixes.
-      const loadFailures = throwing.filter((o) => /LevelLoadError|not defined|required/.test(o.threw ?? ""));
-      expect(loadFailures.map((o) => `${o.pair.id}/${o.pair.track}`), "pairs that failed to load").toEqual(
-        [],
+      const loadFailures = throwing.filter((o) =>
+        /LevelLoadError|not defined|required/.test(o.threw ?? ""),
       );
+      expect(
+        loadFailures.map((o) => `${o.pair.id}/${o.pair.track}`),
+        "pairs that failed to load",
+      ).toEqual([]);
 
       // **And the recorded set of pairs that raise while stepping: 20 of the 187**, across eight
       // levels. Pinned by name, by track and by difficulty, and grouped by cause so that a *new*

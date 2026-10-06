@@ -101,9 +101,14 @@ function corpus(replacements: Readonly<Record<string, string>>): string {
 
   writeFileSync(
     resolve(dir, "summary.ld"),
-    ['Maennchen = {', `  filename = "${SAMPLE}"`, '  name = "Characters"', '  author = "Mark Weyer"', "}", ""].join(
-      "\n",
-    ),
+    [
+      "Maennchen = {",
+      `  filename = "${SAMPLE}"`,
+      '  name = "Characters"',
+      '  author = "Mark Weyer"',
+      "}",
+      "",
+    ].join("\n"),
     "latin1",
   );
   return dir;
