@@ -322,7 +322,8 @@ describeSurvey(
       // the record:
       //
       // ```
-      // Baelle:1  Go:1  Tiere:1  Wuerfel:6  Unmoeglich:6  Labyrinth:5  SilberGold:6  Bunt:10  Rollenspiel:1
+      // Baelle:1  Go:1  Tiere:1  Wuerfel:6  Unmoeglich:6  Labyrinth:5
+      // SilberGold:6  Bunt:10  Rollenspiel:1
       // ```
       //
       // The numbers are kind-change events, not levels, and 37 in total. `Bunt` at ten is the
@@ -351,11 +352,17 @@ describeSurvey(
       // makes is that both halves happen at all.
       const loadTotal = outcomes.reduce((n, o) => n + o.loadMs, 0);
       const stepTotal = outcomes.reduce((n, o) => n + o.stepMs, 0);
-      expect(loadTotal, `load ${loadTotal}ms, step ${stepTotal}ms over 79 levels`).toBeGreaterThan(0);
+      expect(
+        loadTotal,
+        `load ${loadTotal}ms, step ${stepTotal}ms over 79 levels`,
+      ).toBeGreaterThan(0);
       // Every level loads. A level that failed to load would be a `threw` with a message about
       // load rather than about Cual, and the assertion above would not catch it.
-      expect(outcomes.filter((o) => o.steps === 0 && o.threw !== null && /LevelLoadError/.test(o.threw)))
-        .toEqual([]);
+      expect(
+        outcomes.filter(
+          (o) => o.steps === 0 && o.threw !== null && /LevelLoadError/.test(o.threw),
+        ),
+      ).toEqual([]);
     },
     600_000,
   );

@@ -123,8 +123,11 @@ describe("held-key repeat", () => {
     expect(applied(hold.advanceTo(DAS_DELAY * 5)), "while the opposite key stays down").toEqual([]);
     // Only releasing it lets the next press take effect, and that press repeats normally.
     hold.release("right");
-    expect(applied(hold.press(DAS_DELAY * 5, "right")), "right after the release").toEqual(["right"]);
-    expect(applied(hold.advanceTo(DAS_DELAY * 5 + DAS_DELAY)), "right's first repeat").toEqual(["right"]);
+    expect(applied(hold.press(DAS_DELAY * 5, "right")), "right after release").toEqual(["right"]);
+    expect(
+      applied(hold.advanceTo(DAS_DELAY * 5 + DAS_DELAY)),
+      "right's first repeat",
+    ).toEqual(["right"]);
   });
 
   it("fires a long gap once, not once per interval it swallowed", () => {

@@ -69,7 +69,8 @@ function installKeyboard(actions: HeldAction[], onBlur: () => void): {
   const onKey = (e: KeyboardEvent): void => {
     const action = actionForKey(e.key);
     if (action !== null) {
-      for (const event of held.press(performance.now(), action, e.repeat)) applyAction(event.action);
+      const pressed = held.press(performance.now(), action, e.repeat);
+      for (const event of pressed) applyAction(event.action);
       e.preventDefault();
       return;
     }

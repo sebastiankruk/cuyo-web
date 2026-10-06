@@ -34,7 +34,8 @@
  * for as long as the opposite key stays down. Both halves matter and they are not the same claim:
  *
  * - Starting a right repeat immediately would make a player who drifts their thumb across the two
- *   keys get a piece flying right at 18 cells a second, which is not what "I changed my mind" means.
+ *   keys get a piece flying right at 18 cells a second, which is not what "I changed my
+ *   mind" means.
  * - Not cancelling would leave the left repeat running underneath, so the piece would move left and
  *   right at once and appear to jitter in place.
  *
