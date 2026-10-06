@@ -1,0 +1,187 @@
+# Upstream Cuyo, once a week.
+
+# Copyright (C) 2026 Sebastian Ryszard Kruk (dev@kruk.me)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# What this is for, and what it deliberately does not do.
+#
+# The corpus is pinned to upstream 2.1.0. Nothing in this repository watches whether 2.1.1 exists,
+# so an upstream release would be discovered the way a dependency bump usually is: by a level
+# behaving oddly and somebody going to look. This job looks first.
+#
+# It **opens an issue, and it does not touch the repository.** A scheduled workflow with write
+# permissions that pushes to a branch is a supply-chain risk dressed as convenience; one that files
+# an issue cannot change what ships. Everything it knows is in the issue body, and a human decides
+# what to do about it.
+#
+# Why it re-runs the level-format suite as well as the version check: a new upstream version is
+# only worth anything if the levels still load, and the suite is the only thing that can say. But
+# re-running it against the *pinned* corpus proves nothing about the new version, so the suite runs
+# as a liveness check on this job and the version check does the actual work. That is stated here
+# because it would otherwise look like the suite is the point.
+
+name: Upstream Watch
+
+on:
+  schedule:
+    # Mondays at 06:17 UTC. The odd minute is deliberate: `schedule` triggers on the hour, and every
+    # repository using `:00` fires at the same instant, which GitHub documents as a cause of
+    # delayed runs.
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  # Read-only, and the issue is filed with the token this grants. A scheduled job that can push is
+  # a supply-chain risk dressed as convenience; one that can only open an issue cannot change what
+  # ships.
+  contents: read
+  issues: write
+
+env:
+  NODE_VERSION: '22'
+  # Overridable so the parsing can be tested against a fixture index rather than the real pool.
+  # Empty by default, which is what makes the job do its real work rather than a test's.
+  CUYO_POOL_INDEX: 'https://deb.debian.org/debian/pool/main/c/cuyo/'
+  CUYO_VERSION_CMD: ''
+
+jobs:
+  upstream:
+    name: Is there a Cuyo newer than the pinned one?
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      # What is pinned, read from the fetch script rather than repeated here. A version in two
+      # places is one of them wrong, and this one decides whether a release matters.
+      - name: Read the pinned version
+        id: pinned
+        run: |
+          url="$(grep -oP 'cuyo_\K[0-9.]+(?=\.orig\.tar\.gz)' scripts/fetch-cuyo.sh | head -1)"
+          if [ -z "$url" ]; then
+            echo "::error::could not read the pinned version out of scripts/fetch-cuyo.sh"
+            exit 1
+          fi
+          echo "version=$url" >> "$GITHUB_OUTPUT"
+          echo "Pinned upstream Cuyo: $url"
+
+      - name: Look for a newer release in Debian's archive pool
+        id: newer
+        env:
+          # Overridable so the parsing below can be tested against a pool index that is not the
+          # real one. A scheduled job whose only test is "it has never gone red" is a job whose
+          # parsing has never been checked, because the interesting case — a *newer* version — does
+          # not occur on any normal run.
+          POOL_INDEX: ${{ env.CUYO_POOL_INDEX }}
+          # Same, for the version comparison, so a fixture can be tested without a network.
+          VERSION_CMD: ${{ env.CUYO_VERSION_CMD }}
+        run: |
+          pinned="${{ steps.pinned.outputs.version }}"
+          # The pool directory is the authoritative list of what exists, and it is a plain HTML
+          # index rather than an API. Parsing it is the whole job.
+          body="$(curl -fsSL "$POOL_INDEX")" || {
+            echo "::error::could not read Debian's pool index"
+            exit 1
+          }
+          # Only `orig` tarballs: a `debian` revision is packaging, not upstream, and reacting to
+          # one would file an issue every time somebody repacked 2.1.0.
+          found="$(printf '%s' "$body" \
+            | grep -oE 'cuyo_[0-9]+\.[0-9]+(\.[0-9]+)?\.orig\.tar\.gz' \
+            | sed -E 's/^cuyo_(.*)\.orig\.tar\.gz$/\1/' \
+            | sort -u -V)"
+          echo "Versions in the pool:" >&2
+          printf '%s\n' "$found" >&2
+          echo "latest=$(printf '%s\n' "$found" | tail -1)" >> "$GITHUB_OUTPUT"
+          # **The comparison is one command, and it is overridable.** `sort -V` is what makes
+          # `2.1.10` newer than `2.1.9`, which a string comparison gets backwards. The indirection
+          # exists so `upstream-watch.test.ts` can run this exact block against fixture indexes.
+          if [ -n "$VERSION_CMD" ]; then
+            changed="$($VERSION_CMD "$pinned" "$found")"
+          else
+            changed=false
+            [ "$(printf '%s\n' "$found" | tail -1)" != "$pinned" ] && changed=true
+          fi
+          if [ "$changed" = true ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The liveness check, and the job's real subject. It runs against the *pinned* corpus, so it
+      # cannot say anything about the new version — what it establishes is that this job's own
+      # tooling works, so a red run here means the job broke rather than that upstream moved.
+      - name: The level-format suite still passes
+        run: npx vitest run engine/level-format
+
+      - name: Report
+        id: report
+        if: steps.newer.outputs.changed == 'true'
+        env:
+          PINNED: ${{ steps.pinned.outputs.version }}
+          LATEST: ${{ steps.newer.outputs.latest }}
+        run: |
+          {
+            echo "## A Cuyo newer than the pinned one is in Debian's pool"
+            echo
+            echo "Pinned here: \`$PINNED\`.  Latest in the pool: \`$LATEST\`."
+            echo
+            echo "Nothing has been changed — \`.context/upstream-cuyo/\` is not fetched here, and"
+            echo "\`levels/upstream/\` is still the pinned copy. This is a notice, not an upgrade."
+            echo
+            echo "### What to look at"
+            echo
+            echo "* \`scripts/fetch-cuyo.sh\` pins a URL and a SHA-256, both from Debian's \`.dsc\`. A new"
+            echo "  version needs both, and the SHA-256 must come from the new \`.dsc\` rather than from"
+            echo "  the tarball it describes."
+            echo "* \`make check-levels-upstream\` then diffs \`levels/upstream/\` against the fetched tree."
+            echo "  It is the check that says whether the vendored levels are still byte-identical."
+            echo "* \`make level-index\` regenerates the catalogue if the level set moved."
+            echo "* Group 2 of \`openspec/changes/cuyo-web\` records what a new version would mean for the"
+            echo "  level format; a new release may well need a new delta rather than a re-vendor."
+          } > "$RUNNER_TEMP/issue.md"
+          {
+            echo "pinned=$PINNED"
+            echo "latest=$LATEST"
+          } >> "$GITHUB_ENV"
+          echo "body_path=$RUNNER_TEMP/issue.md" >> "$GITHUB_OUTPUT"
+
+      - name: File the issue
+        if: steps.newer.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # `gh issue create --label` fails on a label that does not exist, so it is created if
+          # missing. A scheduled job that dies on a missing label is a scheduled job that stops
+          # reporting, which is the one failure mode this file exists to prevent.
+          gh label create upstream --description "A notice from the weekly upstream watch" \
+            --color 0e8a16 2>/dev/null || true
+          gh issue create \
+            --title "Upstream Cuyo ${{ env.latest }} is available; this project pins ${{ env.pinned }}" \
+            --body-file "${{ steps.report.outputs.body_path }}" \
+            --label upstream
+
+      - name: Say so when there is nothing to report
+        if: steps.newer.outputs.changed != 'true'
+        run: |
+          echo "Pinned version is still the newest in Debian's pool. Nothing to file."
+          echo "This run succeeding is the useful outcome — it means the job works."
