@@ -259,6 +259,14 @@ check-art-manifest:
 
 lint: lint-code lint-types lint-docs lint-specs lint-workflows
 
+# Every source file carries this project's licence header. 14.15, and the reason it is a
+# script and not only a vitest file: this has to be runnable on its own, over a changed
+# file list, without booting the test runner. The header itself is four lines and *names*
+# LICENSING.md and ATTRIBUTION.md rather than pasting seventeen sections of AGPL into 158
+# files; `licence.test.ts` asserts the full text once, which is the right place for it.
+check-licence-headers:
+	@bash scripts/check-licence-headers.sh
+
 # ESLint. The engine/ boundary rule lives in eslint.config.js, so this is also the
 # check that `engine/` stays runnable in plain Node.
 lint-code:
@@ -338,7 +346,7 @@ build: level-data
 # The single command CI runs, so that "green locally" and "green on GitHub" mean
 # the same thing. `make check` is not a separate set of checks: it is these four
 # targets in the order a person would run them.
-check: lint test build check-art check-art-manifest check-level-index validate-levels check-version
+check: lint test build check-art check-art-manifest check-level-index check-licence-headers validate-levels check-version
 	$(AI_ECHO) "All checks passed."
 
 # Serves the production bundle from dist/ rather than the source, which is what
