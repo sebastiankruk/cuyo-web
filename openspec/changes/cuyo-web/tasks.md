@@ -814,7 +814,32 @@ this project is worked on by an agent that pays for every line of tool output, s
 - [x] 14.11 Add a CI job asserting the human-facing banners are still present, and verify it fails when `AI_ECHO` is inverted
 - [x] 14.12 Document the AI mode in `.agents/rules/cuyo-standards.md` and the README, including the measured saving
 - [x] 14.13 Correct the README's upstream clone instruction, which names a repository that does not exist
-- [ ] 14.14 Add a formatter check, and record why no formatter was adopted earlier: the code is hand-formatted at 80 columns with aligned tables, and running one now would rewrite every file for no rule that catches a defect
+- [x] 14.14 Add a formatter check, and record why no formatter was adopted earlier: the code is hand-formatted at 80 columns with aligned tables, and running one now would rewrite every file for no rule that catches a defect
+
+  **The conclusion is right and the reason given is wrong, so `formatting.test.ts` measures the code instead of believing the task.** "Hand-formatted at 80 columns" is not what this repository is:
+
+  | | |
+  | --- | --- |
+  | Source files, excluding generated | 154 |
+  | Lines | 52 396 |
+  | Over 80 columns | 8 371 — **16.0%** |
+  | Over 100 columns | 93 — **0.18%**, across 55 files |
+  | Over 160 columns | 1 |
+  | Longest line | 166, a `BlobStore` fixture in `store.test.ts` |
+
+  So **80 is a soft target and 100 is where "wide" starts**, with a long thin tail of object literals and wrapped error messages. A check asserting 80 columns would fail on a sixth of the lines and fix nothing.
+
+  **Which is why the width rule is a ratchet and not a ceiling: at most 93 wide lines, at most 166 columns.** A ceiling of 100 would fail on 93 existing lines, and the only way to satisfy it is the rewrite 14.14 rules out. A ratchet is enforceable today, can only tighten, and turns "do not make this worse" into something a machine checks.
+
+  **The ratchet caught its own author.** This file's first version asserted `0` lines over 100, from a `find` whose `-o` grouping did not bind as intended and so scanned a different set of files. The allowance had to be written as **93** before the test would pass — which is the argument for *measuring* a ratchet rather than picking one: **a number chosen from a faulty `find` is a wrong gate that looks like a strict one.** A strict-looking rule that is merely wrong is worse than an honest loose one, because it is trusted.
+
+  **Three rules here are not about width**, and two of them were genuinely clean while the third was not:
+
+  - **No tab characters** — 0 across the repository. Checked by character rather than by eye, because a tab is invisible in review and renders at a different width everywhere, and it breaks the aligned comment blocks the code leans on.
+  - **No trailing whitespace** — 0 across the repository. Invisible in review, and it produces diff noise that *hides the change being reviewed*.
+  - **Exactly one newline at end of file** — **52 of 154 files had none, and now all do.** Always wrong when absent, invisible when right, and the kind of thing a formatter fixes without anyone deciding it should be. This is the only edit 14.14 produced, and it is 52 one-byte additions rather than "every file".
+
+  **Why no formatter, stated so it cannot be deleted without noticing.** `prettier` and `biome format` enforce quoting, semicolons, indentation and line breaking — all already consistent, because the code was hand-written and reviewed. **None of them catches a wrong `pos` reaching `bildstapel.cpp`'s range check**, which is the class of defect this codebase has actually produced: four of the corpus survey's ten throws were an index computed past the end of a picture list, and a formatter is silent on all four. The test asserts that this reasoning is *present in this file*, so deleting the argument turns a test red rather than silently reducing four narrow rules to four arbitrary ones.
 - [x] 14.15 Add a licence-header check over source and scripts, and verify `ATTRIBUTION.md` and the GPL notices are named from it
 
   **`scripts/check-licence-headers.sh`, in `make check`, and all 158 source files now carry a header.** The existing `licence.test.ts` already checked the *scripts'* full 16-line AGPL boilerplate — but **not one TypeScript file had a licence notice at all**, which is the actual gap: the project's own code was shipping unlabelled while a `check-licence-headers` gap in `tasks.md` sat at 14.15.
