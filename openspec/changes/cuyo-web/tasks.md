@@ -815,7 +815,27 @@ this project is worked on by an agent that pays for every line of tool output, s
 - [x] 14.12 Document the AI mode in `.agents/rules/cuyo-standards.md` and the README, including the measured saving
 - [x] 14.13 Correct the README's upstream clone instruction, which names a repository that does not exist
 - [ ] 14.14 Add a formatter check, and record why no formatter was adopted earlier: the code is hand-formatted at 80 columns with aligned tables, and running one now would rewrite every file for no rule that catches a defect
-- [ ] 14.15 Add a licence-header check over source and scripts, and verify `ATTRIBUTION.md` and the GPL notices are named from it
+- [x] 14.15 Add a licence-header check over source and scripts, and verify `ATTRIBUTION.md` and the GPL notices are named from it
+
+  **`scripts/check-licence-headers.sh`, in `make check`, and all 158 source files now carry a header.** The existing `licence.test.ts` already checked the *scripts'* full 16-line AGPL boilerplate — but **not one TypeScript file had a licence notice at all**, which is the actual gap: the project's own code was shipping unlabelled while a `check-licence-headers` gap in `tasks.md` sat at 14.15.
+
+  **The header is four lines and points, rather than seventeen lines repeated 158 times.**
+
+  ```
+  // SPDX-License-Identifier: AGPL-3.0-or-later
+  // Copyright (C) 2026 Sebastian Ryszard Kruk (dev@kruk.me)
+  // Licensed under the GNU Affero General Public License, version 3 or later.
+  // See LICENSING.md for the notices this project owes, and ATTRIBUTION.md for what it is
+  // a port of.
+  ```
+
+  Both forms are legally adequate; this one keeps the obligation and points at it, and a recipient who follows the pointer gets the full text — which `licence.test.ts` already asserts once, so a second copy per file would be 158 chances to disagree with it. **The SPDX line is first because that is the line machines read**, and the header goes *above* the file's doc comment rather than inside it: a licence inside a comment about something else is one refactor away from being deleted.
+
+  **`levels/upstream/` and `levels/` are excluded, and that is the exclusion that matters.** Those files carry upstream's own GPL-2.0-or-later notices, and `licence.test.ts` asserts they are grounded in *upstream's own per-file notice*. Stamping AGPL on top would misattribute their work; stripping theirs would break the obligation the project actually owes. Also excluded: generated files (the emitter writes the header instead, since a regeneration would overwrite it), `.d.ts`, and `node_modules`/`dist`/`coverage`/`.context`.
+
+  **A `find` with six prune expressions is a gate that can pass by matching nothing, so `licence-headers.test.ts` watches it refuse** — 8 tests over temporary trees. The most important one asserts the script **fails on a tree with no source files**, which is the failure mode that would otherwise be invisible forever. The count floor is an *argument* rather than a constant for the same reason: **a check that cannot run against a three-file fixture cannot be tested**, and a fixed floor large enough to be useful on this repository would make every fixture look like a broken `find`.
+
+  **Two things the tests caught.** The good-tree fixture asserted a floor of 3 while only 2 of its 3 files matched — the third being the `.d.ts` exclusion, working correctly — so the assertion was checking that a prune *fails*. And the whole file initially resolved `REPO` one level too high, which is why all 8 tests failed identically at first.
 - [ ] 14.16 Add a CI job that runs `npm audit` and fails on a high or critical advisory, with a documented allow-list and an expiry date for each entry
 - [x] 14.17 Add coverage reporting to CI once 13.6 sets the floors, so a drop below them fails the build rather than appearing in a diff
 - [ ] 14.18 Add a scheduled weekly job that re-fetches the corpus and re-runs the level-format suite, so an upstream release is noticed rather than discovered
