@@ -854,7 +854,25 @@ this project is worked on by an agent that pays for every line of tool output, s
 
   **Two mistakes the tests caught.** `--offline-check-only` was documented as "skips `npm audit`", which is true of a real run and false of a test — so **every rule passed vacuously in every fixture**, and seven of the eleven tests were green while asserting nothing. And a single `/has no (why|expires)/` regex over three malformed-entry shapes passed two of them for the wrong reason, because `"expires=soon, which is not a date"` does not match it; each shape now has its own expected message.
 - [x] 14.17 Add coverage reporting to CI once 13.6 sets the floors, so a drop below them fails the build rather than appearing in a diff
-- [ ] 14.18 Add a scheduled weekly job that re-fetches the corpus and re-runs the level-format suite, so an upstream release is noticed rather than discovered
+- [x] 14.18 Add a scheduled weekly job that re-fetches the corpus and re-runs the level-format suite, so an upstream release is noticed rather than discovered
+
+  **`.github/workflows/upstream-watch.yml`, Mondays 06:17 UTC, plus `workflow_dispatch`.** The minute is deliberately **not** `:00` — every repository using `:00` fires at the same instant, which GitHub documents as a cause of delayed runs.
+
+  **The pinned version is *read from* `scripts/fetch-cuyo.sh`, not repeated.** A version in two places is one of them wrong, and this one decides whether a release matters. The grep that reads it is asserted in the test, so a change to the fetch script that broke its readability fails here rather than in a scheduled run a week from now.
+
+  **It files an issue and it cannot change anything.** `contents: read` and `issues: write` is the whole permission set, asserted explicitly — a scheduled job with write permissions that pushes is a supply-chain risk dressed as convenience. The issue body says plainly that nothing has been fetched and nothing has changed, because an issue that implies an upgrade misreads whoever sees it.
+
+  **The interesting case never happens on a normal run, which is the reason the test exists.** "A newer Cuyo exists" is taken **zero times** until upstream releases something, so a job whose only evidence is that it has not gone red is a job whose *parsing* has never been checked — the success path runs weekly and proves nothing about the path that matters. So the parsing sits behind `CUYO_POOL_INDEX` / `CUYO_VERSION_CMD` and 12 tests run the same shell against fixture indexes: a newer version, only the pinned one, packaging revisions, and an older version alongside.
+
+  **Three things that would be wrong, and are not:**
+
+  - **A Debian packaging revision is not an upstream release.** `cuyo_2.1.0-2.2.debian.tar.xz` and `.dsc` are packaging; Debian repacks 2.1.0 regularly, and filing an issue per repack is how a scheduled job trains you to ignore it. Only `orig` tarballs count, and there is a fixture for exactly this.
+  - **`2.1.10` is newer than `2.1.9`,** which `sort -V` gets right and a string comparison does not. **The obvious test example would have passed while proving nothing**: `"2.1.0"` against `"2.1.10"` compares correctly as strings, because `"0" < "1"`. It is `"9"` against `"1"` that is backwards, so the test uses that pair *and computes the string sort's wrong answer inline* to keep the difference visible.
+  - **A missing label would kill the job.** `gh issue create --label` fails on a label that does not exist, and a scheduled job that dies on that stops reporting — the one failure mode the whole file exists to prevent. So the label is created if absent, and the `|| true` is asserted.
+
+  **The level-format suite runs as a liveness check, and says so.** It runs against the *pinned* corpus, so it cannot say anything about a new version; what it establishes is that this job's own tooling works, so a red run means the job broke rather than that upstream moved. That is stated in the workflow header because otherwise it looks like the suite is the point.
+
+  **`upstream-watch.test.ts` also asserts the workflow's permissions, its cron minute being non-zero, and that it passes `check-workflows.mjs`** — every other job in `quality.yml` would be green while this file did nothing, which is what happened when `release.yml` shipped with a missing action owner. That check caught a real error during this work: `steps.report` was referenced with no `id` on the step producing it.
 
 ## 15. Wiring the runtime to the game
 
