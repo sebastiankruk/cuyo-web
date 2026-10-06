@@ -259,6 +259,23 @@ check-art-manifest:
 
 lint: lint-code lint-types lint-docs lint-specs lint-workflows
 
+# `npm audit`, failing on any high or critical advisory that `scripts/npm-audit-allowlist.json`
+# does not already have an entry for.
+#
+# **Not in `make check`, and that is deliberate.** `npm audit` needs the network, and a check that
+# fails when the network is down teaches people to skip it. CI runs this as its own job, where a
+# network failure is visible as a network failure rather than as a local annoyance. Run it by hand
+# before a release.
+#
+# The allow-list carries an expiry date per entry and an expired entry fails. That is the whole
+# design: an allow-list that cannot go stale is a suppression list, and a suppression list that
+# cannot go stale is the same thing as having turned this off. See the script's header for why
+# every entry here is defensible — in short, all eleven advisories are in devDependencies and
+# `npm audit fix` only offers downgrades.
+check-audit:
+	$(AI_ECHO) "Auditing dependencies..."
+	@node scripts/check-npm-audit.mjs
+
 # Every source file carries this project's licence header. 14.15, and the reason it is a
 # script and not only a vitest file: this has to be runnable on its own, over a changed
 # file list, without booting the test runner. The header itself is four lines and *names*

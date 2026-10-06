@@ -1,0 +1,67 @@
+{
+  "$comment": [
+    "Advisories this project has decided not to fix, each with a reason and an expiry date.",
+    "Checked by scripts/check-npm-audit.mjs. An entry past its `expires` date fails the build, on",
+    "purpose: an allow-list that cannot go stale is a suppression list, and a suppression list that",
+    "cannot go stale is the same thing as having turned the check off.",
+    "",
+    "Every entry below is in a devDependency and unreachable from the shipped bundle. The",
+    "production dependencies are react and react-dom, and neither appears in `npm audit` output.",
+    "",
+    "npm audit fix is not an option for any of these. Both direct dependencies are already at",
+    "their latest published version - markdownlint-cli2 0.23.3 and @fission-ai/openspec 1.14.0 - and",
+    "the fix npm offers is a downgrade to 0.21.0 or 0.17.2 respectively. Taking it would move the",
+    "project backwards to satisfy a check about a version it is already past."
+  ],
+  "entries": [
+    {
+      "package": "@fission-ai/openspec",
+      "severity": "high",
+      "via": "fast-glob > micromatch > braces",
+      "why": "Validates this project's OpenSpec files in CI. Reads only files already in the repository, so the reachable precondition is an attacker who can already commit here, at which point they can edit the validator. Latest published version; npm's only fix is a downgrade.",
+      "expires": "2026-11-05"
+    },
+    {
+      "package": "markdownlint-cli2",
+      "severity": "high",
+      "via": "globby > fast-glob > micromatch > braces",
+      "why": "Lints this repository's Markdown in CI. Same precondition: an attacker who can already edit the repository. Its subtree is the whole of the brace-expansion DoS advisory. Latest published version; npm's only fix is a downgrade to 0.21.0.",
+      "expires": "2026-11-05"
+    },
+    {
+      "package": "globby",
+      "severity": "high",
+      "via": "markdownlint-cli2 > globby",
+      "why": "Reached only through markdownlint-cli2, which is devDependencies-only and runs on repository files. Listed separately because npm reports it as its own node, so a single entry for the root would not match the report.",
+      "expires": "2026-11-05"
+    },
+    {
+      "package": "fast-glob",
+      "severity": "high",
+      "via": "markdownlint-cli2 and @fission-ai/openspec",
+      "why": "Reached only from the two devDependencies above. Reported by npm as its own node for the same reason as globby.",
+      "expires": "2026-11-05"
+    },
+    {
+      "package": "micromatch",
+      "severity": "high",
+      "via": "fast-glob and globby",
+      "why": "Reached only from the two devDependencies above. Reported by npm as its own node for the same reason as globby.",
+      "expires": "2026-11-05"
+    },
+    {
+      "package": "braces",
+      "severity": "high",
+      "advisories": ["GHSA-vfj7-8cjw-p6xm"],
+      "why": "GHSA-vfj7-8cjw-p6xm, stack exhaustion in brace expansion. Reached only through the two devDependencies above, on repository files. This is the leaf advisory underneath all five entries above it.",
+      "expires": "2026-11-05"
+    },
+    {
+      "package": "source-map-js",
+      "severity": "high",
+      "advisories": ["GHSA-68fv-2mgg-jv7q"],
+      "why": "GHSA-68fv-2mgg-jv7q, event-loop denial of service. Reached through Vite's CSS pipeline via postcss, css-tree and magicast, so it runs at *build* time and is not in the output bundle. No fix is available upstream at any version.",
+      "expires": "2026-11-05"
+    }
+  ]
+}
