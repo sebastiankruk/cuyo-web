@@ -76,6 +76,35 @@ jobs:
       - name: TypeScript
         run: npx tsc --noEmit
 
+  # `npm audit`, failing on an unlisted high or critical advisory.
+  #
+  # Its own job, and *not* a step in `lint`, for the reason 12.5 and 14.16 both record: this needs
+  # the network, and a check that fails when the network is down teaches people to skip it. Here a
+  # network failure is visible as a network failure.
+  #
+  # The allow-list has an expiry date per entry and an expired entry fails, so this cannot be made
+  # permanently green by adding a name to a list. `npm audit fix` is not the remedy for any of the
+  # eleven advisories here - both direct dependencies are already at their latest published version
+  # and npm only offers a downgrade - which is what makes the allow-list the only option rather than
+  # a shortcut. See `scripts/npm-audit-allowlist.json`.
+  audit:
+    name: Audit dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-fund
+
+      - name: npm audit
+        run: node scripts/check-npm-audit.mjs
+
   # A workflow GitHub cannot parse does not fail: it produces a run with zero jobs and no
   # log. `release.yml` shipped with a missing action owner that way, and every other job
   # in this file was green while no release was published. Hence its own job, rather than

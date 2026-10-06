@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Sebastian Ryszard Kruk (dev@kruk.me)
+// Licensed under the GNU Affero General Public License, version 3 or later.
+// See LICENSING.md for the notices this project owes, and ATTRIBUTION.md for what it is
+// a port of.
 /**
  * Tests for runtime level loading.
  *
@@ -294,7 +299,7 @@ describe("LevelLoader: what it produces", () => {
     expect(sim.board.occupied !== undefined).toBe(true);
     // And the goal count matches what the index said the level contains.
     expect(sim.goalCount).toBe(10);
-  });
+  }, 30000);
 
   it("resolves the level's goal art keys through the manifest", async () => {
     const { loader } = loaderWith();

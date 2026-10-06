@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Sebastian Ryszard Kruk (dev@kruk.me)
+// Licensed under the GNU Affero General Public License, version 3 or later.
+// See LICENSING.md for the notices this project owes, and ATTRIBUTION.md for what it is
+// a port of.
 /**
  * Where level files come from.
  *
@@ -39,8 +44,16 @@ const HERE = dirname(fileURLToPath(import.meta.url));
  * Under `levels/` rather than at the root because a `git log` on a level file should
  * not be mixed up with a `git log` on a build script, and in a subdirectory because
  * `levels/` itself holds contributed levels that may deliberately replace these.
+ *
+ * **`CUYO_LEVELS_DIR` overrides it**, which exists for one reason: task 12.4 asks for the build
+ * gate to be *verified* — to fail on a level that does not parse or compile — and a gate nobody
+ * has seen fail is an assumption. Pointing the gate at a temporary directory with one deliberately
+ * broken level is the only way to watch it refuse, and doing that by temporarily editing the real
+ * corpus would be both racy and alarming. Same pattern as `CUYO_DATA_DIR` below, and the override
+ * affects only the build-time gate and its test, never the game.
  */
-export const VENDORED_DIR = resolve(HERE, "../levels/upstream");
+export const VENDORED_DIR =
+  process.env["CUYO_LEVELS_DIR"] ?? resolve(HERE, "../levels/upstream");
 
 /**
  * Contributed levels, tracked in git.
@@ -49,8 +62,13 @@ export const VENDORED_DIR = resolve(HERE, "../levels/upstream");
  * build-time tooling and its `README` says so explicitly. A level file is content
  * someone else wrote, and mixing it with the tools that read it is the sort of
  * arrangement that makes `git log` on a level unreadable.
+ *
+ * Shares `CUYO_LEVELS_DIR` with {@link VENDORED_DIR}, so a test that points the gate at a
+ * temporary corpus gets both directories pointed at it and `contribSummary()` finds nothing
+ * there rather than silently reading the repository's real contributed levels — which would
+ * defeat the point of the override entirely.
  */
-export const CONTRIB_DIR = resolve(HERE, "../levels");
+export const CONTRIB_DIR = process.env["CUYO_LEVELS_DIR"] ?? resolve(HERE, "../levels");
 
 /**
  * An optional upstream checkout, for the comparison check only.

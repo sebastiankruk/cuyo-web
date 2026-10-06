@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Sebastian Ryszard Kruk (dev@kruk.me)
+// Licensed under the GNU Affero General Public License, version 3 or later.
+// See LICENSING.md for the notices this project owes, and ATTRIBUTION.md for what it is
+// a port of.
 /**
  * One blob, as `Blop::animiere` sees it.
  *
@@ -188,6 +193,66 @@ export function kindChangeOf(
     },
   };
 }
+
+/**
+ * Where a name's value comes from, **without reading it**.
+ *
+ * The five namespaces in the order {@link BlobAnimation.valueOf} documents them, and deliberately
+ * the *same* function rather than a parallel one: the corpus survey needs to ask "does every name
+ * this level uses resolve?" without a blob, and a second copy of this chain would be a second
+ * answer to the same question — which is how `.ld` numbers went missing from `valueOf` in the first
+ * place.
+ *
+ * Split from the read because the two callers want different halves. Reading needs the store, since
+ * a slot's value is per-blob; asking whether a name resolves does not, and must not need a blob to
+ * answer.
+ */
+function sourceOf(
+  deps: BlobAnimationDeps,
+  name: string,
+  subject: ConstantSubject,
+): { kind: "constant"; value: number } | { kind: "slot"; slot: number } | { kind: "none" } {
+  const readOnly = readConstant(name, subject);
+  if (readOnly !== null) return { kind: "constant", value: readOnly };
+  const constant = resolveConstant(name);
+  if (constant !== null) return { kind: "constant", value: constant };
+  const declared = deps.program.allocation.declaredSlots.get(name);
+  if (declared !== undefined) return { kind: "slot", slot: declared };
+  const special = specialVariableSlot(name);
+  if (special >= 0) return { kind: "slot", slot: special };
+  const levelNumber = deps.level.levelNumber(name);
+  if (levelNumber !== null) return { kind: "constant", value: levelNumber };
+  const kinds = deps.level.kinds;
+  for (let i = 0; i < kinds.length; i += 1) {
+    if (kinds[i]?.name === name) return { kind: "constant", value: kinds[i]?.id ?? 0 };
+  }
+  return { kind: "none" };
+}
+
+/**
+ * Whether a name resolves at all, for the corpus check that no level's code reads something the
+ * game cannot answer.
+ *
+ * Static, and therefore cheap: it needs the level's program and nothing else, so all 79 levels cost
+ * a load rather than a playthrough. That is the whole reason it is worth having separately from the
+ * survey — the survey takes about eighty seconds and the rot this catches took eighteen levels.
+ */
+export function nameResolves(deps: BlobAnimationDeps, name: string): boolean {
+  // **The subject comes from the caller**, because "can this name be answered" is not well defined
+  // for an arbitrary position: `loc_p` is *refused* at `absort_nirgends` and at the two singletons
+  // upstream, so a check using one of those would report a refusal as an unresolved name. The
+  // caller picks a position where everything upstream answers is answered.
+  return sourceOf(deps, name, deps.constantSubject(EXISTENCE_PROBE, null)).kind !== "none";
+}
+
+/**
+ * Where an existence check asks from: a cell, and the left-hand one.
+ *
+ * A cell because `loc_p` has no answer without a side (`constants.ts` refuses it for the global,
+ * semiglobal and nowhere blobs), and the left because a two-player field is not a thing this port
+ * has — `PLAYER_COUNT` is 1 — so `loc_p` is 1 everywhere and no name depends on the choice.
+ */
+const EXISTENCE_PROBE = { kind: "cell", x: 0, y: 0, right: false } as const;
 
 /**
  * One blob that can be stepped.
@@ -458,23 +523,12 @@ export class BlobAnimation implements Animatable {
   }
 
   private valueOf(name: string): number | null {
-    const readOnly = readConstant(name, this.ownConstantSubject());
-    if (readOnly !== null) return readOnly;
-    const constant = resolveConstant(name);
-    if (constant !== null) return constant;
-    const slot = this.slotFor(name);
-    if (slot !== null) return this.store.get(slot);
-    const levelNumber = this.deps.level.levelNumber(name);
-    if (levelNumber !== null) return levelNumber;
-    return this.kindNumberOf(name);
-  }
-
-  /** A kind's number by name, which is what `DatenKnoten` holding a kind number reads as. */
-  private kindNumberOf(name: string): number | null {
-    const kinds = this.deps.level.kinds;
-    for (let i = 0; i < kinds.length; i += 1) {
-      if (kinds[i]?.name === name) return kinds[i]?.id ?? null;
-    }
+    // **The asking blob's own subject**, so `falling` is true of a falling piece and `loc_x` is
+    // its column. `nameResolves` passes `nowhere` instead because it only asks whether the name
+    // resolves — see there.
+    const source = sourceOf(this.deps, name, this.ownConstantSubject());
+    if (source.kind === "constant") return source.value;
+    if (source.kind === "slot") return this.store.get(source.slot);
     return null;
   }
 

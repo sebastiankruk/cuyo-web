@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Sebastian Ryszard Kruk (dev@kruk.me)
+// Licensed under the GNU Affero General Public License, version 3 or later.
+// See LICENSING.md for the notices this project owes, and ATTRIBUTION.md for what it is
+// a port of.
 /**
  * The per-blob variable store: one `Int32Array` holding user variables *and* busy flags.
  *

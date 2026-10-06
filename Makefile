@@ -228,6 +228,14 @@ level-data:
 
 # Parses and compiles every level in summary.ld, and fails on the first error. This
 # is the gate that makes "the real levels work" a fact rather than an assumption.
+#
+# Also run inside `npm run build` as `build:levels`, since 12.4 asks for the build itself to
+# refuse a broken level - a gate that only CI invokes is a gate a developer's `npm run build`
+# skips. It runs twice in `make check` for that reason, and twice costs 0.7s. It is kept listed
+# separately so that `check`'s target list still says what it checks.
+#
+# `levels-src/validate-levels-gate.test.ts` is what proves the gate can fail: it points the gate
+# at a temporary corpus with one deliberately broken level, via CUYO_LEVELS_DIR.
 validate-levels:
 	$(AI_ECHO) "Validating every level..."
 	@node $(NODE_TS_FLAGS) levels-src/validate-levels.ts
@@ -250,6 +258,31 @@ check-art-manifest:
 	@bash scripts/check-art-manifest.sh
 
 lint: lint-code lint-types lint-docs lint-specs lint-workflows
+
+# `npm audit`, failing on any high or critical advisory that `scripts/npm-audit-allowlist.json`
+# does not already have an entry for.
+#
+# **Not in `make check`, and that is deliberate.** `npm audit` needs the network, and a check that
+# fails when the network is down teaches people to skip it. CI runs this as its own job, where a
+# network failure is visible as a network failure rather than as a local annoyance. Run it by hand
+# before a release.
+#
+# The allow-list carries an expiry date per entry and an expired entry fails. That is the whole
+# design: an allow-list that cannot go stale is a suppression list, and a suppression list that
+# cannot go stale is the same thing as having turned this off. See the script's header for why
+# every entry here is defensible — in short, all eleven advisories are in devDependencies and
+# `npm audit fix` only offers downgrades.
+check-audit:
+	$(AI_ECHO) "Auditing dependencies..."
+	@node scripts/check-npm-audit.mjs
+
+# Every source file carries this project's licence header. 14.15, and the reason it is a
+# script and not only a vitest file: this has to be runnable on its own, over a changed
+# file list, without booting the test runner. The header itself is four lines and *names*
+# LICENSING.md and ATTRIBUTION.md rather than pasting seventeen sections of AGPL into 158
+# files; `licence.test.ts` asserts the full text once, which is the right place for it.
+check-licence-headers:
+	@bash scripts/check-licence-headers.sh
 
 # ESLint. The engine/ boundary rule lives in eslint.config.js, so this is also the
 # check that `engine/` stays runnable in plain Node.
@@ -305,6 +338,19 @@ test-engine:
 # The second command is what turns vitest's single total into the per-tier table the
 # README records, and it is a separate program so that a run of it can be read as a
 # check in its own right. It exits non-zero when a tier is under its floor.
+# The 79-level survey: every level driven with no input, no step cap lowered.
+#
+# Not part of `check`, and deliberately. It takes about eighty seconds — stepping is ~84 000ms
+# where loading is ~470ms — and six test files already load every level, so adding it to the
+# parallel set pushed `check` past five minutes. The cheap half of the same rot-catcher,
+# engine/game-core/name-resolution.test.ts, costs about 90ms and does run in `check`.
+#
+# So this is the *measurement* half, and it says which levels act on themselves, which `check` has
+# no opinion about. Run it before claiming anything about the corpus.
+survey:
+	$(AI_ECHO) "Driving all 79 levels with no input (about 90s)..."
+	@CUYO_SURVEY=1 $(NPM) $(NPM_RUN) run test -- engine/game-core/corpus-run.test.ts
+
 coverage:
 	$(AI_ECHO) "Running tests with coverage..."
 	@$(NPM) $(NPM_RUN) run test:coverage
@@ -317,7 +363,7 @@ build: level-data
 # The single command CI runs, so that "green locally" and "green on GitHub" mean
 # the same thing. `make check` is not a separate set of checks: it is these four
 # targets in the order a person would run them.
-check: lint test build check-art check-art-manifest check-level-index validate-levels check-version
+check: lint test build check-art check-art-manifest check-level-index check-licence-headers validate-levels check-version
 	$(AI_ECHO) "All checks passed."
 
 # Serves the production bundle from dist/ rather than the source, which is what

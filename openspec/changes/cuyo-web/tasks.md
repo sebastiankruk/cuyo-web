@@ -580,6 +580,12 @@ long enough that scrolling to the bottom is the only way to see what exists.
 - [ ] 7.13 Implement text rendering with a bundled font that scales with the board, and verify legibility at small viewport sizes
 - [ ] 7.14 Implement a deterministic fallback icon for an out-of-range `pos` index, and verify a level requesting a missing index renders rather than failing
 
+  **Deliberately not started, and the reason is a decision that is not mine to make.** Upstream does *not* fall back: `bildstapel.cpp:130` throws `Fehler("Position pos=%d out of range (allowed for file=%d: 0 - %d)")` unconditionally, with no clamp and no default, and this port's check at `cual-runtime/draw.ts:218` is deliberately identical to it. So "renders rather than failing" is a **divergence from the original**, and it is the divergence that keeps four of the survey's ten throws (`Antarctic`, `Dungeon`, `Fische`, `Flechtwerk`) from being fixed.
+
+  **But it is very likely blocked rather than wrong, and that is why it waits.** `pos`'s range depends on the *level's* `pics` count, not on the artwork — so as things stand the range is identical to upstream's and there is nothing new to fall back *from*. Group 8 replaces the art set wholesale (8.5, 8.6), and if the new tiles give a file **fewer icons than upstream's**, then an icon index which was valid becomes out of range *here only*, and a fallback is exactly the right answer — with the fallback's own icon being group 8's to design.
+
+  So this waits on **8.0's shape and 8.5/8.6's icon counts**, and doing it before then would mean inventing machinery for a case that does not yet exist, against an upstream behaviour that currently has none.
+
 ## 8. Art Pipeline
 
 - [ ] 8.0 Make kinds distinguishable by **shape**, not only colour
@@ -688,10 +694,32 @@ long enough that scrolling to the bottom is the only way to see what exists.
 - [x] 12.1 Encode the man page's worked examples as tests: division/modulo table, neighbour pattern, six `@`-assignment cases, busy switch, apple/orange kind constants, and `startdist` rows
 - [x] 12.2 Encode the source-derived constants as a single documented module and assert each value against `src/spielfeld.cpp`, `src/leveldaten.h` and `src/code.h` in comments
 - [x] 12.3 Add engine scenario tests driving real input sequences and asserting board state for one level end to end, including a win and a loss
-- [ ] 12.4 Make the build gate compile all bundled levels and verify `npm run build` fails on any level that does not parse or compile
+- [x] 12.4 Make the build gate compile all bundled levels and verify `npm run build` fails on any level that does not parse or compile
+
+  **The gate already existed; it was simply not in the build.** `levels-src/validate-levels.ts` compiles every level `summary.ld` indexes and failed on the first error, but nothing invoked it as part of `npm run build`, so the one command a developer and a release both run skipped it. It is now `npm run build:levels`, and **both `build` and `build:terse` run it before `tsc`** — levels first, because a level that does not parse is a more specific failure than a type error and it is the one this gate exists for.
+
+  **A gate nobody has watched fail is an assumption wearing a test's clothes**, so `levels-src/validate-levels-gate.test.ts` makes it refuse: a temporary corpus holding upstream's own `maennchen.ld` — 1.3 KB, the smallest in the corpus, genuinely compilable — with one token replaced. `numexplode = 10` becomes `numexplode = kaputt`, which **parses and then fails to compile**, and the gate is watched exiting non-zero *and* naming both the setting and the offending word, because "the build failed" is not a diagnosis. A second case truncates the file mid-section for the **parse** path, since that is a separate route to the exit code and either could have lost it.
+
+  **The passing case is tested first, and uses a real level rather than a synthetic one.** A hand-written level would have to be valid for the passing case to mean anything, and the quiet failure mode is that the gate refuses the *harness* and the obvious fix is to relax the assertion. Copying a real level makes the passing case true by construction. The substitution is itself asserted — if `maennchen.ld` ever stops containing `numexplode = 10` the replacement becomes a silent no-op and every "gate refuses" test starts failing for an unrelated reason.
+
+  **`CUYO_LEVELS_DIR` overrides both committed level directories**, following the existing `CUYO_DATA_DIR` pattern. Breaking one of the 79 in place would be racy — other files read the same paths in parallel workers — and a failure that leaves the corpus modified is a bad thing to automate. The override affects only this gate and its test, never the game.
+
+  **`CUYO_AI_MODE` is stripped from the child.** `validate-levels.ts:163` reads it to suppress the success report under `make`'s terse mode, and vitest inherits it — so these tests passed when run directly and failed under `make check`, which is the worst shape a test can have. Caught by running `make check`, not by `vitest run`.
+
+  **The gate runs twice in `make check` now** — once listed, once inside `build` — which costs **0.7s**. It is kept listed so the target list still says what `check` checks.
 - [ ] 12.5 Measure frame time with the development overlay on a mid-range device profile and verify the board stays within budget with a full board and active animations
 - [ ] 12.6 Verify the Standard track is playable end to end on a real phone, including touch controls, orientation change and offline start
-- [ ] 12.7 Verify every track loads and each level reaches a running state without a runtime error in its first steps
+- [x] 12.7 Verify every track loads and each level reaches a running state without a runtime error in its first steps
+
+  **The catalogue is not 79 levels on one track — it is 187 (level, difficulty) pairs across 5 tracks** (`main`, `all`, `contrib`, `nofx`, `weird`), and `difficulties` is a `Map` keyed by difficulty *name*, so `weird` and `nofx` levels are only reachable through their entry. `loader.test.ts` loads one difficulty per level and therefore cannot see a version-conditioned definition changing a level's kinds on one track only. `engine/level-format/tracks.test.ts` drives all 187 for 30 steps each — a little over three seconds of game time, enough for the border to descend and for draw code to run on real blobs — in **~9 seconds**, so it is in `make check` where the 84-second survey is not.
+
+  **20 of the 187 raise, across 8 levels, and all 20 are pinned by level, track and difficulty.** Six divide by zero (`BoniMali2` and `Kacheln_azyklisch`, on all three of their difficulties); fourteen address a picture that does not exist (`Antarctic`, `Elemente`, `Fische`, `Flechtwerk`, `Hormone`, `Wachsen`). Every cause is upstream's own undefined behaviour or upstream raising the same error this port raises.
+
+  **The single-track survey understated this**, and the multi-track view is what shows it: `Antarctic`'s `pos = version` reaches its out-of-range picture on `all/normal` within 30 steps, while the survey only saw it on the first difficulty and much later. `Hormone`, `Wachsen` and `Elemente` surface as `pos=0 out of range (allowed for file=0: 0 - -1)` — a **kind with draw code and no picture at all**, so the permitted range is the degenerate `0 - -1`.
+
+  **`Baggis` and `Dungeon` are absent here and that is not an oversight** — they raise in the survey but not within 30 steps, which is the whole difference between the two files: this one runs in nine seconds and is in every run; that one runs in eighty-four and is on `make survey`.
+
+  **`expect(throwing).toHaveLength(20)` makes the two lists exhaustive**, so a fourth pair in either group or a throw from a third cause fails with the newcomer's name instead of quietly moving the survey's tally. That is the failure mode that let ten survey throws go unreported.
 - [x] 12.8 Delete the last corpus-absence skip, in `render/palette.test.ts`
 
   The suite reads the level files and returns early when they are missing, which reads
@@ -733,11 +761,48 @@ untested files; the per-table tests are what protect fidelity, so both are neede
 - [x] 13.1 Test every neighbour-mode offset table against upstream's own `bx`/`by` digit strings from `NachbarIterator::setXY`, including the shifted and unshifted hex columns, and verify all ten modes are covered
 - [x] 13.2 Test `connected` and component computation for each neighbour mode, and verify inhibition breaks a connection in the suppressing blob's own frame only
 - [x] 13.3 Extract the renderer's pure geometry, colour derivation and cell-origin maths into canvas-free functions and unit-test them in Node, verifying hex column offsets and mirrored cell origins
-- [ ] 13.4 Drive the frame loop's accumulator with an injected clock and verify it executes one step per 80 ms, clamps a long backlog rather than fast-forwarding, and honours pause
-- [ ] 13.5 Add behaviour tests for input timing under a DOM environment: immediate move, delayed repeat, repeat rate, and cancellation on the opposite direction
+- [x] 13.4 Drive the frame loop's accumulator with an injected clock and verify it executes one step per 80 ms, clamps a long backlog rather than fast-forwarding, and honours pause
+
+  **Already satisfied, and the task is closed by pointing at the tests rather than writing more.** `app/testing/manual-clock.ts` is the injected clock 13.4 asks for — it advances only when told to, so "forty milliseconds passed" is an argument rather than a sleep — and `app/game-loop.test.ts` already asserts all three claims, in seven tests: **one step per 80 ms** ("steps once per STEP_MS, not once per frame", which checks 79 ms does nothing and the 80th ms does something), **a clamped backlog** ("caps the catch-up" — a minute-long frame is 5 steps, not 750 — and "drops a backlog rather than fast-forwarding"), and **pause** ("stops stepping while paused", "resumes on the same loop without being restarted", "does not fast-forward the backlog accrued while paused", "keeps drawing while paused").
+
+  **No code changed, and that is the finding.** 13.4 was written when the loop was untestable; the work it describes happened when `GameLoop` was given its `FrameClock`, which is why the `ManualClock` file exists and why its header says *"every property being tested is about time … a real timer makes all three flaky in the direction that hides bugs: a slow machine passes a 'nothing happened' assertion for the wrong reason."* Writing a second accumulator test would have added coverage of a machine that already has seven and none of a machine that does not.
+- [x] 13.5 Add behaviour tests for input timing under a DOM environment: immediate move, delayed repeat, repeat rate, and cancellation on the opposite direction
+
+  **The timings had to leave the component before they could be tested, and taking them out found a real bug.** `DAS_DELAY` and `DAS_RATE` were two constants wrapped around `window.setTimeout` and `window.setInterval` inside a `useCallback`, so all four claims were about time and all four were unreachable without either sleeping — slow, and flaky in the direction that hides bugs — or reaching into component internals, which ends up asserting the mock. They now live in **`app/hold-repeat.ts`**, a `HoldRepeat` with **no clock of its own**, advanced by `advanceTo(ms)`. The same decision `gestures.ts` made for thresholds and `ManualClock` for `GameLoop`, applied a third time.
+
+  **The bug: the keyboard had no repeat at all.** Its `keydown` handler called `sim.moveLeft()` on **every event, including the ones a browser synthesises while a key is held**, so holding an arrow key moved the piece at whatever rate the operating system chose, and `DAS_RATE` was `DAS_RATE` only for the on-screen buttons. Every timing assertion could have passed while that was true. So `KeyboardEvent.repeat` is now passed through and the synthesised events are ignored, and the test asserts it twice — once as a fact about the platform (`a fresh KeyboardEvent has `repeat: false`; a synthesised one has `repeat: true`) and once from the machine's side, where six synthesised events in a row apply exactly one move.
+
+  **The opposite-direction rule is two claims, not one.** Pressing right while left repeats must cancel left *immediately* — not let it slide for another 55 ms — and must **not** start right: a thumb drifting across both keys would otherwise send the piece sideways at 18 cells a second. Both are asserted, and so is the half that is easy to miss: nothing happens for as long as the opposite key stays down. A related ordering is asserted too, since real fingers produce it: hold left, tap right, lift left — and **left's release must not cancel right**.
+
+  **A long gap fires once, not once per interval missed** — a backgrounded tab has not had 180 repeats, it has had a frame — which is `GameLoop`'s fast-forward guard in the second place it is needed. And **rotation never repeats**, decided by `repeatsWhenHeld` rather than at the call site, because a decision made in two places is one of them eventually forgets.
+
+  **The repeat is pumped from the frame loop's listener, not an interval**, so it obeys the pause: an interval would keep moving the piece behind the rules dialog. That removed the `heldTimers` ref whose only job was cleaning up after itself, and `blur` now clears the machine — **`blur` fires without `keyup`**, so a key released while the tab was hidden would otherwise repeat forever and walk the piece off the board.
+
+  **`jsdom` 30.1.2 added, scoped per file by `@vitest-environment`** and deliberately not made the project default: the engine must stay runnable in plain Node, and a global DOM would quietly let an engine test reach for `document` and pass. `jsdom` rather than `happy-dom` because these tests care about `KeyboardEvent.repeat`, `PointerEvent` and `performance.now`.
+
+  **Two files, because one assertion is about arithmetic and one is about wiring.** `hold-repeat.test.ts` drives the machine — 13 of the 19 new tests. `keyboard.dom.test.ts` drives the *listener* through a real `window` and real `KeyboardEvent`s and asserts the six behaviours above at the platform boundary. **It reproduces the handler rather than importing it**, because exporting it purely for a test's benefit is worse, and mounting the whole component needs a canvas, a `ResizeObserver` and a `requestAnimationFrame` that jsdom has none of — a test built on four stubs mostly tests the stubs. The reproduction's value is that 13.8 catches the drift.
+
+  **Three of my own bugs, all caught by the tests.** `advanceTo` fired at `DAS_DELAY` intervals rather than `DAS_RATE`, so the measured rate was 3× too slow (5 applications where 17 were expected); `repeatingSince` was `private` and a test reached for it; and rotation repeated, because the rule lived in the caller until a test said it should not. A fourth was a **test** that asserted a released key would restore a *cancelled* one — which is incoherent, and the fix was to assert the ordering real fingers actually produce.
 - [x] 13.6 Set coverage thresholds in the test config at the levels in design.md decision 12 and verify the suite fails when a file is left untested
 - [x] 13.7 Record the achieved coverage per tier in the README whenever it is measured, so regressions are visible in review rather than discovered later
-- [ ] 13.8 Mount `PlayScreen` in a DOM environment and verify it sizes the canvas from the space its parent actually offers, so the component cannot re-introduce the four-times-too-tall board that `render/board.test.ts` cannot catch from outside
+- [x] 13.8 Mount `PlayScreen` in a DOM environment and verify it sizes the canvas from the space its parent actually offers, so the component cannot re-introduce the four-times-too-tall board that `render/board.test.ts` cannot catch from outside
+
+  **`app/PlayScreen.dom.test.tsx` — 9 tests mounting the real component**, with React, `react-dom`, `createRoot` and jsdom's DOM all real, against a real level loaded through the real `LevelLoader`. It needed its own file extension because JSX cannot live in a `.ts`, and `vite.config.ts`'s `include` grew `**/*.test.tsx` for it.
+
+  **`render/board.test.ts` genuinely cannot catch this, which is the task's whole point.** Those tests check `boardSizing`, `boardWidth` and `boardHeight`, and all three were — and are — correct. What was wrong was the wiring: *which* element the size came from, and the order the backing store and the CSS box were set. A pure function has no opinion about that, so a suite of pure-function tests passed throughout a bug that made the game unplayable on the device it was most likely to be played on.
+
+  **The stubbed 2D context is a `Proxy` whose tail returns a recording no-op for anything not named.** An enumerated stub has to be kept in step with the renderer, and the first version was missing `arcTo` — so `ctx.arcTo is not a function` failed *every* test for one reason, which reads as a renderer bug and is not one. `requestAnimationFrame`, `ResizeObserver`, `clientWidth`/`clientHeight` and `devicePixelRatio` are stubbed too, each as a **recorder rather than a mock with expectations**: the assertions are about the canvas's own `width`, `height` and `style`, which the component set and nothing else touched.
+
+  **`ResizeObserver` callbacks are kept, not just counted.** jsdom's never fires, so without that the resize path is unreachable and "resizes when the space changes" could only be checked by mounting twice — which proves the size is a *function of* the box but not that the component *notices* a change. With the callbacks, one is fired after the box shrinks and the same canvas is asserted smaller **with its 1:2 proportions intact**, since a resize is exactly when a 1:2 board turns square.
+
+  **Four of my own assumptions were wrong, and the component was right in three of them:**
+
+  - **The DPR is clamped to 2.** `PlayScreen` reads `Math.min(window.devicePixelRatio || 1, 2)`, so a 3× phone draws at 2×. The test expected the raw ratio and failed at 3× — which would have been a bug report against a deliberate decision: a 3× backing store is 2.25× the pixels for detail that is not visible at this art scale. The assertion now says `css × min(ratio, 2)` and says why.
+  - **Crispness is `shape-rendering="crispEdges"`, not `imageSmoothingEnabled`.** Nothing in the codebase sets the latter. The SVG tiles avoid rasterisation smoothing altogether rather than turning it off afterwards, and `render/tile.test.ts:208` already covers it. The mount-level claim is therefore the **drawing scale**: `ctx.setTransform(dpr, 0, 0, dpr, 0, 0)` after the backing store was set to `css × dpr` is what makes one art pixel cover exactly `dpr` device pixels, and getting it wrong leaves the board soft or cropped — neither visible in a pure-function test.
+  - **A board 1:2 is limited by `height / 2`, not `height * 2`.** The first version of the "uses the available space" assertion had the division the other way round and demanded a correct 384-column board exceed 992. The same error then made a 600×900 box look *smaller* than 1024×768 when it gives a **wider** board (450 against 384): a portrait box can be smaller in every dimension and still yield a bigger board.
+  - **`vi.stubGlobal` captures a value, not a getter.** The device ratio was stubbed with `ratio = 1` in `beforeEach` and a test that changed it afterwards still read 1× — so the backing-store assertion passed at 1× and failed at 2× for a reason that had nothing to do with the component. It is a `defineProperty` getter now.
+
+  **`14.14`'s width ratchet caught all of this.** It failed on 102 lines against an allowance of 93 — **every one of them a line I had just written** — and on five files missing a trailing newline. The response was to wrap my own 19 long lines and add the newlines, **not** to raise the allowance. A ratchet that gets raised the first time it fires is a counter, and 14.14's header now records this as the reason to believe it.
 
 ## 14. Linting and continuous integration
 
@@ -766,11 +831,90 @@ this project is worked on by an agent that pays for every line of tool output, s
 - [x] 14.11 Add a CI job asserting the human-facing banners are still present, and verify it fails when `AI_ECHO` is inverted
 - [x] 14.12 Document the AI mode in `.agents/rules/cuyo-standards.md` and the README, including the measured saving
 - [x] 14.13 Correct the README's upstream clone instruction, which names a repository that does not exist
-- [ ] 14.14 Add a formatter check, and record why no formatter was adopted earlier: the code is hand-formatted at 80 columns with aligned tables, and running one now would rewrite every file for no rule that catches a defect
-- [ ] 14.15 Add a licence-header check over source and scripts, and verify `ATTRIBUTION.md` and the GPL notices are named from it
-- [ ] 14.16 Add a CI job that runs `npm audit` and fails on a high or critical advisory, with a documented allow-list and an expiry date for each entry
+- [x] 14.14 Add a formatter check, and record why no formatter was adopted earlier: the code is hand-formatted at 80 columns with aligned tables, and running one now would rewrite every file for no rule that catches a defect
+
+  **The conclusion is right and the reason given is wrong, so `formatting.test.ts` measures the code instead of believing the task.** "Hand-formatted at 80 columns" is not what this repository is:
+
+  | | |
+  | --- | --- |
+  | Source files, excluding generated | 154 |
+  | Lines | 52 396 |
+  | Over 80 columns | 8 371 — **16.0%** |
+  | Over 100 columns | 93 — **0.18%**, across 55 files |
+  | Over 160 columns | 1 |
+  | Longest line | 166, a `BlobStore` fixture in `store.test.ts` |
+
+  So **80 is a soft target and 100 is where "wide" starts**, with a long thin tail of object literals and wrapped error messages. A check asserting 80 columns would fail on a sixth of the lines and fix nothing.
+
+  **Which is why the width rule is a ratchet and not a ceiling: at most 93 wide lines, at most 166 columns.** A ceiling of 100 would fail on 93 existing lines, and the only way to satisfy it is the rewrite 14.14 rules out. A ratchet is enforceable today, can only tighten, and turns "do not make this worse" into something a machine checks.
+
+  **The ratchet caught its own author.** This file's first version asserted `0` lines over 100, from a `find` whose `-o` grouping did not bind as intended and so scanned a different set of files. The allowance had to be written as **93** before the test would pass — which is the argument for *measuring* a ratchet rather than picking one: **a number chosen from a faulty `find` is a wrong gate that looks like a strict one.** A strict-looking rule that is merely wrong is worse than an honest loose one, because it is trusted.
+
+  **Three rules here are not about width**, and two of them were genuinely clean while the third was not:
+
+  - **No tab characters** — 0 across the repository. Checked by character rather than by eye, because a tab is invisible in review and renders at a different width everywhere, and it breaks the aligned comment blocks the code leans on.
+  - **No trailing whitespace** — 0 across the repository. Invisible in review, and it produces diff noise that *hides the change being reviewed*.
+  - **Exactly one newline at end of file** — **52 of 154 files had none, and now all do.** Always wrong when absent, invisible when right, and the kind of thing a formatter fixes without anyone deciding it should be. This is the only edit 14.14 produced, and it is 52 one-byte additions rather than "every file".
+
+  **Why no formatter, stated so it cannot be deleted without noticing.** `prettier` and `biome format` enforce quoting, semicolons, indentation and line breaking — all already consistent, because the code was hand-written and reviewed. **None of them catches a wrong `pos` reaching `bildstapel.cpp`'s range check**, which is the class of defect this codebase has actually produced: four of the corpus survey's ten throws were an index computed past the end of a picture list, and a formatter is silent on all four. The test asserts that this reasoning is *present in this file*, so deleting the argument turns a test red rather than silently reducing four narrow rules to four arbitrary ones.
+- [x] 14.15 Add a licence-header check over source and scripts, and verify `ATTRIBUTION.md` and the GPL notices are named from it
+
+  **`scripts/check-licence-headers.sh`, in `make check`, and all 158 source files now carry a header.** The existing `licence.test.ts` already checked the *scripts'* full 16-line AGPL boilerplate — but **not one TypeScript file had a licence notice at all**, which is the actual gap: the project's own code was shipping unlabelled while a `check-licence-headers` gap in `tasks.md` sat at 14.15.
+
+  **The header is four lines and points, rather than seventeen lines repeated 158 times.**
+
+  ```
+  // SPDX-License-Identifier: AGPL-3.0-or-later
+  // Copyright (C) 2026 Sebastian Ryszard Kruk (dev@kruk.me)
+  // Licensed under the GNU Affero General Public License, version 3 or later.
+  // See LICENSING.md for the notices this project owes, and ATTRIBUTION.md for what it is
+  // a port of.
+  ```
+
+  Both forms are legally adequate; this one keeps the obligation and points at it, and a recipient who follows the pointer gets the full text — which `licence.test.ts` already asserts once, so a second copy per file would be 158 chances to disagree with it. **The SPDX line is first because that is the line machines read**, and the header goes *above* the file's doc comment rather than inside it: a licence inside a comment about something else is one refactor away from being deleted.
+
+  **`levels/upstream/` and `levels/` are excluded, and that is the exclusion that matters.** Those files carry upstream's own GPL-2.0-or-later notices, and `licence.test.ts` asserts they are grounded in *upstream's own per-file notice*. Stamping AGPL on top would misattribute their work; stripping theirs would break the obligation the project actually owes. Also excluded: generated files (the emitter writes the header instead, since a regeneration would overwrite it), `.d.ts`, and `node_modules`/`dist`/`coverage`/`.context`.
+
+  **A `find` with six prune expressions is a gate that can pass by matching nothing, so `licence-headers.test.ts` watches it refuse** — 8 tests over temporary trees. The most important one asserts the script **fails on a tree with no source files**, which is the failure mode that would otherwise be invisible forever. The count floor is an *argument* rather than a constant for the same reason: **a check that cannot run against a three-file fixture cannot be tested**, and a fixed floor large enough to be useful on this repository would make every fixture look like a broken `find`.
+
+  **Two things the tests caught.** The good-tree fixture asserted a floor of 3 while only 2 of its 3 files matched — the third being the `.d.ts` exclusion, working correctly — so the assertion was checking that a prune *fails*. And the whole file initially resolved `REPO` one level too high, which is why all 8 tests failed identically at first.
+- [x] 14.16 Add a CI job that runs `npm audit` and fails on a high or critical advisory, with a documented allow-list and an expiry date for each entry
+
+  **`scripts/check-npm-audit.mjs`, `make check-audit`, and a new `audit` job in `quality.yml`.** `npm audit` today reports **11 advisories — 7 high, 1 moderate, 3 low, 0 critical** — so a plain "fail on high" gate would have been red on arrival, and red on arrival is how gates get `--force`d.
+
+  **`npm audit fix` is not available as a remedy for any of them, which is why the allow-list is the only option rather than a shortcut.** Both direct dependencies are already at their latest published version — `markdownlint-cli2` 0.23.3, `@fission-ai/openspec` 1.14.0 — and the fix npm offers is a **downgrade** to 0.21.0 or 0.17.2. Taking it would move the project backwards to satisfy a check about a version it is already past.
+
+  **Every advisory is in a `devDependency` and none is reachable from the shipped bundle**, which is the claim the allow-list's defensibility rests on, so it is *asserted* rather than asserted-in-prose: production dependencies are `react` and `react-dom`, neither of which appears in the audit output, and the eleven come from `markdownlint-cli2` (lints repository prose), `@fission-ai/openspec` (validates repository specs), and `source-map-js` (reached through Vite's CSS pipeline, so build-time only and not in the bundle). All three require an attacker who could already edit the repository — at which point they can edit the validator.
+
+  **Every entry carries an `expires` date and an expired entry fails, which is the whole design.** An allow-list with no expiry is a suppression list, and a suppression list that cannot go stale is indistinguishable from having turned the check off. So the *failure* is the default: the dates are a month out from this writing, and `npm-audit.test.ts` proves the mechanism by running the same fixture with `AUDIT_TODAY` at 2099 and at today — **an expiry check that never fails is as useless as one that always does**, so both directions are asserted.
+
+  **Low and moderate do not fail the build, and that is 14.16's line rather than a convenient one.** The three low and one moderate are `katex`'s prototype pollution and `smol-toml`'s quadratic parse, both in `markdownlint-cli2`'s subtree under the same "attacker who can edit the repository" premise. Failing on them would train people to reach for `--force`, which is the failure mode this check exists to prevent. They are still **printed** — a report nobody reads is not a report, and a low that becomes a high by being upgraded should be something someone noticed.
+
+  **The test does not run `npm audit`, and that is the design.** The two states that matter — an expired entry, an unlisted advisory — are **unreachable from today's advisory set**, because today it is all listed and none of it is expired. So the script takes its report and allow-list from `AUDIT_REPORT` / `AUDIT_ALLOWLIST` and its date from `AUDIT_TODAY`, and 11 tests exercise all of it without touching the network. The real audit still runs in CI, where a network failure is visible as a network failure.
+
+  **Not in `make check`, deliberately.** `npm audit` needs the network, and a check that fails when the network is down teaches people to skip it. Run it by hand before a release.
+
+  **Two mistakes the tests caught.** `--offline-check-only` was documented as "skips `npm audit`", which is true of a real run and false of a test — so **every rule passed vacuously in every fixture**, and seven of the eleven tests were green while asserting nothing. And a single `/has no (why|expires)/` regex over three malformed-entry shapes passed two of them for the wrong reason, because `"expires=soon, which is not a date"` does not match it; each shape now has its own expected message.
 - [x] 14.17 Add coverage reporting to CI once 13.6 sets the floors, so a drop below them fails the build rather than appearing in a diff
-- [ ] 14.18 Add a scheduled weekly job that re-fetches the corpus and re-runs the level-format suite, so an upstream release is noticed rather than discovered
+- [x] 14.18 Add a scheduled weekly job that re-fetches the corpus and re-runs the level-format suite, so an upstream release is noticed rather than discovered
+
+  **`.github/workflows/upstream-watch.yml`, Mondays 06:17 UTC, plus `workflow_dispatch`.** The minute is deliberately **not** `:00` — every repository using `:00` fires at the same instant, which GitHub documents as a cause of delayed runs.
+
+  **The pinned version is *read from* `scripts/fetch-cuyo.sh`, not repeated.** A version in two places is one of them wrong, and this one decides whether a release matters. The grep that reads it is asserted in the test, so a change to the fetch script that broke its readability fails here rather than in a scheduled run a week from now.
+
+  **It files an issue and it cannot change anything.** `contents: read` and `issues: write` is the whole permission set, asserted explicitly — a scheduled job with write permissions that pushes is a supply-chain risk dressed as convenience. The issue body says plainly that nothing has been fetched and nothing has changed, because an issue that implies an upgrade misreads whoever sees it.
+
+  **The interesting case never happens on a normal run, which is the reason the test exists.** "A newer Cuyo exists" is taken **zero times** until upstream releases something, so a job whose only evidence is that it has not gone red is a job whose *parsing* has never been checked — the success path runs weekly and proves nothing about the path that matters. So the parsing sits behind `CUYO_POOL_INDEX` / `CUYO_VERSION_CMD` and 12 tests run the same shell against fixture indexes: a newer version, only the pinned one, packaging revisions, and an older version alongside.
+
+  **Three things that would be wrong, and are not:**
+
+  - **A Debian packaging revision is not an upstream release.** `cuyo_2.1.0-2.2.debian.tar.xz` and `.dsc` are packaging; Debian repacks 2.1.0 regularly, and filing an issue per repack is how a scheduled job trains you to ignore it. Only `orig` tarballs count, and there is a fixture for exactly this.
+  - **`2.1.10` is newer than `2.1.9`,** which `sort -V` gets right and a string comparison does not. **The obvious test example would have passed while proving nothing**: `"2.1.0"` against `"2.1.10"` compares correctly as strings, because `"0" < "1"`. It is `"9"` against `"1"` that is backwards, so the test uses that pair *and computes the string sort's wrong answer inline* to keep the difference visible.
+  - **A missing label would kill the job.** `gh issue create --label` fails on a label that does not exist, and a scheduled job that dies on that stops reporting — the one failure mode the whole file exists to prevent. So the label is created if absent, and the `|| true` is asserted.
+
+  **The level-format suite runs as a liveness check, and says so.** It runs against the *pinned* corpus, so it cannot say anything about a new version; what it establishes is that this job's own tooling works, so a red run means the job broke rather than that upstream moved. That is stated in the workflow header because otherwise it looks like the suite is the point.
+
+  **`upstream-watch.test.ts` also asserts the workflow's permissions, its cron minute being non-zero, and that it passes `check-workflows.mjs`** — every other job in `quality.yml` would be green while this file did nothing, which is what happened when `release.yml` shipped with a missing action owner. That check caught a real error during this work: `steps.report` was referenced with no `id` on the step producing it.
 
 ## 15. Wiring the runtime to the game
 
@@ -952,4 +1096,25 @@ and wiring without the defaults would leave the great majority of the corpus ine
   **The five effects are wired for real.** `explode` sets `exploding = 1`, so a level's `explode` reaches the same state machine the rules do and `testExplosions` finds it; `sound` queues per step because audio is group 11 and **a queued sample is assertable where a sample reaching a sound card is not**.
 
   **Every stepping test got heavier**, because every step now animates: three tests crossed vitest's 5s default *under coverage instrumentation only* (1090ms, 692ms and 1188ms outside it) and were raised to 30s with the measurement in a comment. Trimmed instead would mean skipping the animation, which is the AGENTS-notes explosion failure arriving a third time. 8 scenario tests that were failing on `loc_x` now pass. **`engine/` coverage 93.4% statements and 87.6% branches.**
-- [ ] 15.7 Verify the wiring against the corpus: re-run the 12.3 survey and record how many of the 79 levels' outcomes changed, and name a level whose blobs now move on their own
+- [x] 15.7 Verify the wiring against the corpus: re-run the 12.3 survey and record how many of the 79 levels' outcomes changed, and name a level whose blobs now move on their own
+
+  **The 12.3 survey was never a test.** It was `9 won, 69 lost, 1 unfinished` in a **comment** in `scenarios.test.ts`, with nothing recomputing it — and a three-bucket tally cannot say *threw*, so **10 of the 79 levels had been throwing rather than finishing and were being counted as losses.** Measured, with Cual running: **8 won, 59 lost, 2 unfinished, 10 throwing.**
+
+  **The outcomes split in two by cost, which is the design decision here.** Six test files load all 79 levels and run in parallel workers, and adding an 84-second file to that set pushed `make check` from eleven seconds to over five minutes. So:
+
+  - **`name-resolution.test.ts` runs in `check` (~90ms).** It loads every level and **steps nothing**, and it walks every `Stmt`/`Expr` in every kind's draw code putting each name through the *same* `sourceOf` the running game uses — not a parallel copy, because a second copy of the five namespaces is a second answer to the same question, which is how `.ld` numbers went missing from `valueOf` in the first place. It catches **the class that actually happened**: 18 levels throwing `no variable named 'x'`.
+  - **`corpus-run.test.ts` runs on demand, via `make survey`.** It asserts the tally, **the ten names**, and which causes those ten have — so a change says where rather than moving a count. It **skips by default and says so in its suite name**, because vitest only shows a file's `console.log` under `--reporter=verbose` and a skipped check that looks like a pass is precisely how the 9/69/1 figure survived.
+
+  **Nine levels act on themselves, and the claim is measured rather than illustrated.** `kind` is watched, not position, because **nothing but Cual rewrites a kind** — gravity moves blobs, an explosion removes them, and `kind = x` is an assignment only a level's own code can make. `Baelle:1 Go:1 Tiere:1 Wuerfel:6 Unmoeglich:6 Labyrinth:5 SilberGold:6 Bunt:10 Rollenspiel:1`, 37 events in total; **`Bunt` changes ten blobs' kinds in a no-input run**, which is a level driving its own board. Counted over the corpus rather than naming one level by hand, because picking the one that flatters the change is what 12.3's note says not to do.
+
+  **The step cap is load-bearing, so the survey cannot be made cheap by asking for less.** Measured at caps 300, 600 and 2500: at 600 the active-level count falls from 9 to 5 and a survey assertion fails. Only two levels reach 2500 (`Ziehlen`, `Angst`) and the median is 480 steps, so the cost is spread rather than one runaway — and **stepping is two orders of magnitude more expensive than loading** (84 000ms against 471ms for the same 79 levels), which is the opposite of what 15.5's heavier slot allocation suggested.
+
+  **One real gap found — and fixed, one character deep.** `kachelnR.ld:43` writes `inhibit_alle = <DIR_U+DIR_UR+DIR_DR+DIR_D+DIR_DL+DIR_UL>`, a `.ld` definition whose value is **arithmetic over the predefined constants**. It did not resolve, and the cause was not arithmetic: `cual-constants.ts` builds the direction table with `...Object.entries(DIR)`, whose keys are the **bare suffixes** — so it registered `U`, `UR`, `R`, ... and **never registered a single `DIR_*` name**. Upstream's `knoten.cpp:99` lists all eighteen as `"DIR_U", "DIR_UR", ... "DIR_B"`, and `speicherGlobaleVordefinierte` puts them in every knoten *"daß auch außerhalb von cual darauf zugegriffen werden kann"*. So `<neighbours_hex6>` had always worked — `neighbours_hex6` is a key in its own right — which is why 79 levels loaded and only this one name broke.
+
+  **The test that would not have caught it is instructive.** `cual-constants.test.ts` already asserted all eighteen direction values, and `DIR.U` is `0x1` and perfectly correct. What was missing is that the *name the rest of the program looks up* is `DIR_U`. The new test asks for `CUAL_CONSTANTS.get("DIR_U")`, and also that the bare `U` and `D` are **absent** — short enough that a future level could plausibly use them as ordinary names.
+
+  **`name-resolution.test.ts`'s known-gap assertion is now `[]`,** not a one-element list, so it is a pure tripwire again.
+
+  **`scenarios.test.ts`'s header no longer claims Cual never runs** — "`LevelLoader` does not import the Cual compiler at all… `Simulation` has no phase that runs one" was true when written, stopped being true at 15.6, and was not updated. It is what made the old figure believable.
+
+  **`loader.test.ts`'s "produces a level the engine can actually run" needed a 30s timeout**, because 400 steps now animate every blob on the board. That is 15.6's cost made visible: `step()` was free of Cual before and now runs a ~1000-node tree per kind. The survey's 88s is the same fact at corpus scale.

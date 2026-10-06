@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Sebastian Ryszard Kruk (dev@kruk.me)
+// Licensed under the GNU Affero General Public License, version 3 or later.
+// See LICENSING.md for the notices this project owes, and ATTRIBUTION.md for what it is
+// a port of.
 /**
  * One real level, played end to end, with a win and a loss.
  *
@@ -32,22 +37,28 @@
  * statement available here that the input path is actually wired to the board: a test where the
  * input does nothing could not produce two different endings.
  *
- * ## What "end to end" does *not* cover, because it is not wired
+ * ## What changed under this file's feet
  *
- * **These scenarios never run the level's Cual programme, and neither does anything else.**
- * `LevelLoader` does not import the Cual compiler at all - its private `compile()` builds kinds,
- * settings and the start layout and nothing else - `LevelDef` has no field for a compiled
- * program, and `Simulation` has no phase that runs one. The blobs in this file therefore never
- * pull themselves; they only fall, stack and explode.
+ * **This header used to say the scenarios never run a level's Cual programme, and that the
+ * consequence was 9 won / 69 lost / 1 unfinished.** Both sentences were true when written and both
+ * stopped being true at 15.6, and nothing recomputed either — the figure was prose with nothing
+ * behind it, which is how a level that *threw* came to be counted as one that *lost*.
  *
- * The consequence is measured rather than asserted. Driving all 79 levels with no input at all
- * and a 2500-step cap: **9 are won, 69 are lost, 1 unfinished.** The 9 are the levels whose goal
- * blobs happen to be clearable by a falling piece; for the rest, upstream's own logic is what
- * pulls blobs together, and without it the board silts up and the border wins.
+ * 15.6 wired every blob's code into `Simulation.step()`, and 15.7 measured the consequence: **8 won,
+ * 59 lost, 2 unfinished and 10 throwing**, with `corpus-run.test.ts` now asserting all four. Ten
+ * levels had been throwing rather than finishing at all, which a three-bucket tally cannot express.
  *
- * That is a real gap in the engine, not a gap in this test, and it is recorded here and in the
- * reconciliation note rather than papered over by choosing a level that flatters the limitation.
- * `ParatroopersInvers` was chosen *because* it survives the limitation in both directions.
+ * The scenarios below still only drive one level by hand, and the survey is a separate file — but
+ * the gap this paragraph describes is closed, and it is closed rather than narrowed.
+ *
+ * ## Why the remaining throws are not defects
+ *
+ * Every one of the ten is upstream's undefined behaviour or upstream raising the same error: two
+ * divide by zero where `divv` (`code.h:98`) has no zero check and upstream is `SIGFPE`; four compute
+ * `pos` past the end of their own picture and hit `bildstapel.cpp:133`'s check, which this port
+ * makes identically; and four are a kind with draw code and no picture, or a `file` past the end of
+ * a kind's picture list, where `sorte.cpp:98` gives the kind code anyway and `getBilddatei(0)`
+ * then indexes an empty vector.
  */
 
 import { readFileSync } from "node:fs";
