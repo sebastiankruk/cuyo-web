@@ -73,7 +73,7 @@
  * 100 is worse than one that says 100 and means it.
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -125,15 +125,20 @@ interface SourceFile {
 function sources(): SourceFile[] {
   const out: SourceFile[] = [];
   const walk = (dir: string): void => {
-    for (const entry of readdirSync(dir)) {
-      const full = join(dir, entry);
-      if (statSync(full).isDirectory()) {
-        if (entry === "node_modules" || entry === GENERATED) continue;
+    // `withFileTypes` rather than a `statSync` per entry: the directory flag arrives with the name,
+    // so a path is never stat-ed and then read back. That is a real TOCTOU window, and CodeQL's
+    // `js/inconsistent-file-system-usage` found it here — the one thing on this branch a check
+    // actually refused. It is also one syscall per entry instead of two.
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      const name = entry.name;
+      if (entry.isDirectory()) {
+        if (name === "node_modules" || name === GENERATED) continue;
         walk(full);
         continue;
       }
-      if (!entry.endsWith(".ts") && !entry.endsWith(".tsx")) continue;
-      if (entry.endsWith(".d.ts")) continue;
+      if (!name.endsWith(".ts") && !name.endsWith(".tsx")) continue;
+      if (name.endsWith(".d.ts")) continue;
       out.push({ path: relative(ROOT, full), text: readFileSync(full, "utf8") });
     }
   };

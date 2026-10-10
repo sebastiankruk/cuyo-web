@@ -27,7 +27,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import config, { COVERAGE_FLOORS } from "./vite.config.ts";
 
@@ -61,13 +61,15 @@ function coverage(): {
 function sources(dir: string): string[] {
   const found: string[] = [];
   const walk = (path: string): void => {
-    for (const entry of readdirSync(path)) {
-      const full = join(path, entry);
-      if (statSync(full).isDirectory()) {
+    // `withFileTypes` rather than a `statSync` per entry — see `formatting.test.ts`, where the
+    // same shape drew a `js/inconsistent-file-system-usage` alert. The flag arrives with the name.
+    for (const entry of readdirSync(path, { withFileTypes: true })) {
+      const full = join(path, entry.name);
+      if (entry.isDirectory()) {
         walk(full);
         continue;
       }
-      if (!entry.endsWith(".ts") || entry.endsWith(".test.ts")) continue;
+      if (!entry.name.endsWith(".ts") || entry.name.endsWith(".test.ts")) continue;
       found.push(relative(ROOT, full));
     }
   };
