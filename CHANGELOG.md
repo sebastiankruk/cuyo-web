@@ -24,11 +24,30 @@ something a player can tell.
   starts each attempt differently, so the drawn blobs are one of the arrangements the
   level allows. The fixed ones, the background, and the colours are exact.
 
-- Progress tracking, unlocking and the level introduction are implemented and
-  tested (tasks 6.5 and 6.6), but nothing on screen shows them yet: the catalogue
-  screen that would display locked levels, best scores and the skip-introductions
-  setting is task 9.4, which arrives with the menus. Nothing here changes what the
-  game looks like, so per this file's own rule it is not a release note.
+- **The level list now remembers what you have finished.** A level you have won is
+  ticked and carries your best score for the difficulty you are looking at; a level you
+  have not reached yet says which one to finish first; and the track header counts what
+  you have done. Finishing a level is recorded, so the catalogue updates without a
+  reload.
+
+  A level that cannot be started yet is **shown and dimmed rather than hidden**, and
+  still tells you which level opens it. A level this engine genuinely cannot play says
+  so in its own words instead — those two are different problems and the stylesheet
+  gives them different borders, because one is something to do and the other is a
+  limitation no amount of progress will fix.
+
+  **Nothing is hidden behind the gate.** Every level stays reachable: playing whatever
+  is unlocked reaches all 78 playable ones, which `progress.test.ts` walks to a fixed
+  point to prove. Note that this does change what the catalogue _looks_ like — a fresh
+  install has 3 of the 59 Standard levels playable, which is what a track gate means. If
+  you would rather see all 79 at once, that is `GATE_ON_PROGRESS` in
+  `engine/progress/progress.ts`, and a test asserts the resulting number either way — but
+  flipping it fails about nine tests, because they describe the gated behaviour rather
+  than the rule behind it. Worth knowing before assuming it is a one-line change.
+
+- The **level introduction** is implemented and tested (task 6.6) but still not on
+  screen: it is the last part of the progress work 9.4 leaves showing, and it arrives
+  with the menus.
 
 ### Fixed
 

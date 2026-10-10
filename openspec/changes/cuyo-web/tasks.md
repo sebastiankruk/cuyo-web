@@ -633,7 +633,58 @@ long enough that scrolling to the bottom is the only way to see what exists.
 - [ ] 9.1 Implement the screen router (main menu, settings, level select, introduction, game, pause, results) with back navigation that preserves game state, and verify navigating away from and back to a paused level
 - [ ] 9.2 Implement the external store bridging the simulation loop to React, and verify the HUD updates while the simulation runs without React re-rendering per step
 - [ ] 9.3 Implement the main menu entry points, and verify play, level select, settings and restart are reachable
-- [ ] 9.4 Implement the level select screen with name, locked state, completion and best score, and verify a locked level cannot be started
+- [x] 9.4 Implement the level select screen with name, locked state, completion and best score, and verify a locked level cannot be started
+
+  The rules were already implemented and tested by 6.5; nothing rendered them. What 9.4
+  adds is the join between the rule and the screen, and **the join was where the bug was**:
+  the card's hit target tested `entry.supported`, which predates the gate and is `true` for
+  a locked level. So all 56 locked Standard levels had a full-card button on them. Both
+  `level-cards.test.ts` (the rules) and the component would have been green.
+
+  - **`app/level-cards.ts`**, pure, holds the card state. Its one job beyond 6.5 is the
+    **precedence between the two reasons a card cannot be played**, which is not a
+    hypothetical: `isUnlocked` walks `playableInTrack`, which *drops* unsupported levels,
+    so for `DreiD` the index is always `-1` and `isUnlocked` returns `false` — not because
+    a gate is in the way but because there is no chain to gate it in. Both predicates are
+    false at once for every unsupported level. Getting the order backwards labels `DreiD`
+    **Locked**, promising a level will open when it never will.
+  - **The gate is checked in `App.start`, not only in the card.** 9.4 asks that a locked
+    level cannot be *started*; a card with no button is a claim about the card. A stale
+    card from before a completion would start the level, so the loader asks too. Both read
+    `canStart` on one card state, so they cannot disagree — and the DOM test asserts both
+    ends.
+  - **Cards keep unplayable levels.** `trackProgress` drops them, which was right for a
+    progression display and wrong here: a level that exists should be visible and should
+    say why. Dropping them was omission rather than decision, and it is the silent
+    omission `LevelIndexEntry.supported` exists to prevent.
+  - **`app/record-once.ts`**, because recording a win is an effect on `phase` and `phase`
+    stays `won` for every frame the result overlay is up. Each firing is *individually
+    correct* — same score, `recordCompletion` keeps the higher — so nothing about the
+    value is ever wrong; the device just writes storage once a frame for as long as the
+    player looks at their score, and "the win was recorded" passes throughout. The guard
+    is outside the component because the claim is about how many times it fires, which
+    cannot be reached by driving a simulation to one win. `lost` does not spend the
+    claim: a level lost is not progress, and the catalogue has no business ticking it.
+
+  **The gate itself is `GATE_ON_PROGRESS`, and it is on.** The spec requires it, so it
+  ships; what the measurement adds is that the choice is now a named constant with a test
+  asserting the number either way, rather than a property of the logic nobody can see the
+  effect of. Nothing is stranded either way — `progress.test.ts` walks the chain to a fixed
+  point and all 78 playable levels are reachable — so the constant decides which levels
+  are *offered*, never which are reachable.
+
+  **Flipping it is not free, and measuring that was worth doing.** Turning it off fails
+  **nine** tests: `progress.test.ts`'s and `level-cards.test.ts`'s both describe gated
+  behaviour in their assertions rather than only the rule behind it, so they would have to
+  be rewritten rather than re-run. That is the right way for them to be written and the
+  wrong thing to claim in a changelog as "one flag" — so the changelog says nine.
+
+  **Judgement calls, both reversible and both argued in the code.** Locked cards stay
+  visible and dimmed rather than hidden, because a card that disappears says "does not
+  exist" where "not yet" is the truth. And the difficulty control stays on a locked card,
+  since choosing one changes what `Play` *would* load and is the only useful thing a
+  player reading a locked card can do — the gate is unaffected either way, as that control
+  calls `onChoose` and never `onPick`.
 - [ ] 9.5 Implement the pause menu offering resume, restart and abandon, and verify resuming continues the same board
 - [ ] 9.6 Implement the settings screen for audio, reduced motion, portrait lock and left-handed layout, and verify each takes effect
 - [ ] 9.7 Add a development overlay showing step count, frame time and blob count, and verify it can be toggled

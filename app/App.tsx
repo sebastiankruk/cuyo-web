@@ -9,9 +9,13 @@ import { catalogue, loadLevel } from "./levels.ts";
 import {
   DIFFICULTIES,
   describeDifficulty,
-  levelsInTrack,
 } from "../engine/level-format/index-data.ts";
 import { tileSvg } from "../render/tile.ts";
+import { cardState, canStart, cardsInTrack, trackCounts } from "./level-cards.ts";
+import type { LevelCardState } from "./level-cards.ts";
+import { completeAndStore, emptyState, readState } from "./progress-storage.ts";
+import type { StoredState } from "./progress-storage.ts";
+import type { Progress } from "../engine/progress/progress.ts";
 import type { LevelDef } from "../engine/level-format/level-data.ts";
 import type {
   Difficulty,
@@ -37,6 +41,19 @@ type State =
       readonly kind: "failed";
       readonly chosen: Chosen;
       readonly message: string;
+    }
+  | {
+      /**
+       * A level that was not allowed to start.
+       *
+       * A state rather than a silent return, because the requirement is that a locked
+       * level cannot be started *and the player can find out why*. Refusing to load is
+       * only half of it: a tap that does nothing is indistinguishable from a broken app,
+       * and the card's own message is below the fold on a phone.
+       */
+      readonly kind: "blocked";
+      readonly entry: LevelIndexEntry;
+      readonly reason: string;
     };
 
 /**
@@ -54,9 +71,41 @@ type State =
 export function App() {
   const [state, setState] = useState<State>({ kind: "catalogue" });
   const [seed] = useState(() => (Date.now() & 0xffff) | 1);
+  /**
+   * What the player has finished, read once per launch.
+   *
+   * Held in React state rather than re-read on every render so that a win is a state
+   * transition like any other, and the catalogue re-renders against a value that cannot
+   * change underneath it mid-paint. `readState` is total — a corrupt store yields empty
+   * progress rather than throwing — so this cannot take the catalogue down with it.
+   */
+  const [stored, setStored] = useState<StoredState>(emptyState);
+
+  // Read after the first paint rather than during it, because `readState` touches
+  // `localStorage`, which does not exist during a server render and is a synchronous
+  // main-thread read either way. The catalogue's first paint is therefore "nothing won",
+  // which is the truth for a returning player for exactly one frame.
+  useEffect(() => {
+    setStored(readState());
+  }, []);
 
   const start = useCallback(
     (entry: LevelIndexEntry, difficulty: Difficulty) => {
+      /*
+       * The gate, checked here and not only in the card — task 9.4's actual requirement.
+       *
+       * A card that renders no button is a claim about the card; this is the claim about
+       * the game. 9.4 asks that a locked level cannot be *started*, and the way that
+       * silently fails is a level reached some other way — a stale card from before a
+       * completion, a keyboard activation of a focusable node, a future deep link — with
+       * the loader never having been asked. Both ends read `canStart` on one card state,
+       * so the two cannot disagree.
+       */
+      const card = cardState(stored.progress, catalogue(), entry, difficulty);
+      if (!canStart(card)) {
+        setState({ kind: "blocked", entry, reason: card.blockDetail });
+        return;
+      }
       const chosen: Chosen = { entry, difficulty };
       setState({ kind: "loading", chosen });
       loadLevel(entry.id, difficulty).then(
@@ -72,8 +121,19 @@ export function App() {
         },
       );
     },
-    [],
+    [stored.progress],
   );
+
+  /**
+   * A win, recorded and shown.
+   *
+   * `completeAndStore` both computes the new record and writes it, so the state set here
+   * is the one on the device rather than a copy of it. The catalogue reads this value, so
+   * finishing a level ticks its card without a reload.
+   */
+  const onWin = useCallback((id: string, difficulty: Difficulty, score: number) => {
+    setStored(completeAndStore(id, difficulty, score));
+  }, []);
 
   const exit = useCallback(() => setState({ kind: "catalogue" }), []);
 
@@ -94,8 +154,26 @@ export function App() {
         level={state.level}
         seed={seed}
         onExit={exit}
+        onWin={(score) => onWin(state.chosen.entry.id, state.chosen.difficulty, score)}
         onRestart={() => start(state.chosen.entry, state.chosen.difficulty)}
       />
+    );
+  }
+
+  if (state.kind === "blocked") {
+    // The same shell the loading screen uses, because it is the same situation: a level
+    // that was asked for and did not happen. Escape already leaves it, so this is never a
+    // dead end.
+    return (
+      <main className="shell">
+        <header className="shell__header">
+          <h1>{state.entry.name}</h1>
+          <p>{state.reason}</p>
+        </header>
+        <button type="button" className="btn" onClick={exit}>
+          ‹ Levels
+        </button>
+      </main>
     );
   }
 
@@ -117,13 +195,15 @@ export function App() {
     );
   }
 
-  return <Catalogue onPick={start} />;
+  return <Catalogue progress={stored.progress} onPick={start} />;
 }
 
 /** The level list, grouped by track. */
 function Catalogue({
+  progress,
   onPick,
 }: {
+  readonly progress: Progress;
   readonly onPick: (entry: LevelIndexEntry, difficulty: Difficulty) => void;
 }) {
   const index = catalogue();
@@ -160,21 +240,48 @@ function Catalogue({
       </header>
 
       {tracks.map((track) => {
-        const levels = levelsInTrack(index, track);
-        if (levels.length === 0) return null;
+        /*
+         * The cards for this track, derived once and passed down whole.
+         *
+         * A `LevelCardState` per level rather than a flag, because the card needs four
+         * related facts and recomputing them at the point of use is how two of them end up
+         * describing different levels — the button says playable and the text says
+         * locked. `cardsInTrack` is also what keeps unplayable levels in the list, which
+         * `levelsInTrack` alone did not distinguish.
+         *
+         * The chosen difficulty is read per level as the cards are built, because a card's
+         * best score is its chosen difficulty's score and the control that chooses it is
+         * on the card. Changing one re-derives that card, not the other 78.
+         */
+        const difficultyOf = (entry: LevelIndexEntry): Difficulty =>
+          chosen.get(entry.id) ?? "normal";
+        const cards = cardsInTrack(progress, index, track, difficultyOf);
+        if (cards.length === 0) return null;
+        const counts = trackCounts(cards);
         return (
           <section key={track} className="track">
             <h2 className="track__name">
               {trackName(track)}
-              <span className="track__count">{levels.length}</span>
+              {/*
+                How far through the track the player is — task 9.4.
+                "3 of 59" rather than a percentage, because the fraction is the more
+                flattering number and the less useful one: it does not say what is left.
+                Only shown once something has been won, since "0 of 59" on a first visit
+                is a statement about the player rather than about the game.
+              */}
+              {counts.completed > 0 && (
+                <span className="track__count">
+                  {counts.completed} of {counts.total} won
+                </span>
+              )}
             </h2>
             <ul className="levels">
-              {levels.map((entry) => (
-                <li key={`${track}-${entry.id}`}>
+              {cards.map((card) => (
+                <li key={`${track}-${card.entry.id}`}>
                   <LevelCard
-                    entry={entry}
-                    chosen={chosen.get(entry.id) ?? "normal"}
-                    onChoose={(difficulty) => pick(entry.id, difficulty)}
+                    card={card}
+                    chosen={difficultyOf(card.entry)}
+                    onChoose={(difficulty) => pick(card.entry.id, difficulty)}
                     onPick={onPick}
                   />
                 </li>
@@ -236,16 +343,17 @@ function Catalogue({
  * level - which is what would happen with a naive `onClick` on the card.
  */
 function LevelCard({
-  entry,
+  card,
   chosen,
   onChoose,
   onPick,
 }: {
-  readonly entry: LevelIndexEntry;
+  readonly card: LevelCardState;
   readonly chosen: Difficulty;
   readonly onChoose: (difficulty: Difficulty) => void;
   readonly onPick: (entry: LevelIndexEntry, difficulty: Difficulty) => void;
 }) {
+  const { entry } = card;
   // Only difficulties the level actually has. `summary.ld` declares variant lists as
   // subsets of a track, so most levels have one and some have all three.
   const offered = DIFFICULTIES.filter((d) => entry.difficulties.has(d));
@@ -267,13 +375,28 @@ function LevelCard({
     [shown],
   );
   return (
-    <div className="levelCard">
+    <div
+      className={
+        /*
+         * The unsupported modifier, and only for unsupported. The stylesheet cannot tell
+         * an unsupported card from a locked one otherwise — both carry
+         * `.levelCard__blocked` — and the two say different things: one is a to-do for
+         * the player, the other a limitation of the game that no progress fixes.
+         */
+        card.blockReason === "unsupported"
+          ? "levelCard levelCard--unsupported"
+          : "levelCard"
+      }
+    >
       {/*
-        First in the DOM, so tab order follows reading order and the difficulty control
-        is reached straight after. Its label names the action rather than the level, so
-        a screen reader says what pressing it does.
+        The hit target exists if and only if the card is playable — task 9.4.
+
+        **`canStart(card)`, not `entry.supported`.** The old condition predates the gate:
+        it asked only whether this engine can run the level, so a locked level got a
+        full-card button that started it. The one field is what both this and `App`'s
+        loader read, so the button and the loader cannot disagree about a level.
       */}
-      {entry.supported ? (
+      {canStart(card) ? (
         <button
           type="button"
           className="levelCard__hit"
@@ -289,7 +412,24 @@ function LevelCard({
           The reason is in the card's text instead.
         */
         <span className="levelCard__blocked" role="note">
-          {entry.unsupportedReason}
+          {card.blockDetail}
+        </span>
+      )}
+      {/*
+        The tick, for a level won at any difficulty.
+
+        **A tick rather than dimming or a strike-through**, because this is the one piece
+        of progress feedback the card carries and it has to survive a glance down a list of
+        79. It is placed on the name rather than beside the tags so that a card's own head
+        line says "finished" without the reader having to check which row of small pills
+        it belongs to.
+
+        `aria-label` rather than the bare glyph: a tick is announced as "check mark" or
+        not at all, and what a player needs to hear is that they have finished this level.
+      */}
+      {card.completed && (
+        <span className="levelCard__tick" role="img" aria-label={`${entry.name} won`}>
+          ✓
         </span>
       )}
       {/*
@@ -365,8 +505,37 @@ function LevelCard({
         {chosen !== "normal" && (
           <span className="levelCard__difficultyNote">{described.description}</span>
         )}
+        {/*
+          The best score, as a tag among the tags — task 9.4.
+
+          **Only when there is one.** `null` is "never won at this difficulty", and
+          printing "best —" or "best 0" for the 79 cards that have never been won would
+          make the two that have look like they lost points. It is the *chosen*
+          difficulty's score, so a player who beat this on Easy and is looking at the Hard
+          row is not answered about Easy; `cardState` returns null there rather than
+          falling back, which is the same distinction `LevelRecord.bestScore` draws.
+
+          A tag and not a heading: it is one fact in a row of small facts, and a number
+          given prominence would read as the level's rating rather than the player's own
+          best attempt.
+        */}
+        {card.bestScore !== null && (
+          <span className="levelCard__best">Best {card.bestScore}</span>
+        )}
       </span>
       <span className="levelCard__actions">
+        {/*
+          The difficulty control stays on a locked card.
+
+          **Deliberately, and this is the one judgement in 9.4 that could go the other
+          way.** Choosing a difficulty changes which level `Play` would load and which
+          best score is shown, both of which are still true for a locked level — and a
+          player reading a locked card is often reading it *because* they intend to play
+          it, so hiding the control removes the only thing they can usefully do.
+
+          The gate is unaffected either way: this control calls `onChoose`, never
+          `onPick`, and `App.start` re-checks `canStart` regardless of how it was reached.
+        */}
         {entry.supported && offered.length > 1 && (
           <span
             className="levelCard__difficulties"
@@ -390,8 +559,12 @@ function LevelCard({
           An affordance, not a control. The card's own button is the hit target, so
           this only says what pressing the card does and repeats the chosen difficulty
           where the finger is about to land.
+
+          **`canStart`, not `entry.supported`** — a "Play" pill on a locked card is a
+          promise the card does not keep, and it is the most misleading thing the card
+          could say. A locked level shows its blocked reason instead.
         */}
-        {entry.supported && (
+        {canStart(card) && (
           <span className="levelCard__play" aria-hidden="true">
             Play
             {chosen !== "normal" && (
