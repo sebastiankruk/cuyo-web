@@ -5,6 +5,7 @@
 // a port of.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GameLoop } from "./game-loop.ts";
+import { WinRecorder } from "./record-once.ts";
 import { RulesDialog } from "./RulesDialog.tsx";
 import { Simulation } from "../engine/game-core/simulation.ts";
 import type { Phase } from "../engine/game-core/simulation.ts";
@@ -68,6 +69,23 @@ interface Props {
    * not the one the player just failed.
    */
   onRestart?: () => void;
+  /**
+   * Called once when the level is won, with the final score — task 9.4.
+   *
+   * **The score only.** Which level and which difficulty is `App`'s knowledge, not the
+   * screen's: `PlayScreen` is handed a `LevelDef`, which carries no difficulty, and
+   * passing it one to echo back would be a way to record a win against the wrong
+   * difficulty if the two ever disagreed. `App` knows both because it chose them.
+   *
+   * **Once**, which is the whole difficulty: `phase` stays `won` for every frame after
+   * the win, so an effect keyed on it alone would record a completion on every one of
+   * them, writing the device once a frame for as long as the overlay is up. The ref
+   * below is what makes "once" a fact about the transition rather than about the value.
+   *
+   * Optional because `PlayScreen` is mounted in `PlayScreen.dom.test.tsx` with a level
+   * and nothing else, and a screen that cannot record anything should still mount.
+   */
+  onWin?: (score: number) => void;
 }
 
 interface Hud {
@@ -91,7 +109,7 @@ const INITIAL_HUD: Hud = {
   failure: null,
 };
 
-export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
+export function PlayScreen({ level, seed, onExit, onRestart, onWin }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const loopRef = useRef<GameLoop | null>(null);
   /**
@@ -274,6 +292,23 @@ export function PlayScreen({ level, seed, onExit, onRestart }: Props) {
   useEffect(() => {
     if (loopRef.current !== null) loopRef.current.paused = rulesOpen;
   }, [rulesOpen]);
+
+  /**
+   * Record the win, once — task 9.4.
+   *
+   * `recordOnce` owns the "once", because a ref inline in an effect is a claim no test
+   * can check: the effect body is only reachable by driving a real `Simulation` to a
+   * win, which needs 2500 steps and a frame clock, and the claim is about *how many
+   * times* it fires rather than *whether* it fires at all. See `app/record-once.ts`.
+   */
+  const recorder = useRef(WinRecorder());
+  useEffect(() => {
+    recorder.current = WinRecorder();
+  }, [runId]);
+  useEffect(() => {
+    if (onWin === undefined) return;
+    if (recorder.current.claim(hud.phase, hud.score)) onWin(hud.score);
+  }, [hud.phase, hud.score, onWin]);
 
 
   // Touch, on the board itself. `touch-action: none` on the canvas means the

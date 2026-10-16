@@ -58,6 +58,31 @@ export const INCOMPLETE: LevelRecord = Object.freeze({
   bestScore: null,
 });
 
+/**
+ * Whether completion gates the ordered tracks at all.
+ *
+ * **The spec requires the gate, and the catalogue's first impression argues against it.**
+ * The requirement — "SHALL use completion to unlock subsequent levels in the ordered
+ * tracks" — is why `isUnlocked` exists, and everything about it is tested. What the
+ * measurement adds is the consequence: at a fresh install only **3 of the 59** `main`
+ * levels are playable, so a catalogue with the gate on opens looking closed.
+ *
+ * Both readings are defensible and the difference is a design decision rather than a
+ * bug, so it is one named constant rather than a fork in the logic:
+ *
+ * - `true` — Standard is a course. What the spec says, and what the tracks are for.
+ * - `false` — every level is open and completion only adds a tick and a score. A
+ *   browser port of a collection of other people's experimental levels, where being
+ *   unable to reach `Pfeile` on your first visit is a worse first message than the
+ *   track ordering being advisory.
+ *
+ * Nothing is stranded either way, and that is asserted rather than assumed:
+ * `progress.test.ts` walks the chain to a fixed point and checks that playing whatever
+ * is unlocked reaches all 78 playable levels. **This constant decides which levels are
+ * *offered*, never which are reachable.**
+ */
+export const GATE_ON_PROGRESS = true;
+
 /** The key a record is stored under. Exported so persistence cannot invent one. */
 export function progressKey(id: string, difficulty: Difficulty): string {
   return `${id}${KEY_SEPARATOR}${difficulty}`;
@@ -179,6 +204,10 @@ export function isUnlocked(
   index: LevelIndex,
   entry: LevelIndexEntry,
 ): boolean {
+  // The gate, off. See `GATE_ON_PROGRESS` — this is the whole of the difference between
+  // a course and a catalogue, and it is checked here rather than at the call sites so
+  // that turning it off cannot leave one screen gating and another not.
+  if (!GATE_ON_PROGRESS) return true;
   for (const track of entry.tracks.keys()) {
     const chain = playableInTrack(index, track);
     const at = chain.indexOf(entry);

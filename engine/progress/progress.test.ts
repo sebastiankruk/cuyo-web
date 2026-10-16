@@ -22,6 +22,7 @@ import {
   type LevelIndexEntry,
 } from "../level-format/index-data.ts";
 import {
+  GATE_ON_PROGRESS,
   INCOMPLETE,
   bestScoreFor,
   completedAtAnyDifficulty,
@@ -144,6 +145,23 @@ describe("progress records", () => {
 describe("unlocking", () => {
   const main = ids(LEVEL_INDEX, "main");
   const first = LEVEL_INDEX.byId.get(main[0]!)!;
+
+  it("respects GATE_ON_PROGRESS, which is the whole of the course-versus-catalogue question", () => {
+    // **The decision, asserted in whichever direction it was made.** The spec requires
+    // the gate; the measurement is that it shows a new player 3 of 59 Standard levels.
+    // Both are defensible and it is a design call, so it is one named constant — but a
+    // constant nobody can see the effect of is not a decision, it is a spelling. So the
+    // number each way is pinned here, against the real corpus, because 3 and 59 are not
+    // derivable from a small example and they are the whole of what is being chosen.
+    const playable = playableInTrack(LEVEL_INDEX, "main");
+    const open = playable.filter((e) => isUnlocked(emptyProgress(), LEVEL_INDEX, e));
+    if (GATE_ON_PROGRESS) {
+      expect(open.length, "gated: Standard is a course").toBe(3);
+      expect(open.length).toBeLessThan(playable.length / 10);
+    } else {
+      expect(open.length, "ungated: every level is offered").toBe(playable.length);
+    }
+  });
 
   it("unlocks the first level of a track with no progress at all", () => {
     // Otherwise a new player opens the catalogue to one playable level and a wall.

@@ -826,15 +826,146 @@ button::-moz-focusring {
   line-height: 1.35;
 }
 
-.levelCard:has(.levelCard__blocked) {
-  border-style: dashed;
+/*
+ * The completion tick, on the card's head line — task 9.4.
+ *
+ * **Positioned rather than in flow**, so it does not steal width from the name. The name
+ * is the one thing on the card a player scans for, and a grid column reserved for a
+ * check mark would shorten it on exactly the narrow phones where scanning matters most.
+ * Absolute positioning against the card's own `padding` keeps it clear of the border at
+ * any card size.
+ *
+ * Green rather than the accent, and it is the only green on the card. The accent is
+ * already the author colour and the focus ring, so reusing it would make "finished" look
+ * like "selected".
+ */
+.levelCard {
+  position: relative;
 }
 
-.levelCard__actions {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-top: 0.15rem;
+.levelCard__tick {
+  position: absolute;
+  top: 0.85rem;
+  left: 0.4rem;
+  color: var(--accent-2);
+  font-size: 1rem;
+  line-height: 1;
+  /* Over the name's left edge rather than beside it, so it reads as a mark *on* the
+     card's identity and not as another item in the card's text. */
+  pointer-events: none;
+}
+
+/* Push the head clear of the tick, so the name never runs underneath it. */
+.levelCard:has(.levelCard__tick) {
+  padding-left: 2.1rem;
+}
+
+/*
+ * The best score.
+ *
+ * **Shares the tags row's pill styling but sits outside `.levelCard__tags`**, because it
+ * is the one tag that is about *this player* rather than about the level. The distinction
+ * is worth the extra rule: a card reading "3 colours · hex · Best 1200" should parse as
+ * two things said about the level and one said about you, and it does not if the score
+ * is just another word in the level's list.
+ *
+ * `--accent-2` again, for the same reason as the tick: it is the player's own
+ * achievement and shares a colour with nothing else on the card.
+ */
+.levelCard__best {
+  display: inline-block;
+  margin-top: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--accent-2);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  align-self: start;
+}
+
+/*
+ * A blocked card.
+ *
+ * **From a screenshot, and the first version of this was too quiet.** The gate was
+ * working and the report on that screenshot was "I don't see much difference" — which is
+ * a fair reading of a card distinguished only by *absence*: no Play pill, a 1px dashed
+ * border, and a name one step down in colour. Three subtractions, none of them a
+ * statement.
+ *
+ * So a blocked card now says so three ways — a lock on the name, a reason at the top of
+ * the body, and the dim itself — and the dim is deeper than it was. `--muted` on
+ * `--panel` is a contrast ratio of about 4.3:1, which is legible; that is the point of
+ * the muted name *as a reading colour*, and the wrong choice for saying "not this one".
+ *
+ * **Deeper, not invisible.** The level exists, has a name and an author, and a player
+ * looking for it deserves to find it — a card that disappears says "does not exist" where
+ * "not yet" is the truth. `opacity: 0.62` is well short of that, and the lock and the
+ * reason stay at full contrast because those are the two things carrying the message.
+ *
+ * Applied to the whole card rather than to each text colour, so it covers the description
+ * and the author as well — those are level facts, not player facts, and a level you
+ * cannot play yet is still a level with an author.
+ */
+.levelCard:has(.levelCard__blocked) {
+  border-style: dashed;
+  opacity: 0.62;
+}
+
+/*
+ * The reason, promoted above the description.
+ *
+ * **Full contrast, and deliberately not dimmed with the card.** It is the one sentence
+ * that says what to do next, so dimming it would dim the answer — and at 0.62 it would
+ * land at roughly 2.7:1, which is not readable text at any size.
+ *
+ * `aria-live` is not set: the reason does not change while the card is on screen, and a
+ * polite announcement on page load would read 56 near-identical sentences out loud.
+ */
+.levelCard__why {
+  display: block;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/*
+ * The lock, on the name's line.
+ *
+ * **`currentColor` via the SVG's stroke, sized in `em`** so it sits with the name rather
+ * than beside it: an absolutely-positioned or fixed-size lock would sit wrong at the
+ * 1.15rem the name is set in, and the tick beside it is already absolute.
+ *
+ * `vertical-align` rather than flex, because `.levelCard__head` is a grid cell containing
+ * flow content and adding a flex container would change the name's own baseline. The
+ * negative margin closes the gap a glyph's side bearing would otherwise open.
+ */
+.levelCard__lock {
+  display: inline-block;
+  margin-right: 0.3rem;
+  color: var(--muted);
+  vertical-align: -0.05em;
+  /* Above the stretched hit target, with the rest of the text. */
+  pointer-events: none;
+}
+
+/*
+ * An unsupported level, distinguished from a locked one.
+ *
+ * **Dotted rather than dashed, which is the only difference and is a real one.** `DreiD`
+ * needs a neighbour mode this engine does not have, and no amount of winning will change
+ * that: its message is a limitation of the game, where a locked card's message is a
+ * to-do for the player. Rendering both as "dashed" would make them the same kind of dead
+ * end, and a player who has unlocked everything and still cannot play `DreiD` deserves to
+ * be able to tell the difference at a glance rather than by reading both.
+ *
+ * Asserted in `app/level-cards.dom.test.tsx` against the rendered class, because this
+ * distinction exists in the markup rather than here — the stylesheet cannot tell the two
+ * apart otherwise, which is why the modifier is on the element.
+ */
+.levelCard--unsupported {
+  border-style: dotted;
 }
 
 /*
