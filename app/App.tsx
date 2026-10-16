@@ -473,12 +473,67 @@ function LevelCard({
         grid.
       */}
       <span className="levelCard__head">
+        {/*
+          The lock, on the name's line — from a screenshot.
+
+          **The gate was working and the screenshot could not tell.** Every locked card was
+          distinguished only by the *absence* of a Play pill, a 1px dashed border, and a
+          name going from `#e8ecf5` to `#97a1b8`. That is three subtractions, and the
+          report on that screenshot was "I don't see much difference" — which is the
+          correct report of a state expressed only by what is missing.
+
+          A glyph says it positively. It sits beside the name rather than replacing it,
+          because the level exists and is findable; a card that hid itself or showed a
+          lock *instead of* a name would make 56 levels look like they do not exist,
+          which is a different message from "not yet" and is not what is true.
+
+          Drawn rather than an emoji: 🔒 is a colour glyph that renders differently on
+          every platform and cannot be given the card's own muted colour, which is the
+          whole of the visual language here.
+        */}
+        {card.blockReason !== "none" && (
+          <span
+            className="levelCard__lock"
+            role="img"
+            aria-label={
+              card.blockReason === "unsupported"
+                ? `${entry.name} cannot be played by this version`
+                : `${entry.name} is locked`
+            }
+            // **The one place `dangerouslySetInnerHTML` is right for a constant.** Written
+            // as a child it renders as visible `<svg viewBox=…>` text — the markup,
+            // escaped — so every locked card would carry a line of source in it. Caught by
+            // `level-cards.dom.test.tsx` asserting `innerHTML` contains `<svg`, which is
+            // the assertion that only passes if React parsed it rather than escaped it.
+            //
+            // Safe because `LOCK_GLYPH` is a module constant with nothing interpolated
+            // into it; the tile's use of this is riskier and says so.
+            dangerouslySetInnerHTML={{ __html: LOCK_GLYPH }}
+          />
+        )}
         <span className="levelCard__name">{entry.name}</span>
         {entry.author !== "" && (
           <span className="levelCard__author">{entry.author}</span>
         )}
       </span>
       <span className="levelCard__rest">
+        {/*
+          The blocked reason, promoted above the description — from a screenshot.
+
+          It was rendering last, below the tags and below the Easy/Normal control, which
+          made it read as another item in the difficulty row rather than as the card's
+          status. It is the one sentence on the card that says what to do next, so it is
+          now the first thing in `rest`: above the description, because the description
+          is about the level and the blocker is about the player.
+
+          **Not removed from where it was** — `levelCard__blocked` is the only element
+          carrying the reason in the accessible tree for a blocked card's hit target, and
+          the stylesheet keys the dashed and dotted borders off it. This is a second,
+          visible rendering of the same string rather than a move.
+        */}
+        {card.blockReason !== "none" && (
+          <span className="levelCard__why">{card.blockDetail}</span>
+        )}
         {entry.description !== "" && (
           <span className="levelCard__desc">{entry.description}</span>
         )}
@@ -579,6 +634,25 @@ function LevelCard({
     </div>
   );
 }
+
+/**
+ * A padlock, as three rectangles rather than an emoji.
+ *
+ * **Inline SVG rather than 🔒** for two reasons that both came from looking at it. A
+ * colour emoji renders differently on every platform, so the lock in a screenshot from
+ * one machine says nothing about the lock on another; and it cannot be given the card's
+ * own `--muted`, so it would sit on the dimmed card as the brightest thing in it —
+ * louder than the level name it is qualifying.
+ *
+ * Drawn in a 1em box so it scales with whatever it sits beside, and `currentColor` so
+ * the one place that sets a colour is the stylesheet.
+ */
+const LOCK_GLYPH =
+  '<svg viewBox="0 0 12 14" width="11" height="13" fill="none" ' +
+  'stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false">' +
+  '<rect x="1.5" y="6.5" width="9" height="6" rx="1.2" />' +
+  '<path d="M3.75 6.5V4.75a2.25 2.25 0 0 1 4.5 0V6.5" />' +
+  "</svg>";
 
 /**
  * How many colour kinds the level has at its normal difficulty.

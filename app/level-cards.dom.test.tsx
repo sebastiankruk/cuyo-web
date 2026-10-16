@@ -110,15 +110,32 @@ async function mount(): Promise<HTMLElement> {
   return host;
 }
 
-/** The card element for a level id, by its name text. */
+/**
+ * The card element for a level id.
+ *
+ * **Matched on the name element, not on `textContent.includes`.** The first version did
+ * the latter, and it silently returned the wrong card for a level whose display name is a
+ * substring of another's — `Pfeile` is displayed as "Arrows", and `textContent` found
+ * "Arrows" inside a *different* card first. The assertions then failed on a label reading
+ * "Arrows is locked", which reads like a bug in the component and is not one.
+ *
+ * The name is a `<span class="levelCard__name">`, and matching that is exact.
+ */
 function card(host: HTMLElement, id: string): HTMLElement {
   const entry = LEVEL_INDEX.byId.get(id);
   if (entry === undefined) throw new Error(`${id} is not in the catalogue`);
-  const found = [...host.querySelectorAll(".levelCard")].find((el) =>
-    el.textContent?.includes(entry.name),
+  const found = [...host.querySelectorAll(".levelCard")].find(
+    (el) => el.querySelector(".levelCard__name")?.textContent === entry.name,
   );
   if (found === undefined) throw new Error(`no card for ${id}`);
   return found as HTMLElement;
+}
+
+/** A level's display name, which is not always its id — `Pfeile` is shown as "Arrows". */
+function nameOf(id: string): string {
+  const entry = LEVEL_INDEX.byId.get(id);
+  if (entry === undefined) throw new Error(`${id} is not in the catalogue`);
+  return entry.name;
 }
 
 /** Whether a card offers a hit target. */
@@ -254,6 +271,103 @@ describe("a win is recorded once, not once a frame", () => {
     // The fetch 404s, so no game ever runs and nothing is written — which is the
     // assertion that matters here: **the failed load did not record a win.**
     expect(storage.get(PROGRESS_KEY)).toBe(storedDocument(emptyProgress()));
+  });
+});
+
+describe("a blocked card says so, from a screenshot", () => {
+  /*
+   * This block exists because of a report: the gate was working, and the answer to
+   * "here is a locked card" was *"I don't see much difference"*. That was a fair reading
+   * of a card distinguished only by absence — no Play pill, a 1px dashed border, a name
+   * one step down in colour. Nothing about that was wrong; it was simply not saying
+   * anything.
+   *
+   * So the three ways a blocked card now announces itself are asserted, because "it looks
+   * different now" is not a claim a future change can fail. A screenshot is the only way
+   * to see whether they are *enough*, and that check is the user's; whether they are
+   * present at all is ours.
+   */
+
+  it("carries a lock on the name's line, labelled for a screen reader", async () => {
+    const host = await mount();
+    // **The display name, not the id.** `Pfeile` is shown as "Arrows" and `DreiD` as
+    // "3D"; the label reads what the card reads, so the assertion has to as well. The
+    // first version of this wrote the id and failed with "expected 'Arrows is locked' to
+    // be 'Pfeile is locked'" — which reads like a component bug and was a test one.
+    const lock = card(host, "Pfeile").querySelector(".levelCard__lock");
+    expect(lock, "a locked card carries a lock").not.toBeNull();
+    // Labelled rather than left as a bare glyph: an unlabelled SVG is announced as
+    // "graphic" or not at all, and what a player needs to hear is that it is locked.
+    expect(lock?.getAttribute("aria-label")).toBe(`${nameOf("Pfeile")} is locked`);
+    // Drawn, not an emoji — a colour glyph would be the brightest thing on a dimmed
+    // card and would render differently on every platform, so a screenshot of one would
+    // say nothing about the others.
+    expect(lock?.innerHTML).toContain("<svg");
+    expect(lock?.textContent).not.toContain("🔒");
+  });
+
+  it("puts the reason above the description, not below the difficulty control", async () => {
+    // It rendered last, which made "Finish Noseballs." read as another item in the
+    // Easy/Normal row rather than as the card's status.
+    const host = await mount();
+    const rest = card(host, "Pfeile").querySelector(".levelCard__rest");
+    const why = rest?.querySelector(".levelCard__why");
+    const desc = rest?.querySelector(".levelCard__desc");
+    expect(why, "the reason is rendered").not.toBeNull();
+    expect(why?.textContent).toMatch(/^Finish .+\.$/);
+    // Before the description in the DOM, which is what "above" means here.
+    const order = [...(rest?.children ?? [])];
+    expect(order.indexOf(why as Element)).toBeLessThan(order.indexOf(desc as Element));
+    // And before the difficulty control, which is where it used to sit — the failure this
+    // whole block is about. The control is in `__actions`, a later sibling of `__rest`,
+    // so "the reason precedes the control in the DOM" is simply the index comparison.
+    const all = [...card(host, "Pfeile").children];
+    const whyIndex = all.findIndex((el) => el.querySelector(".levelCard__why") !== null);
+    const actionsIndex = all.findIndex((el) => el.className.includes("levelCard__actions"));
+    expect(whyIndex).toBeGreaterThanOrEqual(0);
+    expect(actionsIndex).toBeGreaterThanOrEqual(0);
+    expect(whyIndex).toBeLessThan(actionsIndex);
+  });
+
+  it("does not put a lock or a reason on a playable card", async () => {
+    const host = await mount();
+    const open = card(host, "Nasenkugeln");
+    expect(open.querySelector(".levelCard__lock")).toBeNull();
+    expect(open.querySelector(".levelCard__why")).toBeNull();
+  });
+
+  it("distinguishes unsupported from locked in the lock's label too", async () => {
+    // The border already differs (dotted vs dashed). If the label said "locked" for
+    // `DreiD` as well, the card would claim the player could do something about it.
+    const host = await mount();
+    const lock = card(host, "DreiD").querySelector(".levelCard__lock");
+    expect(lock?.getAttribute("aria-label")).toBe(
+      `${nameOf("DreiD")} cannot be played by this version`,
+    );
+  });
+
+  it("dims the blocked card far enough to read as unavailable", async () => {
+    // The third of the three. Asserted against the stylesheet because a computed
+    // `opacity` needs a layout engine jsdom does not have — and the number is the claim,
+    // not the property.
+    const css = readFileSync(resolve(import.meta.dirname, "styles.css"), "utf8");
+    const rule = /\.levelCard:has\(\.levelCard__blocked\)\s*\{([^}]*)\}/.exec(css);
+    expect(rule, "a rule for blocked cards in app/styles.css").not.toBeNull();
+    const body = rule?.[1] ?? "";
+    const opacity = /opacity:\s*([\d.]+)/.exec(body)?.[1];
+    expect(opacity, "blocked cards are dimmed by a stated opacity").toBeDefined();
+    // Deep enough to read as "not this one", shallow enough that the level still looks
+    // like a level. The upper bound is the one that matters: past this a card starts
+    // looking like it does not exist, which is a different message from "not yet".
+    expect(Number(opacity)).toBeGreaterThan(0.55);
+    expect(Number(opacity)).toBeLessThan(0.7);
+    // The reason is exempt from the dim, and cannot be: at 0.62 it would land near
+    // 2.7:1, which is not a readable text colour at any size. It is the one sentence on
+    // the card that says what to do next, so it carries `--text` explicitly.
+    const why = /\.levelCard__why\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(why, "a rule for .levelCard__why in app/styles.css").not.toBe("");
+    expect(why).toMatch(/color:\s*var\(--text\)/);
+    expect(why).not.toMatch(/opacity/);
   });
 });
 
